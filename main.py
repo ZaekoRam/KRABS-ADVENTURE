@@ -101,8 +101,8 @@ def main():
     img_salir = scale_to_width(img_salir, target_salir)
 
     # Columna alineada a la izquierda del centro (ajusta COL_X si quieres)
-    COL_X = int(constantes.ANCHO_VENTANA * 0.32)
-    COL_play = int(constantes.ANCHO_VENTANA * 0.31)
+    COL_X = int(constantes.ANCHO_VENTANA * 0.28)
+    COL_play = int(constantes.ANCHO_VENTANA * 0.27)
     Y0 = int(constantes.ALTO_VENTANA * 0.30)  # posición del primer botón
     GAP1 = 70
     GAP = 74 # separación entre botones
@@ -115,8 +115,16 @@ def main():
     pygame.draw.rect(ventana, (0, 255, 0), btn_opc.rect, 2)
     pygame.draw.rect(ventana, (0, 0, 255), btn_salir.rect, 2)
 
+
+
     # Juego: usa tu clase actual
-    jugador = Personaje(250, 350)
+    player_img = pygame.image.load("assets//images//characters//krabby//krabby.png")
+    player_img = pygame.transform.scale(player_img,
+                                        (player_img.get_width()*constantes.ANCHO_PERSONAJE,
+                                         player_img.get_height()*constantes.ANCHO_PERSONAJE))
+    jugador = Personaje(250, 250, player_img)
+    jump_held = False
+    jump_timer = 0.0
     mover_arriba = mover_abajo = mover_izquierda = mover_derecha = False
 
     estado = ESTADO_MENU
@@ -153,14 +161,18 @@ def main():
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         estado = ESTADO_MENU
-                    if event.key == pygame.K_a: mover_izquierda = True
+                    if event.key in (pygame.K_a, pygame.K_left) : mover_izquierda = True
                     if event.key == pygame.K_d: mover_derecha   = True
-                    if event.key == pygame.K_w: mover_arriba    = True
+                    if event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
+                        jump_held = True
+                        jugador.saltar(forzado=False)
                     if event.key == pygame.K_s: mover_abajo     = True
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_a: mover_izquierda = False
                     if event.key == pygame.K_d: mover_derecha   = False
-                    if event.key == pygame.K_w: mover_arriba    = False
+                    if event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
+                        jump_held = False
+                        jump_timer = 0.0
                     if event.key == pygame.K_s: mover_abajo     = False
 
         # -------------------- Actualizar --------------------
@@ -172,6 +184,7 @@ def main():
         elif estado == ESTADO_JUEGO:
             dx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
             dy = (constantes.VELOCIDAD if mover_abajo   else 0) - (constantes.VELOCIDAD if mover_arriba    else 0)
+            jugador.actualizar(dt)
             jugador.movimiento(dx, dy)
 
         # -------------------- Dibujar --------------------
