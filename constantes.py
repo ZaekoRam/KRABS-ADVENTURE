@@ -1,7 +1,7 @@
 ANCHO_VENTANA = 800
 ALTO_VENTANA = 600
 GRAVEDAD = 1400.0      # px/s^2
-SALTO_VEL = -520.0     # px/s   (negativo = arriba)
+SALTO_VEL = -750.0     # px/s   (negativo = arriba)
 ALTURA_SUELO = 64      # alto del suelo
 ALTO_PERSONAJE = 0.5
 ANCHO_PERSONAJE = 0.5

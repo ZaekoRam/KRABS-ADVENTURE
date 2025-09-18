@@ -161,19 +161,19 @@ def main():
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         estado = ESTADO_MENU
-                    if event.key in (pygame.K_a, pygame.K_left) : mover_izquierda = True
-                    if event.key == pygame.K_d: mover_derecha   = True
+                    if event.key in (pygame.K_a, pygame.K_LEFT) : mover_izquierda = True
+                    if event.key in (pygame.K_d, pygame.K_RIGHT) : mover_derecha   = True
                     if event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
                         jump_held = True
                         jugador.saltar(forzado=False)
-                    if event.key == pygame.K_s: mover_abajo     = True
+                    if event.key in (pygame.K_s, pygame.K_DOWN): mover_abajo = True
                 if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_a: mover_izquierda = False
-                    if event.key == pygame.K_d: mover_derecha   = False
+                    if event.key in (pygame.K_a, pygame.K_LEFT): mover_izquierda = False
+                    if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha    = False
                     if event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
                         jump_held = False
                         jump_timer = 0.0
-                    if event.key == pygame.K_s: mover_abajo     = False
+                    if event.key in (pygame.K_s, pygame.K_DOWN): mover_abajo     = False
 
         # -------------------- Actualizar --------------------
         if estado == ESTADO_MENU:
