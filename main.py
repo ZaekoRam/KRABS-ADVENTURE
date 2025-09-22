@@ -3,14 +3,15 @@ import pygame
 from pathlib import Path
 import constantes
 from personaje import Personaje
-import musica  # <-- NUEVO
+import musica  # manejo de música
 
-# ¡Muy importante! Configurar mixer ANTES de pygame.init()
-pygame.mixer.pre_init(44100, -16, 2, 512)
+# --- IMPORTS para mapa Tiled y cámara ---
+from pytmx.util_pygame import load_pygame
 
 # -------------------- Helpers de rutas e imágenes --------------------
 BASE_DIR = Path(__file__).resolve().parent
 IMG_DIR  = BASE_DIR / "assets" / "images"
+MAP_DIR  = BASE_DIR / "assets" / "maps"
 
 def scale_to_width(surf: pygame.Surface, target_w: int) -> pygame.Surface:
     ratio = target_w / surf.get_width()
@@ -72,20 +73,84 @@ class ImageButton:
         return (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
                 and self.rect.collidepoint(event.pos))
 
+# -------------------- Mapa Tiled + Cámara --------------------
+class NivelTiled:
+    def __init__(self, ruta_tmx: Path):
+        # Carga TMX con imágenes listas para blit
+        self.tmx = load_pygame(str(ruta_tmx))
+        self.tile_w = self.tmx.tilewidth
+        self.tile_h = self.tmx.tileheight
+        self.width_px  = self.tmx.width  * self.tile_w
+        self.height_px = self.tmx.height * self.tile_h
+
+        # (Opcional) grupos de objetos "Collisions" y "Spawns"
+        self.collision_rects = []
+        if "Collisions" in self.tmx.objectgroups:
+            for obj in self.tmx.objectgroups["Collisions"]:
+                r = pygame.Rect(int(obj.x), int(obj.y), int(obj.width), int(obj.height))
+                self.collision_rects.append(r)
+
+        self.spawn = None
+        if "Spawns" in self.tmx.objectgroups:
+            for obj in self.tmx.objectgroups["Spawns"]:
+                if getattr(obj, "name", "") == "player":
+                    self.spawn = (int(obj.x), int(obj.y))
+                    break
+
+    def draw(self, surface: pygame.Surface, camera_offset):
+        """Dibuja solo lo visible según el offset de cámara."""
+        ox, oy = camera_offset
+        sw, sh = surface.get_size()
+
+        x0 = max(0, ox // self.tile_w)
+        y0 = max(0, oy // self.tile_h)
+        x1 = min(self.tmx.width,  (ox + sw) // self.tile_w + 2)
+        y1 = min(self.tmx.height, (oy + sh) // self.tile_h + 2)
+
+        for layer in self.tmx.visible_layers:
+            if hasattr(layer, "tiles"):  # solo tile layers
+                for x, y, image in layer.tiles():
+                    if x0 <= x < x1 and y0 <= y < y1:
+                        surface.blit(image, (x * self.tile_w - ox, y * self.tile_h - oy))
+
+    def world_size(self):
+        return self.width_px, self.height_px
+
+class Camara:
+    def __init__(self, viewport_size, world_size):
+        self.vw, self.vh = viewport_size
+        self.ww, self.wh = world_size
+        self.ox = 0
+        self.oy = 0
+
+    def follow(self, target_rect: pygame.Rect, lerp=1.0):
+        cx = target_rect.centerx - self.vw // 2
+        cy = target_rect.centery - self.vh // 2
+        cx = max(0, min(cx, self.ww - self.vw))
+        cy = max(0, min(cy, self.wh - self.vh))
+        # seguimiento (lerp=1 -> directo)
+        self.ox += (cx - self.ox) * lerp
+        self.oy += (cy - self.oy) * lerp
+
+    def offset(self):
+        return int(self.ox), int(self.oy)
+
 # -------------------- Estados --------------------
 ESTADO_MENU   = "MENU"
 ESTADO_JUEGO  = "JUEGO"
 ESTADO_OPC    = "OPCIONES"
 
 def main():
+    # ¡Muy importante! Configurar mixer ANTES de pygame.init()
+    pygame.mixer.pre_init(44100, -16, 2, 512)
+
     pygame.init()
     ventana = pygame.display.set_mode((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     pygame.display.set_caption("Krab's adventure")
     reloj = pygame.time.Clock()
 
-    # Fondos
+    # Fondos (solo menú)
     fondo_menu  = escalar_a_ventana(cargar_primera_imagen("menufondo",  usa_alpha=False))
-    fondo_nivel = escalar_a_ventana(cargar_primera_imagen("nivelfondo", usa_alpha=False))
 
     # Botones
     img_play     = cargar_primera_imagen("botonplay",     usa_alpha=True)
@@ -111,22 +176,32 @@ def main():
     btn_opc   = ImageButton(img_opciones, midleft=(COL_X, btn_play.rect.bottom + GAP1))
     btn_salir = ImageButton(img_salir,    midleft=(COL_X, btn_opc.rect.bottom + GAP))
 
-    # Personaje (tamaño relativo)
-    player_img = pygame.image.load(str(IMG_DIR / "characters" / "krabby" / "krabby.png")).convert_alpha()
-    player_img = pygame.transform.scale(
-        player_img,
-        (max(1, int(player_img.get_width() *  constantes.ANCHO_PERSONAJE)),
-         max(1, int(player_img.get_height() * constantes.ANCHO_PERSONAJE)))
+    # --------- Cargar mapa Tiled y preparar jugador + cámara ----------
+    # Cambia el nombre si tu archivo se llama distinto
+    tmx_path = MAP_DIR / "nivel1.tmx"
+    try:
+        nivel = NivelTiled(tmx_path)
+    except Exception as e:
+        raise SystemExit(f"Error cargando TMX {tmx_path}: {e}")
+
+    # Spawn del jugador (si no hay punto en TMX, usa uno por defecto)
+    spawn_x, spawn_y = nivel.spawn if nivel.spawn else (250, 250)
+    jugador = Personaje(spawn_x, spawn_y)
+
+    cam = Camara(
+        (constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA),
+        nivel.world_size()
     )
-    jugador = Personaje(250, 250, player_img)
-    jump_held = False
-    mover_arriba = mover_abajo = mover_izquierda = mover_derecha = False
 
     # Música inicial: menú
     try:
         musica.play("menu", volumen=0.8)
     except Exception as e:
         print("Aviso música:", e)
+
+    # Flags de input
+    jump_held = False
+    mover_arriba = mover_abajo = mover_izquierda = mover_derecha = False
 
     estado = ESTADO_MENU
     run = True
@@ -181,8 +256,13 @@ def main():
         if estado == ESTADO_JUEGO:
             dx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
             dy = (constantes.VELOCIDAD if mover_abajo   else 0) - (constantes.VELOCIDAD if mover_arriba    else 0)
+
+            # Actualiza física/anim del jugador
             jugador.actualizar(dt)
             jugador.movimiento(dx, dy)
+
+            # Cámara siguiendo al jugador
+            cam.follow(jugador.forma, lerp=1.0)
 
         # -------------------- Dibujar --------------------
         if estado == ESTADO_MENU:
@@ -197,8 +277,10 @@ def main():
             ventana.blit(sub, (constantes.ANCHO_VENTANA//2 - sub.get_width()//2, 60))
 
         elif estado == ESTADO_JUEGO:
-            ventana.blit(fondo_nivel, (0, 0))
-            jugador.dibujar(ventana)
+            # Dibuja TMX y luego al jugador con offset
+            nivel.draw(ventana, cam.offset())
+            ox, oy = cam.offset()
+            ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
 
         pygame.display.flip()
 
