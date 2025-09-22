@@ -1,21 +1,20 @@
+# personaje.py
 import pygame
-from pygame.examples.cursors import image
-
 import constantes
 
-class Personaje():
+class Personaje:
     def __init__(self, x, y, image):
         self.image = image
-        self.forma= pygame.Rect(0,0,constantes.ANCHO_PERSONAJE, constantes.ALTO_PERSONAJE)
+        self.forma = pygame.Rect(0, 0, constantes.ANCHO_PERSONAJE, constantes.ALTO_PERSONAJE)
         self.vel_y = 0.0
         self.en_piso = False
-        self.forma.center=(x,y)
+        self.forma.center = (x, y)
 
     def dibujar(self, interfaz):
         interfaz.blit(self.image, self.forma)
-        pygame.draw.rect(interfaz, constantes.COLOR_PERSONAJE,self.forma)
+        pygame.draw.rect(interfaz, constantes.COLOR_PERSONAJE, self.forma)
 
-    def movimiento(self, delta_x,  _delta_y_ignorado=0):
+    def movimiento(self, delta_x, _delta_y_ignorado=0):
         self.forma.x += int(delta_x)
 
     def saltar(self, forzado=False):
