@@ -108,8 +108,62 @@ class Camara:
         self.ox += (cx - self.ox) * lerp; self.oy += (cy - self.oy) * lerp
     def offset(self): return int(self.ox), int(self.oy)
 
+# -------------------- Pause Menu --------------------
+class PauseMenu:
+    def __init__(self, size):
+        self.w, self.h = size
+        self.font_title = pygame.font.Font(None, 64)
+        self.font_item  = pygame.font.Font(None, 42)
+        self.options = ["Continuar", "Salir al menú"]
+        self.selected = 0
+        self.panel = pygame.Surface((int(self.w*0.6), int(self.h*0.5)), pygame.SRCALPHA)
+        self.panel.fill((0, 0, 0, 140))
+
+    def handle_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
+                return "resume" if self.selected == 0 else "menu"
+            if event.key in (pygame.K_UP, pygame.K_w):
+                self.selected = (self.selected - 1) % len(self.options)
+            if event.key in (pygame.K_DOWN, pygame.K_s):
+                self.selected = (self.selected + 1) % len(self.options)
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mx, my = event.pos
+            x = (self.w - self.panel.get_width())//2
+            y = (self.h - self.panel.get_height())//2
+            items = self._item_rects(x, y)
+            for i, r in enumerate(items):
+                if r.collidepoint(mx, my):
+                    self.selected = i
+                    return "resume" if i == 0 else "menu"
+        return None
+
+    def _item_rects(self, px, py):
+        rects = []
+        start_y = py + 120
+        for i, _ in enumerate(self.options):
+            r = pygame.Rect(0,0, 300, 48)
+            r.centerx = px + self.panel.get_width()//2
+            r.y = start_y + i*60
+            rects.append(r)
+        return rects
+
+    def draw(self, surface):
+        dim = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
+        dim.fill((0,0,0,100)); surface.blit(dim, (0,0))
+        px = (self.w - self.panel.get_width())//2
+        py = (self.h - self.panel.get_height())//2
+        surface.blit(self.panel, (px, py))
+        title = self.font_title.render("PAUSA", True, (255,255,255))
+        surface.blit(title, (self.w//2 - title.get_width()//2, py + 40))
+        for i, text in enumerate(self.options):
+            color = (255,230,120) if i == self.selected else (230,230,230)
+            surf = self.font_item.render(text, True, color)
+            r = surf.get_rect(center=(self.w//2, py + 120 + i*60))
+            surface.blit(surf, r)
+
 # -------------------- Estados --------------------
-ESTADO_MENU, ESTADO_JUEGO, ESTADO_OPC = "MENU", "JUEGO", "OPCIONES"
+ESTADO_MENU, ESTADO_JUEGO, ESTADO_OPC, ESTADO_PAUSA = "MENU", "JUEGO", "OPCIONES", "PAUSA"
 
 def main():
     pygame.mixer.pre_init(44100, -16, 2, 512); pygame.init()
@@ -133,8 +187,8 @@ def main():
     spawn_x, spawn_y = nivel.spawn if nivel.spawn else (250, 250)
     jugador = Personaje(spawn_x, spawn_y)
 
-    # (Opcional) Bajar al jugador al piso desde el inicio:
-    suelo_top = constantes.ALTO_VENTANA - constantes.ALTURA_SUELO   # ALTURA_SUELO POSITIVO
+    # Alinear al piso al iniciar
+    suelo_top = constantes.ALTO_VENTANA - constantes.ALTURA_SUELO
     jugador.forma.bottom = suelo_top
     jugador.en_piso = True
     jugador.vel_y = 0
@@ -146,6 +200,9 @@ def main():
 
     mover_izquierda = mover_derecha = False
     estado, run = ESTADO_MENU, True
+    VOL_NORMAL, VOL_PAUSA = 0.8, 0.3
+
+    pause_menu = PauseMenu((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
 
     while run:
         dt = reloj.tick(constantes.FPS) / 1000.0
@@ -168,6 +225,9 @@ def main():
 
             elif estado == ESTADO_JUEGO:
                 if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        estado = ESTADO_PAUSA
+                        pygame.mixer.music.set_volume(VOL_PAUSA)
                     if event.key in (pygame.K_a, pygame.K_LEFT):  mover_izquierda = True
                     if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha   = True
                     if event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
@@ -177,55 +237,47 @@ def main():
                     if event.key in (pygame.K_a, pygame.K_LEFT):  mover_izquierda = False
                     if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha   = False
 
+            elif estado == ESTADO_PAUSA:
+                action = pause_menu.handle_event(event)
+                if action == "resume":
+                    estado = ESTADO_JUEGO; pygame.mixer.music.set_volume(VOL_NORMAL)
+                elif action == "menu":
+                    estado = ESTADO_MENU; pygame.mixer.music.set_volume(VOL_NORMAL); musica.switch("menu")
+
         if estado == ESTADO_JUEGO:
-            # Velocidad horizontal → desplazamiento por frame
             vx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
             dx = vx * dt
 
-            # Física vertical
             jugador.aplicar_gravedad(dt)
             dy = int(jugador.vel_y * dt)
-
-            # Movimiento
             jugador.movimiento(dx, 0.0)
             jugador.forma.y += dy
 
-            # -------- PISO (ALTURA_SUELO positivo) --------
+            # Piso (ahora sin abs)
             suelo_top = constantes.ALTO_VENTANA - constantes.ALTURA_SUELO
             if jugador.forma.bottom >= suelo_top:
                 jugador.forma.bottom = suelo_top
-                jugador.vel_y = 0
-                jugador.en_piso = True
+                jugador.vel_y = 0; jugador.en_piso = True
             else:
                 jugador.en_piso = False
 
-            # Distancia al piso → hint para pre-landing
-            dist = max(0, suelo_top - jugador.forma.bottom)
-            if hasattr(jugador, "update_landing_hint"):
-                jugador.update_landing_hint(dist)
-
-            # En tierra decidimos idle/run. En el aire, Personaje maneja el estado.
             if jugador.en_piso:
                 jugador.state = "run" if vx != 0 else "idle"
 
-            # Dirección & animación
             jugador.set_dx(vx)
             jugador.animar(dt)
-
-            # Cámara
             cam.follow(jugador.forma, lerp=1.0)
 
-        # -------------------- Dibujar --------------------
         if estado == ESTADO_MENU:
             ventana.blit(fondo_menu, (0, 0)); btn_play.draw(ventana); btn_opc.draw(ventana); btn_salir.draw(ventana)
         elif estado == ESTADO_OPC:
             ventana.blit(fondo_menu, (0, 0))
             sub = pygame.font.Font(None, 48).render("OPCIONES (ESC para volver)", True, (255, 255, 255))
             ventana.blit(sub, (constantes.ANCHO_VENTANA//2 - sub.get_width()//2, 60))
-        elif estado == ESTADO_JUEGO:
+        elif estado in ("JUEGO", "PAUSA"):
             nivel.draw(ventana, cam.offset())
-            ox, oy = cam.offset()
-            ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
+            ox, oy = cam.offset(); ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
+            if estado == "PAUSA": pause_menu.draw(ventana)
 
         pygame.display.flip()
 
