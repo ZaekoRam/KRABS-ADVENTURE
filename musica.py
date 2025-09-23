@@ -4,9 +4,11 @@ import pygame
 
 BASE_DIR = Path(__file__).resolve().parent
 AUDIO_DIR = BASE_DIR / "assets" / "audio"
+SFX_DIR   = AUDIO_DIR / "sfx"
 
+# ------------ Música (igual que antes) ------------
 LIB = {
-    "menu": AUDIO_DIR / "menu.ogg",
+    "menu":   AUDIO_DIR / "menu.ogg",
     "nivel1": AUDIO_DIR / "nivel1.ogg",
 }
 
@@ -16,7 +18,6 @@ _current = None
 def _ensure_init():
     global _inited
     if not _inited:
-        # mixer se inicializa aquí; pre_init lo harás en main.py antes de pygame.init()
         pygame.mixer.init()
         _inited = True
 
@@ -46,3 +47,36 @@ def stop(fade_ms=0):
         pygame.mixer.music.fadeout(fade_ms)
     else:
         pygame.mixer.music.stop()
+
+# ------------ Efectos de sonido (nuevo) ------------
+# Mapea nombres → archivos. Cambia los nombres si tus archivos se llaman distinto.
+SFX_LIB = {
+    "jump":  SFX_DIR / "jump.wav",
+    "coin":  SFX_DIR / "coin.wav",
+    "click": SFX_DIR / "click.wav",
+}
+
+# Caché de pygame.mixer.Sound
+_SFX_CACHE = {}
+
+def sfx(name: str, volume=1.0):
+    """Reproduce un efecto por nombre. Carga bajo demanda y cachea."""
+    _ensure_init()
+    path = SFX_LIB.get(name)
+    if not path:
+        raise KeyError(f"SFX '{name}' no está definido en SFX_LIB")
+    if not path.exists():
+        raise FileNotFoundError(f"No existe el archivo de SFX: {path}")
+
+    snd = _SFX_CACHE.get(name)
+    if snd is None:
+        snd = pygame.mixer.Sound(str(path))
+        _SFX_CACHE[name] = snd
+    snd.set_volume(max(0.0, min(1.0, volume)))
+
+    # Usa un canal libre para no cortar otros sonidos
+    ch = pygame.mixer.find_channel()
+    if ch:
+        ch.play(snd)
+    else:
+        snd.play()

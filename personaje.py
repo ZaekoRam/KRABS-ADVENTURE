@@ -2,83 +2,107 @@ import pygame
 import constantes
 from pathlib import Path
 
-class Personaje:
-    def __init__(self, x, y):
+class Personaje(pygame.sprite.Sprite):
+    def __init__(self, spawn_x: int, spawn_y: int):
+        super().__init__()
+
         base_dir = Path(__file__).resolve().parent
-        img_dir = base_dir / "assets" / "images" / "characters" / "krabby"
+        krab_dir = base_dir / "assets" / "images" / "characters" / "krabby"
 
-        # Cargar frames
-        self.frames_idle = [pygame.image.load(str(img_dir / "krabby1.png")).convert_alpha()]
-        self.frames_run = [
-            pygame.image.load(str(img_dir / f"krabby{i}.png")).convert_alpha()
-            for i in range(1, 5)  # krabby1..4
-        ]
+        # ---- helpers de carga/escala ----
+        def load(name: str) -> pygame.Surface:
+            return pygame.image.load(str(krab_dir / name)).convert_alpha()
 
-        # Escalar
-        self.frames_idle = [pygame.transform.scale(img, (
-            int(img.get_width() * constantes.ANCHO_IMAGEN),
-            int(img.get_height() * constantes.ALTO_IMAGEN)
-        )) for img in self.frames_idle]
+        def scale(img: pygame.Surface) -> pygame.Surface:
+            return pygame.transform.scale(
+                img,
+                (
+                    int(img.get_width()  * constantes.ANCHO_IMAGEN),
+                    int(img.get_height() * constantes.ALTO_IMAGEN),
+                ),
+            )
 
-        self.frames_run = [pygame.transform.scale(img, (
-            int(img.get_width() * constantes.ANCHO_IMAGEN),
-            int(img.get_height() * constantes.ALTO_IMAGEN)
-        )) for img in self.frames_run]
+        # ---- FRAMES ----
+        self.frames_idle = [scale(load(f"idle{i}.png")) for i in range(1, 3)]   # 2 frames
+        self.frames_run  = [scale(load(f"krabby{i}.png")) for i in range(1, 5)]
+        self.frames_jump = [scale(load(f"jump{i}.png"))   for i in range(1, 8)]  # 7 frames de salto
 
-        # Estado inicial
-        self.state = "idle"
-        self.image = self.frames_idle[0]
-        self.forma = self.image.get_rect(center=(x, y))
-        self.vel_y = 0.0
+        # ---- estado y anim ----
+        self.state        = "idle"
+        self.facing_right = True
+        self.anim_index   = 0.0
+        self.run_fps      = 10.0   # velocidad al correr
+        self.jump_fps     = 8.0    # salto
+        self.idle_fps     = 2.0    # idle lento (2 frames por segundo)
+
+        # ---- física ----
+        self.vel_y   = 0.0
         self.en_piso = False
 
-        # Animación
-        self.anim_index = 0.0
-        self.anim_speed = 8.0  # frames por segundo
-        self.facing_right = True
+        # ---- render y rect ----
+        self.image = self.frames_idle[0]
+        self.forma = self.image.get_rect()
+        self.forma.midbottom = (int(spawn_x), int(spawn_y))
 
-    def dibujar(self, interfaz):
-        interfaz.blit(self.image, self.forma)
+        self._pos_x = float(self.forma.x)
 
-    def movimiento(self, delta_x, _delta_y_ignorado=0):
-        self.forma.x += int(delta_x)
-        if delta_x > 0:
+    # ---------------- API ----------------
+    def colocar_en_midbottom(self, x, y):
+        self.forma.midbottom = (int(x), int(y))
+        self._pos_x = float(self.forma.x)
+
+    def movimiento(self, delta_x: float, _delta_y_ignorado: float = 0.0):
+        self._pos_x += float(delta_x)
+        self.forma.x = int(self._pos_x)
+
+    def set_dx(self, dx_pixels_per_sec: float):
+        if dx_pixels_per_sec > 0:
             self.facing_right = True
-        elif delta_x < 0:
+        elif dx_pixels_per_sec < 0:
             self.facing_right = False
-        # Cambiar estado según movimiento
-        self.state = "run" if delta_x != 0 else "idle"
 
-    def saltar(self, forzado=False):
+        if self.en_piso:
+            if dx_pixels_per_sec != 0:
+                self.state = "run"
+            else:
+                self.state = "idle"
+
+    def saltar(self, forzado: bool = False):
         if self.en_piso or forzado:
             self.vel_y = constantes.SALTO_VEL
             self.en_piso = False
+            self.state = "jump"
+            self.anim_index = 0.0
 
-    def actualizar(self, dt):
-        # Física Y
+    def aplicar_gravedad(self, dt: float):
         self.vel_y += constantes.GRAVEDAD * dt
-        self.forma.y += int(self.vel_y * dt)
 
-        suelo_top = constantes.ALTO_VENTANA - constantes.ALTURA_SUELO
-        if self.forma.bottom >= suelo_top:
-            self.forma.bottom = suelo_top
-            self.vel_y = 0
-            self.en_piso = True
+    def actualizar(self, dt: float):
+        self.aplicar_gravedad(dt)
 
-        # Animación
+    def animar(self, dt: float):
         if self.state == "idle":
-            frame_list = self.frames_idle
-            self.anim_index = 0
-        else:  # "run"
-            frame_list = self.frames_run
-            self.anim_index += self.anim_speed * dt
-            if self.anim_index >= len(frame_list):
-                self.anim_index = 0
+            self.anim_index += self.idle_fps * dt
+            if self.anim_index >= len(self.frames_idle):
+                self.anim_index = 0.0
+            frame = self.frames_idle[int(self.anim_index)]
 
-        frame = frame_list[int(self.anim_index)]
+        elif self.state == "run":
+            self.anim_index += self.run_fps * dt
+            if self.anim_index >= len(self.frames_run):
+                self.anim_index = 0.0
+            frame = self.frames_run[int(self.anim_index)]
 
-        # Flip según dirección
-        if self.facing_right:
-            self.image = frame
+        elif self.state == "jump":
+            self.anim_index += self.jump_fps * dt
+            idx = min(int(self.anim_index), len(self.frames_jump) - 1)
+            frame = self.frames_jump[idx]
+
+        elif self.state == "fall":
+            frame = self.frames_jump[-1]
+
         else:
-            self.image = pygame.transform.flip(frame, True, False)
+            frame = self.frames_idle[0]
+
+        # flip según dirección
+        self.image = frame if self.facing_right else pygame.transform.flip(frame, True, False)
