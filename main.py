@@ -1,15 +1,164 @@
 # main.py
 import pygame
 from pathlib import Path
+import time, math  # necesarios para sincronización y saneo de metadatos
 import constantes
 from personaje import Personaje
 import musica
 from pytmx.util_pygame import load_pygame
+import imageio
+from fuentes import get_font  # <-- NUEVO: usar tu fuente pixel
+
+
+# --- Reproductor de intro usando imageio con sync estable, fps robusto y delay de audio por evento ---
+def play_intro(
+    screen,
+    video_path: Path,
+    audio_path: Path,
+    size=(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA),
+    skip_keys=(pygame.K_SPACE, pygame.K_RETURN, pygame.K_ESCAPE),
+    FPS_MIN=5.0,
+    FPS_MAX=60.0,
+    FPS_OVERRIDE=30,   # fuerza FPS si lo conoces (ej: 30.0)
+    AV_OFFSET=0.0,       # offset (+/- seg) para ajustar video vs audio
+    audio_delay=0.0,      # segundos que esperará la música antes de empezar
+):
+    """
+    Sincroniza el video al tiempo real y permite retrasar el arranque del audio sin pausar el video.
+    - FPS robusto: usa nframes/duration cuando sea posible; si no, meta['fps'] con límites [FPS_MIN..FPS_MAX].
+    - Índice de frame = int(elapsed * fps) (no incrementa i a mano).
+    - 'audio_delay' se implementa con un evento programado (se nota sí o sí).
+    - SPACE/ENTER/ESC para saltar.
+    """
+    if not video_path.exists():
+        return
+
+    clock = pygame.time.Clock()
+    reader = None
+
+    # ---- Audio: pre-cargar y programar arranque por evento (ms) ----
+    AUDIO_START_EVENT = pygame.USEREVENT + 24
+    audio_started = False
+    music_loaded = False
+
+    try:
+        if audio_path.exists():
+            pygame.mixer.music.stop()  # garantiza silencio previo
+            pygame.mixer.music.load(str(audio_path))
+            pygame.mixer.music.set_volume(1.0)
+            music_loaded = True
+            pygame.time.set_timer(AUDIO_START_EVENT, int(max(0.0, float(audio_delay)) * 1000), loops=1)
+        else:
+            pygame.mixer.music.stop()
+    except Exception as e:
+        print("Aviso audio intro:", e)
+
+    try:
+        reader = imageio.get_reader(str(video_path))
+        meta = reader.get_meta_data()
+
+        meta_fps = meta.get("fps", 24.0)
+        nframes = meta.get("nframes", None)
+        duration = meta.get("duration", None)
+
+        # Saneos
+        if not (isinstance(nframes, (int, float)) and math.isfinite(nframes) and nframes > 0):
+            nframes = None
+        if not (isinstance(duration, (int, float)) and math.isfinite(duration) and duration > 0):
+            duration = None
+
+        # FPS robusto
+        if FPS_OVERRIDE is not None and FPS_OVERRIDE > 0:
+            fps = float(FPS_OVERRIDE)
+        elif nframes is not None and duration is not None:
+            fps = float(nframes) / float(duration)
+        else:
+            try:
+                fps = float(meta_fps)
+            except Exception:
+                fps = 24.0
+
+        # Limitar a un rango razonable
+        fps = max(FPS_MIN, min(FPS_MAX, fps))
+
+        # Reloj base para el video
+        t0 = time.perf_counter() + AV_OFFSET
+
+        last_drawn = -1  # último índice dibujado
+
+        while True:
+            # Eventos
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.mixer.music.stop()
+                    if reader: reader.close()
+                    pygame.quit()
+                    raise SystemExit
+                if event.type == pygame.KEYDOWN and event.key in skip_keys:
+                    pygame.mixer.music.stop()
+                    if reader: reader.close()
+                    return
+                # Arranque diferido del audio por evento: respeta exactamente 'audio_delay'
+                if event.type == AUDIO_START_EVENT and music_loaded and not audio_started:
+                    try:
+                        pygame.mixer.music.play(loops=0)
+                    except Exception as e:
+                        print("Aviso al reproducir audio intro:", e)
+                    audio_started = True
+
+            now = time.perf_counter()
+            elapsed = now - t0
+
+            # Cortar por duración finita (con pequeño margen)
+            if duration is not None and elapsed > (duration + 0.05):
+                break
+
+            expected_i = int(max(0.0, elapsed) * fps)
+
+            # Cortar por nframes válido
+            if nframes is not None and expected_i >= int(nframes):
+                break
+
+            # Si no hay nuevo frame “teórico”, respira y sigue
+            if expected_i == last_drawn:
+                clock.tick(120)
+                continue
+
+            # Obtener frame; si no existe, salimos
+            try:
+                frame = reader.get_data(expected_i)
+            except IndexError:
+                break
+
+            h, w = frame.shape[0], frame.shape[1]
+            surf = pygame.image.frombuffer(frame.tobytes(), (w, h), "RGB").convert()
+            if (w, h) != size:
+                surf = pygame.transform.smoothscale(surf, size)
+
+            screen.blit(surf, (0, 0))
+            pygame.display.flip()
+            last_drawn = expected_i
+
+            # Suavizado: esperar hasta el siguiente instante teórico de frame
+            next_time = (last_drawn + 1) / fps
+            spare = next_time - (time.perf_counter() - t0)
+            if spare > 0:
+                time.sleep(min(spare, 0.02))
+            clock.tick(240)
+
+    finally:
+        try:
+            if reader: reader.close()
+        except Exception:
+            pass
+        pygame.mixer.music.stop()
+
 
 # -------------------- Paths --------------------
 BASE_DIR = Path(__file__).resolve().parent
 IMG_DIR  = BASE_DIR / "assets" / "images"
 MAP_DIR  = BASE_DIR / "assets" / "maps"
+VID_DIR  = BASE_DIR / "assets" / "video"    # <--- carpeta de video
 
 # -------------------- Helpers --------------------
 def scale_to_width(surf: pygame.Surface, target_w: int) -> pygame.Surface:
@@ -141,8 +290,8 @@ class Camara:
 class PauseMenu:
     def __init__(self, size):
         self.w, self.h = size
-        self.font_title = pygame.font.Font(None, 64)
-        self.font_item  = pygame.font.Font(None, 42)
+        self.font_title = get_font(constantes.FONT_UI_TITLE)
+        self.font_item = get_font(constantes.FONT_UI_ITEM)
         self.options = ["Continuar", "Salir al menú"]
         self.selected = 0
         self.panel = pygame.Surface((int(self.w*0.6), int(self.h*0.5)), pygame.SRCALPHA)
@@ -195,8 +344,8 @@ class PauseMenu:
 class ContinueOverlay:
     def __init__(self, size, seconds=8):
         self.w, self.h = size
-        self.font_title = pygame.font.Font(None, 64)
-        self.font_item  = pygame.font.Font(None, 42)
+        self.font_title = get_font(constantes.FONT_UI_TITLE)
+        self.font_item = get_font(constantes.FONT_UI_ITEM)
         self.seconds_total = float(seconds)
         self.remaining = float(seconds)
         self.panel = pygame.Surface((int(self.w*0.6), int(self.h*0.5)), pygame.SRCALPHA)
@@ -247,9 +396,12 @@ class MenuKrab:
         self.scale = float(scale)
 
     def jump_and_leave(self):
-        if self.state != "idle": return
-        try: musica.sfx("jump", volume=0.9)
-        except Exception: pass
+        if self.state != "idle":
+            return
+        try:
+            musica.sfx("jump", volume=0.9)
+        except Exception:
+            pass
         self.state = "leaving"
         self.p.saltar(forzado=True)
         self.vx = float(getattr(constantes, "VELOCIDAD", 300)) * 0.9
@@ -266,7 +418,9 @@ class MenuKrab:
             self.p.animar(dt)
 
     def offscreen(self, w, h):
-        return (self.p.forma.bottom < -40) or (self.p.forma.left > w + 40) or (self.p.forma.top > h + 40)
+        return (self.p.forma.bottom < -40) or \
+               (self.p.forma.left > w + 40) or \
+               (self.p.forma.top > h + 40)
 
     def draw(self, surface):
         if self.scale != 1.0:
@@ -280,6 +434,7 @@ class MenuKrab:
         else:
             surface.blit(self.p.image, self.p.forma)
 
+
 # -------------------- Estados --------------------
 ESTADO_MENU, ESTADO_JUEGO, ESTADO_OPC, ESTADO_PAUSA = "MENU", "JUEGO", "OPCIONES", "PAUSA"
 ESTADO_MUERTE   = "MUERTE"
@@ -287,13 +442,31 @@ ESTADO_CONTINUE = "CONTINUE"
 ESTADO_GAMEOVER = "GAMEOVER"
 
 def main():
-    pygame.mixer.pre_init(44100, -16, 2, 512); pygame.init()
+    # Audio antes de pygame.init para evitar pops
+    pygame.mixer.pre_init(44100, -16, 2, 512)
+    pygame.init()
+    if not pygame.mixer.get_init():
+        pygame.mixer.init(44100, -16, 2, 512)
+
     ventana = pygame.display.set_mode((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     pygame.display.set_caption("Krab's adventure")
     reloj = pygame.time.Clock()
 
-    font_hud = pygame.font.Font(None, 36)
+    # --- INTRO: solo una vez por sesión ---
+    video_path = VID_DIR / "intro.mp4"
+    audio_path = VID_DIR / "intro.wav"  # tu audio real (WAV/OGG recomendado)
+    pygame.mixer.music.set_volume(1.0)  # volumen de la intro
+    # Ajusta a tu gusto:
+    play_intro(
+        ventana,
+        video_path,
+        audio_path,
+        FPS_OVERRIDE=25.0,     # <-- tu video a 30 fps
+        AV_OFFSET=0.0,         # mueve el video vs audio si hay desfase fijo (ej. -0.08)
+        audio_delay=1.2        # <-- retrasa el audio X s sin parar el video (prueba 0.0 / 0.8 / 1.2 / 1.5)
+    )
 
+    font_hud = get_font(constantes.FONT_HUD)  # <-- cambiado
     tiempo_total = float(getattr(constantes, "TIEMPO_NIVEL1", 60))
     timer = tiempo_total
 
@@ -312,7 +485,7 @@ def main():
 
     # ---- Krabby en el menú (más grande y movido a la derecha)
     KRAB_MENU_POS  = (int(constantes.ANCHO_VENTANA*0.85), int(constantes.ALTO_VENTANA*0.83))
-    KRAB_MENU_SCALE = 2.0  # <-- ajusta a tu gusto: 1.5, 2.0, 2.5...
+    KRAB_MENU_SCALE = 2.0
     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
     menu_leaving = False
 
@@ -329,6 +502,7 @@ def main():
 
     cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
 
+    # Música del menú (se arranca DESPUÉS de la intro)
     try: musica.play("menu", volumen=0.8)
     except Exception as e: print("Aviso música:", e)
 
@@ -476,7 +650,7 @@ def main():
 
         elif estado == ESTADO_OPC:
             ventana.blit(fondo_menu, (0, 0))
-            sub = pygame.font.Font(None, 48).render("OPCIONES (ESC para volver)", True, (255, 255, 255))
+            sub = get_font(constantes.FONT_SUBTITLE).render("OPCIONES (ESC para volver)", True, (255, 255, 255))
             ventana.blit(sub, (constantes.ANCHO_VENTANA//2 - sub.get_width()//2, 60))
 
         elif estado in ("JUEGO", "PAUSA"):
@@ -503,4 +677,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
