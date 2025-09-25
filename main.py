@@ -463,7 +463,7 @@ def main():
         audio_path,
         FPS_OVERRIDE=25.0,     # <-- tu video a 30 fps
         AV_OFFSET=0.0,         # mueve el video vs audio si hay desfase fijo (ej. -0.08)
-        audio_delay=1.2        # <-- retrasa el audio X s sin parar el video (prueba 0.0 / 0.8 / 1.2 / 1.5)
+        audio_delay=1.2,        # <-- retrasa el audio X s sin parar el video (prueba 0.0 / 0.8 / 1.2 / 1.5)
     )
 
     font_hud = get_font(constantes.FONT_HUD)  # <-- cambiado
