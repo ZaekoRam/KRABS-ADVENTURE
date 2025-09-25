@@ -7,7 +7,7 @@ from personaje import Personaje
 import musica
 from pytmx.util_pygame import load_pygame
 import imageio
-from fuentes import get_font  # <-- NUEVO: usar tu fuente pixel
+from fuentes import get_font  # <-- usar tu fuente pixel
 
 
 # --- Reproductor de intro usando imageio con sync estable, fps robusto y delay de audio por evento ---
@@ -161,6 +161,33 @@ MAP_DIR  = BASE_DIR / "assets" / "maps"
 VID_DIR  = BASE_DIR / "assets" / "video"    # <--- carpeta de video
 
 # -------------------- Helpers --------------------
+def mover_con_colisiones(jugador, dx, dy, colliders):
+    """Movimiento por ejes con resolución de colisiones (suelo/paredes/techo)."""
+    # --- Horizontal ---
+    if dx != 0:
+        jugador.forma.x += int(dx)
+        for r in colliders:
+            if jugador.forma.colliderect(r):
+                if dx > 0:   # yendo a la derecha: choca pared izquierda
+                    jugador.forma.right = r.left
+                else:        # yendo a la izquierda
+                    jugador.forma.left = r.right
+
+    # --- Vertical ---
+    jugador.en_piso = False
+    if dy != 0:
+        jugador.forma.y += int(dy)
+        for r in colliders:
+            if jugador.forma.colliderect(r):
+                if dy > 0:   # cayendo: apoyar en piso
+                    jugador.forma.bottom = r.top
+                    jugador.vel_y = 0
+                    jugador.en_piso = True
+                else:        # saltando: pegar en techo
+                    jugador.forma.top = r.bottom
+                    jugador.vel_y = 0
+
+
 def scale_to_width(surf: pygame.Surface, target_w: int) -> pygame.Surface:
     ratio = target_w / surf.get_width()
     target_h = int(surf.get_height() * ratio)
@@ -456,30 +483,34 @@ def main():
     video_path = VID_DIR / "intro.mp4"
     audio_path = VID_DIR / "intro.wav"  # tu audio real (WAV/OGG recomendado)
     pygame.mixer.music.set_volume(1.0)  # volumen de la intro
-    # Ajusta a tu gusto:
     play_intro(
         ventana,
         video_path,
         audio_path,
-        FPS_OVERRIDE=25.0,     # <-- tu video a 30 fps
-        AV_OFFSET=0.0,         # mueve el video vs audio si hay desfase fijo (ej. -0.08)
-        audio_delay=1.2,        # <-- retrasa el audio X s sin parar el video (prueba 0.0 / 0.8 / 1.2 / 1.5)
+        FPS_OVERRIDE=25.0,
+        AV_OFFSET=0.0,
+        audio_delay=1.2,
     )
 
-    font_hud = get_font(constantes.FONT_HUD)  # <-- cambiado
+    font_hud = get_font(constantes.FONT_HUD)
     tiempo_total = float(getattr(constantes, "TIEMPO_NIVEL1", 60))
     timer = tiempo_total
 
     # --- Recursos menú
     fondo_menu = escalar_a_ventana(cargar_primera_imagen("menufondo", False))
+    titulo_img   = scale_to_width(cargar_primera_imagen("menu_titulo",   True), 360)
     img_play     = scale_to_width(cargar_primera_imagen("botonplay",     True), 360)
     img_opciones = scale_to_width(cargar_primera_imagen("botonopciones", True), 340)
     img_salir    = scale_to_width(cargar_primera_imagen("botonsalir",    True), 345)
 
     COL_X = int(constantes.ANCHO_VENTANA * 0.28)
+    Y1 = int(constantes.ALTO_VENTANA * 0.15)
+    COL_TITLE = int(constantes.ANCHO_VENTANA * 0.28)
     COL_play = int(constantes.ANCHO_VENTANA * 0.27)
-    Y0, GAP1, GAP = int(constantes.ALTO_VENTANA * 0.30), 70, 74
-    btn_play  = ImageButton(img_play,     midleft=(COL_play, Y0))
+    Y0, GAP1, GAP = int(constantes.ALTO_VENTANA * 0.35), 60, 64
+
+    titulo = ImageButton(titulo_img, midleft=(COL_TITLE, Y1))
+    btn_play = ImageButton(img_play, midleft=(COL_play, Y0))
     btn_opc   = ImageButton(img_opciones, midleft=(COL_X, btn_play.rect.bottom + GAP1))
     btn_salir = ImageButton(img_salir,    midleft=(COL_X, btn_opc.rect.bottom + GAP))
 
@@ -494,8 +525,21 @@ def main():
     spawn_x, spawn_y = nivel.spawn if nivel.spawn else (250, 250)
     jugador = Personaje(spawn_x, spawn_y)
 
+    if nivel.spawn:
+        # Si hay spawn desde Tiled, respétalo como midbottom del rectángulo
+        jugador.forma.midbottom = (spawn_x, spawn_y)
+        jugador.en_piso = False
+        jugador.vel_y = 0
+    else:
+        # Ajusta spawn: deja caer al jugador hasta apoyar sobre alguna colisión (si está en el aire)
+        for _ in range(120):  # 120 px de margen de caída para encontrar piso cercano
+            # 1px por paso para no atravesar plataformas delgadas
+            mover_con_colisiones(jugador, 0, 1, nivel.collision_rects)
+            if jugador.en_piso:
+                break
+
     # Alinear al piso al iniciar
-    suelo_top = constantes.ALTO_VENTANA - constantes.ALTURA_SUELO
+    suelo_top = constantes.ALTO_VENTANA + (constantes.ALTURA_SUELO)
     jugador.forma.bottom = suelo_top
     jugador.en_piso = True
     jugador.vel_y = 0
@@ -589,38 +633,101 @@ def main():
                 timer = tiempo_total
                 estado = ESTADO_JUEGO
 
-        elif estado == ESTADO_JUEGO:
-            timer -= dt
-            if timer <= 0:
-                timer = 0
-                try: musica.sfx("death", volume=0.9)
-                except Exception: pass
-                freeze_cam_offset = cam.offset()
-                iniciar_muerte(jugador)
-                pygame.mixer.music.set_volume(0.35)
-                estado = ESTADO_MUERTE
+            elif estado == ESTADO_JUEGO:
+                timer -= dt
+                if timer <= 0:
+                    timer = 0
+                    try:
+                        musica.sfx("death", volume=0.9)
+                    except Exception:
+                        pass
+                    freeze_cam_offset = cam.offset()
+                    iniciar_muerte(jugador)
+                    pygame.mixer.music.set_volume(0.35)
+                    estado = ESTADO_MUERTE
 
+                # --- Movimiento horizontal ---
+                vx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
+                dx = vx * dt
+
+                # --- Física vertical ---
+                jugador.aplicar_gravedad(dt)
+                dy = int(jugador.vel_y * dt)
+
+                # --- Aplicar movimiento ---
+                jugador.movimiento(dx, 0.0)  # mueve en X
+                jugador.forma.y += dy  # mueve en Y
+
+                # --- Colisión con el suelo (alto del suelo en POSITIVO) ---
+                # input → velocidad horizontal
+                vx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
+                dx = vx * dt
+
+                # física vertical
+                jugador.aplicar_gravedad(dt)
+                dy = jugador.vel_y * dt
+
+                # mover con colisiones contra los rects del TMX
+                mover_con_colisiones(jugador, dx, dy, nivel.collision_rects)
+
+                # estado animación
+                if jugador.en_piso:
+                    jugador.state = "run" if vx != 0 else "idle"
+                else:
+                    jugador.state = "jump" if jugador.vel_y < 0 else "fall"
+
+                jugador.set_dx(vx)
+                jugador.animar(dt)
+
+                # cámara
+                cam.follow(jugador.forma, lerp=1.0)
+                # --- Animación ---
+                if jugador.en_piso:
+                    jugador.state = "run" if vx != 0 else "idle"
+
+                jugador.set_dx(vx)
+                jugador.animar(dt)
+                cam.follow(jugador.forma, lerp=1.0)
+
+            # --------- MOVIMIENTO + COLISIONES ---------
             vx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
             dx = vx * dt
 
+            # aplicar gravedad
             jugador.aplicar_gravedad(dt)
             dy = int(jugador.vel_y * dt)
-            jugador.movimiento(dx, 0.0)
+
+            # --- mover en X y resolver colisiones horizontales ---
+            jugador.forma.x += int(dx)
+            for rect in nivel.collision_rects:
+                if jugador.forma.colliderect(rect):
+                    if dx > 0:   # hacia la derecha
+                        jugador.forma.right = rect.left
+                    elif dx < 0: # hacia la izquierda
+                        jugador.forma.left = rect.right
+            jugador._pos_x = float(jugador.forma.x)  # coherencia con su posición flotante
+
+            # --- mover en Y y resolver colisiones verticales ---
             jugador.forma.y += dy
+            jugador.en_piso = False
+            for rect in nivel.collision_rects:
+                if jugador.forma.colliderect(rect):
+                    if dy > 0:  # cayendo
+                        jugador.forma.bottom = rect.top
+                        jugador.vel_y = 0
+                        jugador.en_piso = True
+                    elif dy < 0:  # golpeando techo
+                        jugador.forma.top = rect.bottom
+                        jugador.vel_y = 0
 
-            suelo_top = constantes.ALTO_VENTANA - constantes.ALTURA_SUELO
-            if jugador.forma.bottom >= suelo_top:
-                jugador.forma.bottom = suelo_top
-                jugador.vel_y = 0; jugador.en_piso = True
-            else:
-                jugador.en_piso = False
-
+            # actualizar estado según contacto y movimiento
             if jugador.en_piso:
                 jugador.state = "run" if vx != 0 else "idle"
 
             jugador.set_dx(vx)
             jugador.animar(dt)
             cam.follow(jugador.forma, lerp=1.0)
+            print("Jugador bottom:", jugador.forma.bottom, "Suelo top:", suelo_top)
 
         elif estado == ESTADO_MUERTE:
             jugador.aplicar_gravedad(dt)
@@ -645,7 +752,7 @@ def main():
         # -------------------- Draw --------------------
         if estado == ESTADO_MENU:
             ventana.blit(fondo_menu, (0, 0))
-            btn_play.draw(ventana); btn_opc.draw(ventana); btn_salir.draw(ventana)
+            titulo.draw(ventana); btn_play.draw(ventana); btn_opc.draw(ventana); btn_salir.draw(ventana)
             menu_krab.draw(ventana)
 
         elif estado == ESTADO_OPC:
