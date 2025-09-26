@@ -10,21 +10,40 @@ class NivelTiled:
         self.tile_h = self.tmx.tileheight
         self.width_px  = self.tmx.width  * self.tile_w
         self.height_px = self.tmx.height * self.tile_h
-
-        # Colisiones opcionales desde capa de objetos "Collisions"
         self.collision_rects = []
-        if "Collisions" in self.tmx.objectgroups:
-            for obj in self.tmx.objectgroups["Collisions"]:
-                r = pygame.Rect(int(obj.x), int(obj.y), int(obj.width), int(obj.height))
-                self.collision_rects.append(r)
+
+        # Leer la capa de objetos llamada "Collisions"
+        try:
+            # 1. Intenta obtener la capa de objetos por su nombre
+            collision_layer = self.tmx.get_layer_by_name("collisions")
+            # Si el nombre es en minúsculas en Tiled, usa "collisions"
+
+            # 2. Verifica que sea una capa de objetos (clase TiledObjectGroup)
+            import pytmx
+            if isinstance(collision_layer, pytmx.TiledObjectGroup):
+                for obj in collision_layer:
+                    # 3. Solo añadimos objetos con tamaño real
+                    if obj.width > 0 and obj.height > 0:
+                        rect = pygame.Rect(
+                            int(obj.x),
+                            int(obj.y),
+                            int(obj.width),
+                            int(obj.height)
+                        )
+                        self.collision_rects.append(rect)
+                print(f"DEBUG: Se cargaron {len(self.collision_rects)} rectángulos de colisión.")  # DEBUGGING
+            else:
+                print("ADVERTENCIA: La capa 'Collisions' existe pero no es una TiledObjectGroup.")
+
+        except ValueError:
+            print("ADVERTENCIA: Capa de colisiones 'Collisions' no encontrada en el archivo TMX.")
 
         # Spawn opcional desde "Spawns" → objeto con name="player"
-        self.spawn = None
-        if "Spawns" in self.tmx.objectgroups:
-            for obj in self.tmx.objectgroups["Spawns"]:
-                if getattr(obj, "name", "") == "player":
-                    self.spawn = (int(obj.x), int(obj.y))
-                    break
+        self.nivel.spawn = (0, 0)
+        for obj in self.tmx_data.objects:
+            if obj.name == "spaaaaawn":
+                self.nivel.spawn = (obj.x, obj.y)
+                break
 
     def draw(self, surface: pygame.Surface, camera_offset):
         ox, oy = camera_offset
