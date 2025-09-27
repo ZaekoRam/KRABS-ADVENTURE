@@ -197,15 +197,25 @@ def reiniciar_nivel(nivel, jugador):
     # Fallback si no hay spawn
     x, y_spawn = 100, 600
 
-    # 🔑 CORRECCIÓN: Usar el spawn de Tiled si se encontró
     if nivel.spawn:
         x, y_spawn = int(nivel.spawn[0]), int(nivel.spawn[1])
 
-    # Crucial: Colocar el punto 'midbottom' en la coordenada de spawn (x, y_spawn)
-    jugador.forma.midbottom = (x, y_spawn)
+    # Si tu clase Personaje tiene un método para colocar (como usar en MenuKrab), úsalo:
+    if hasattr(jugador, "colocar_en_midbottom"):
+        try:
+            jugador.colocar_en_midbottom(x, y_spawn)
+        except Exception:
+            # Caer de vuelta a la manipulación directa del rect
+            jugador.forma.midbottom = (x, y_spawn)
+    else:
+        jugador.forma.midbottom = (x, y_spawn)
 
     jugador.vel_y = 0
     jugador.en_piso = True
+    jugador.state = "idle"
+
+    # DEBUG opcional: imprime valores para verificar que el spawn es correcto
+    print(f"[DEBUG] reiniciar_nivel -> spawn=({x},{y_spawn}), jugador.rect={jugador.forma}")
 
 def iniciar_muerte(jugador):
     death_jump = getattr(constantes, "DEATH_JUMP_VEL",
@@ -250,12 +260,14 @@ class ImageButton:
 
 # -------------------- TMX Level --------------------
 class NivelTiled:
+
     def __init__(self, ruta_tmx: Path):
         self.tmx = load_pygame(str(ruta_tmx))
         self.tile_w = self.tmx.tilewidth; self.tile_h = self.tmx.tileheight
         self.width_px  = self.tmx.width  * self.tile_w
         self.height_px = self.tmx.height * self.tile_h
 
+        self.goal_rects = []
         self.collision_rects = []
         try:
             # 1. Intenta obtener la capa de objetos por su nombre
@@ -282,13 +294,31 @@ class NivelTiled:
         except ValueError:
             print("ADVERTENCIA: Capa de colisiones 'Collisions' no encontrada en el archivo TMX.")
 
+        if "Meta" in self.tmx.objectgroups:
+            for obj in self.tmx.objectgroups["Meta"]:
+                rect = pygame.Rect(int(obj.x), int(obj.y),
+                                   int(obj.width), int(obj.height))
+                self.goal_rects.append(rect)
 
         self.spawn = None
-        # 🔑 CORRECCIÓN: Usar el nombre de capa correcto: "Spawns"
         if "Spawns" in self.tmx.objectgroups:
             for obj in self.tmx.objectgroups["Spawns"]:
                 if getattr(obj, "name", "") == "player":
-                    self.spawn = (int(obj.x), int(obj.y));break
+                    # Si el objeto tiene altura (ej. tile), usamos y + height para obtener la "base".
+                    oy = int(getattr(obj, "y", 0))
+                    oh = int(getattr(obj, "height", 0))
+                    ox = int(getattr(obj, "x", 0))
+                    if oh > 0:
+                        spawn_x = ox + int(
+                            getattr(obj, "width", 0) // 2)  # centrar horizontalmente sobre el objeto/tile
+                        spawn_y = oy + oh  # base (= bottom) del objeto
+                    else:
+                        # point object: usar exactamente la coordenada
+                        spawn_x = ox
+                        spawn_y = oy
+                    self.spawn = (spawn_x, spawn_y)
+                    break
+
 
 
     def draw(self, surface: pygame.Surface, camera_offset):
@@ -478,6 +508,7 @@ ESTADO_MENU, ESTADO_JUEGO, ESTADO_OPC, ESTADO_PAUSA = "MENU", "JUEGO", "OPCIONES
 ESTADO_MUERTE   = "MUERTE"
 ESTADO_CONTINUE = "CONTINUE"
 ESTADO_GAMEOVER = "GAMEOVER"
+ESTADO_VICTORIA = "VICTORIA"
 
 def main():
     # Audio antes de pygame.init para evitar pops
@@ -627,18 +658,55 @@ def main():
         if estado == ESTADO_MENU:
             menu_krab.update(dt)
             if menu_leaving and menu_krab.offscreen(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA):
+                print("[DEBUG] Transición MENU -> JUEGO")
+                print(f" nivel.spawn = {nivel.spawn}")
+                print(f" jugador antes reiniciar = {jugador.forma}")
                 musica.switch("nivel1")
                 pygame.mixer.music.set_volume(VOL_NORMAL)
                 timer = tiempo_total
 
-                # jugador = Personaje(0, 0) # <--- ¡ELIMINAR ESTA LÍNEA! Ya se creó en main(
                 reiniciar_nivel(nivel, jugador)
-                # 🔑 PASO 2: Alinear la cámara instantáneamente (es crucial)
+                print(f" jugador después reiniciar = {jugador.forma}")
+                print(f" cam.offset() = {cam.offset()}")
+
+                # Forzar la cámara inmediatamente al centro del jugador (sin interpolación)
+                cx = jugador.forma.centerx - cam.vw // 2
+                cy = jugador.forma.centery - cam.vh // 2
+                # Clamp para no salir del world bounds
+                cx = max(0, min(cx, cam.ww - cam.vw))
+                cy = max(0, min(cy, cam.wh - cam.vh))
+                cam.set_offset(cx, cy)
+
+                # opcional: asegurar que follow deja el mismo valor
                 cam.follow(jugador.forma, lerp=1.0)
 
-                estado = ESTADO_JUEGO
+                limite_y = nivel.tmx.height * nivel.tmx.tileheight
+
+                # Verificación ÚNICA al iniciar
+                if jugador.forma.top > limite_y:
+                    # Por ejemplo, cambiar a estado de muerte en vez de jugar
+                    estado = ESTADO_MUERTE
+                    print("El jugador apareció fuera del mapa. Pasando a ESTADO_MUERTE")
+                else:
+                    estado = ESTADO_JUEGO
+
+
 
         elif estado == ESTADO_JUEGO:
+            # --- en tu bucle de juego principal ---
+            jugador.update(dt, nivel.collision_rects)
+            if jugador.forma.top > nivel.tmx.height * nivel.tmx.tileheight:
+                print("Jugador cayó del nivel, reiniciando...")
+                try:
+                    musica.sfx("death", volume=0.9)
+                except Exception:
+                    pass
+                freeze_cam_offset = cam.offset()
+                iniciar_muerte(jugador)
+                pygame.mixer.music.set_volume(0.35)
+                estado = ESTADO_MUERTE
+            # Si el jugador cae por debajo del mapa
+
             # --- OBTENER OFFSET DE CÁMARA ---
             ox, oy = cam.offset()
 
@@ -704,6 +772,12 @@ def main():
             jugador.animar(dt)
             cam.follow(jugador.forma, lerp=1.0)
 
+            for goal in nivel.goal_rects:
+                if jugador.forma.colliderect(goal):
+                    estado = ESTADO_VICTORIA  # o llama a una función ganar()
+                    print("¡Has ganado!")
+                    break
+
         elif estado == ESTADO_MUERTE:
             jugador.aplicar_gravedad(dt)
             dy = int(jugador.vel_y * dt)
@@ -723,6 +797,23 @@ def main():
                 freeze_cam_offset = None
                 menu_leaving = False
                 menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+
+
+        elif estado == ESTADO_VICTORIA:
+            # Animación simple: el jugador puede seguir con una pose
+            jugador.state = "idle"
+            jugador.animar(dt)
+            # Espera entrada para volver al menú
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN,
+                                                                  pygame.K_SPACE,
+                                                                  pygame.K_ESCAPE):
+                    musica.switch("menu")  # cambia la música al menú si quieres
+                    estado = ESTADO_MENU
+                    menu_leaving = False
+                    menu_krab = MenuKrab(midbottom=KRAB_MENU_POS,
+                                         scale=KRAB_MENU_SCALE)
+
 
         # -------------------- Draw --------------------
         if estado == ESTADO_MENU:
@@ -752,6 +843,22 @@ def main():
             draw_timer(ventana, font_hud, max(0, timer), pos=(20, 20))
             if estado == "CONTINUE":
                 continue_ui.draw(ventana)
+
+        elif estado == ESTADO_VICTORIA:
+            # Fondo del nivel congelado
+            nivel.draw(ventana, cam.offset())
+            ox, oy = cam.offset()
+            ventana.blit(jugador.image,
+                         (jugador.forma.x - ox, jugador.forma.y - oy))
+
+            # Mensaje de victoria
+            msg = get_font(constantes.FONT_UI_TITLE).render("¡VICTORIA!", True, (255, 255, 0))
+            ventana.blit(msg, (constantes.ANCHO_VENTANA // 2 - msg.get_width() // 2,
+                               constantes.ALTO_VENTANA // 2 - msg.get_height() // 2))
+
+            hint = get_font(constantes.FONT_UI_ITEM).render("Pulsa ENTER para volver al menú", True, (255, 255, 255))
+            ventana.blit(hint, (constantes.ANCHO_VENTANA // 2 - hint.get_width() // 2,
+                                constantes.ALTO_VENTANA // 2 + 60))
 
         pygame.display.flip()
 

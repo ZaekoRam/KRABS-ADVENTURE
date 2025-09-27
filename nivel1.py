@@ -45,7 +45,19 @@ class NivelTiled:
         if "Spawns" in self.tmx.objectgroups:
             for obj in self.tmx.objectgroups["Spawns"]:
                 if getattr(obj, "name", "") == "player":
-                    self.spawn = (int(obj.x), int(obj.y));
+                    # Si el objeto tiene altura (ej. tile), usamos y + height para obtener la "base".
+                    oy = int(getattr(obj, "y", 0))
+                    oh = int(getattr(obj, "height", 0))
+                    ox = int(getattr(obj, "x", 0))
+                    if oh > 0:
+                        spawn_x = ox + int(
+                            getattr(obj, "width", 0) // 2)  # centrar horizontalmente sobre el objeto/tile
+                        spawn_y = oy + oh  # base (= bottom) del objeto
+                    else:
+                        # point object: usar exactamente la coordenada
+                        spawn_x = ox
+                        spawn_y = oy
+                    self.spawn = (spawn_x, spawn_y)
                     break
 
     def draw(self, surface: pygame.Surface, camera_offset):

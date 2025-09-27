@@ -12,7 +12,7 @@ FPS = 60
 VELOCIDAD = 300
 # --- Muerte / vidas / tiempo ---
 VIDAS_INICIALES = 4              # cuántas vidas tiene el jugador
-TIEMPO_NIVEL1   = 10             # segundos (si no quieres timer, comenta esta línea)
+TIEMPO_NIVEL1   = 150             # segundos (si no quieres timer, comenta esta línea)
 
 # Impulso hacia arriba al iniciar la animación de muerte (estilo Mario)
 # Usa tu SALTO_VEL como base (negativo = hacia arriba)
