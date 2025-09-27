@@ -192,14 +192,25 @@ def draw_timer(surface, font, seconds, pos=(20, 20)):
     surface.blit(shad, (x+2, y+2))
     surface.blit(surf, (x, y))
 
+
 def reiniciar_nivel(nivel, jugador):
-    if getattr(nivel, "spawn", None):
-        x, y = int(nivel.spawn[0]), int(nivel.spawn[1])
+    if nivel.spawn:
+        # Tiled usa (x, y) como la esquina superior izquierda del objeto.
+        x, y_spawn = int(nivel.spawn[0]), int(nivel.spawn[1])
     else:
-        x, y = 250, 250
-    jugador.forma.midbottom = (x, y)
+        # Fallback si no hay spawn
+        x, y_spawn = 250, 250
+
+    # *** CORRECCIÓN CLAVE: AJUSTAR LA POSICIÓN Y ***
+    # La coordenada 'y' de Tiled es el TOP del punto de spawn.
+    # Para que el 'midbottom' del personaje esté en el suelo (y_spawn),
+    # debemos colocar el 'y' de su 'midbottom' en y_spawn.
+
+    # Crucial: Colocar el punto 'midbottom' en la coordenada de spawn (x, y_spawn)
+    jugador.forma.midbottom = (x, y_spawn)
+
     jugador.vel_y = 0
-    jugador.en_piso = False
+    jugador.en_piso = True  # <-- Aseguramos que esté en el piso al inicio
 
 def iniciar_muerte(jugador):
     death_jump = getattr(constantes, "DEATH_JUMP_VEL",
@@ -276,11 +287,13 @@ class NivelTiled:
         except ValueError:
             print("ADVERTENCIA: Capa de colisiones 'Collisions' no encontrada en el archivo TMX.")
 
+
         self.spawn = None
         if "Spawns" in self.tmx.objectgroups:
             for obj in self.tmx.objectgroups["Spawns"]:
                 if getattr(obj, "name", "") == "player":
-                    self.spawn = (int(obj.x), int(obj.y)); break
+                    self.spawn = (int(obj.x), int(obj.y));break
+
 
     def draw(self, surface: pygame.Surface, camera_offset):
         ox, oy = camera_offset; sw, sh = surface.get_size()
@@ -515,18 +528,25 @@ def main():
     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
     menu_leaving = False
 
+    # ... dentro de def main():
+
     # --- Nivel y jugador
     nivel = NivelTiled(MAP_DIR / "nivel1.tmx")
-    spawn_x, spawn_y = nivel.spawn if nivel.spawn else (250, 250)
-    jugador = Personaje(spawn_x, spawn_y)
 
-    # Alinear al piso al iniciar
-    suelo_top = constantes.ALTO_VENTANA - constantes.ALTURA_SUELO
-    jugador.forma.bottom = suelo_top
-    jugador.en_piso = True
-    jugador.vel_y = 0
+    # Crea el objeto Personaje en cualquier posición inicial (ej: 0, 0)
+    jugador = Personaje(0, 0)
 
+    # LÓGICA DE POSICIONAMIENTO INICIAL:
+    reiniciar_nivel(nivel, jugador)
+    # ELIMINA O COMENTA la siguiente línea si la moviste dentro de reiniciar_nivel:
+    # jugador.en_piso = True
+
+    # La cámara se debe inicializar DESPUÉS de posicionar al jugador
     cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
+
+    # 🔑 CORRECCIÓN OPCIONAL: Centrar la cámara incluso en la inicialización
+    # Esto asegura que si el juego salta el menú, el personaje es visible.
+    cam.follow(jugador.forma, lerp=1.0)
 
     # Música del menú (se arranca DESPUÉS de la intro)
     try: musica.play("menu", volumen=0.8)
@@ -591,13 +611,16 @@ def main():
             elif estado == ESTADO_CONTINUE:
                 action = continue_ui.handle_event(event)
                 if action == "continue":
-                    reiniciar_nivel(nivel, jugador)
-                    jugador.forma.bottom = constantes.ALTO_VENTANA - constantes.ALTURA_SUELO
-                    jugador.vel_y = 0; jugador.en_piso = True
+                    reiniciar_nivel(nivel, jugador)  # <-- Esto posiciona el personaje en el spawn
+                        # --- ELIMINA LAS LÍNEAS OBSOLETAS DE SUELO FIJO ---
+                        # jugador.forma.bottom = constantes.ALTO_VENTANA - constantes.ALTURA_SUELO
+                        # jugador.vel_y = 0; jugador.en_piso = True
+                        # --------------------------------------------------
                     timer = tiempo_total
                     pygame.mixer.music.set_volume(VOL_NORMAL)
                     estado = ESTADO_JUEGO
                     freeze_cam_offset = None
+
                 elif action == "menu":
                     pygame.mixer.music.set_volume(VOL_NORMAL)
                     musica.switch("menu")
@@ -613,6 +636,14 @@ def main():
                 musica.switch("nivel1")
                 pygame.mixer.music.set_volume(VOL_NORMAL)
                 timer = tiempo_total
+
+            # 1. POSICIONAR AL JUGADOR (la función que ya funciona)
+                reiniciar_nivel(nivel, jugador)
+
+            # 2. ALINEAR LA CÁMARA (la parte que faltaba al inicio)
+            # El parámetro lerp=1.0 fuerza a la cámara a saltar instantáneamente a la posición.
+                cam.follow(jugador.forma, lerp=1.0)
+
                 estado = ESTADO_JUEGO
 
         elif estado == ESTADO_JUEGO:
@@ -662,9 +693,7 @@ def main():
             # ----------------------------------------------------
             jugador.forma.y += dy  # 3. Aplicar movimiento vertical
 
-            jugador.en_piso = False
             for rect in nivel.collision_rects:
-                # 4. Chequear y corregir colisión vertical
                 if jugador.forma.colliderect(rect):
                     if dy > 0:  # cayendo
                         jugador.forma.bottom = rect.top
@@ -674,13 +703,7 @@ def main():
                         jugador.forma.top = rect.bottom
                         jugador.vel_y = 0
 
-            suelo_top = constantes.ALTO_VENTANA - constantes.ALTURA_SUELO
-            if jugador.forma.bottom >= suelo_top:
-                jugador.forma.bottom = suelo_top
-                jugador.vel_y = 0; jugador.en_piso = True
-            else:
-                jugador.en_piso = False
-
+            # --- Lógica de estado final ---
             if jugador.en_piso:
                 jugador.state = "run" if vx != 0 else "idle"
 

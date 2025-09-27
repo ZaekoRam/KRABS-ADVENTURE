@@ -39,11 +39,13 @@ class NivelTiled:
             print("ADVERTENCIA: Capa de colisiones 'Collisions' no encontrada en el archivo TMX.")
 
         # Spawn opcional desde "Spawns" → objeto con name="player"
-        self.nivel.spawn = (0, 0)
-        for obj in self.tmx_data.objects:
-            if obj.name == "spaaaaawn":
-                self.nivel.spawn = (obj.x, obj.y)
-                break
+            # En main.py, dentro de NivelTiled.__init__
+            self.spawn = None
+            if "Spawns" in self.tmx.objectgroups:
+                for obj in self.tmx.objectgroups["Spawns"]:
+                    if getattr(obj, "name", "") == "player":
+                        self.spawn = (int(obj.x), int(obj.y));
+                        break
 
     def draw(self, surface: pygame.Surface, camera_offset):
         ox, oy = camera_offset
