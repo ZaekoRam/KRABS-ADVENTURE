@@ -194,23 +194,18 @@ def draw_timer(surface, font, seconds, pos=(20, 20)):
 
 
 def reiniciar_nivel(nivel, jugador):
-    if nivel.spawn:
-        # Tiled usa (x, y) como la esquina superior izquierda del objeto.
-        x, y_spawn = int(nivel.spawn[0]), int(nivel.spawn[1])
-    else:
-        # Fallback si no hay spawn
-        x, y_spawn = 250, 250
+    # Fallback si no hay spawn
+    x, y_spawn = 100, 600
 
-    # *** CORRECCIÓN CLAVE: AJUSTAR LA POSICIÓN Y ***
-    # La coordenada 'y' de Tiled es el TOP del punto de spawn.
-    # Para que el 'midbottom' del personaje esté en el suelo (y_spawn),
-    # debemos colocar el 'y' de su 'midbottom' en y_spawn.
+    # 🔑 CORRECCIÓN: Usar el spawn de Tiled si se encontró
+    if nivel.spawn:
+        x, y_spawn = int(nivel.spawn[0]), int(nivel.spawn[1])
 
     # Crucial: Colocar el punto 'midbottom' en la coordenada de spawn (x, y_spawn)
     jugador.forma.midbottom = (x, y_spawn)
 
     jugador.vel_y = 0
-    jugador.en_piso = True  # <-- Aseguramos que esté en el piso al inicio
+    jugador.en_piso = True
 
 def iniciar_muerte(jugador):
     death_jump = getattr(constantes, "DEATH_JUMP_VEL",
@@ -289,6 +284,7 @@ class NivelTiled:
 
 
         self.spawn = None
+        # 🔑 CORRECCIÓN: Usar el nombre de capa correcto: "Spawns"
         if "Spawns" in self.tmx.objectgroups:
             for obj in self.tmx.objectgroups["Spawns"]:
                 if getattr(obj, "name", "") == "player":
@@ -423,6 +419,7 @@ class MenuKrab:
     def __init__(self, midbottom, scale=2.0):
         self.p = Personaje(midbottom[0], midbottom[1])
         self.p.colocar_en_midbottom(*midbottom)
+        self.initial_midbottom = midbottom # 🔑 Guardamos la posición original
         self.p.en_piso = True
         self.p.vel_y = 0
         self.state = "idle"
@@ -445,6 +442,13 @@ class MenuKrab:
             self.p.set_dx(0)
             self.p.state = "idle"
             self.p.animar(dt)
+
+            # 🔑 CORRECCIÓN: Forzar la posición vertical al suelo del menú
+            # Esto actúa como el suelo virtual
+            self.p.forma.midbottom = self.initial_midbottom
+            self.p.vel_y = 0
+            self.p.en_piso = True
+
         elif self.state == "leaving":
             self.p.aplicar_gravedad(dt)
             self.p.movimiento(self.vx * dt, 0.0)
@@ -533,20 +537,10 @@ def main():
     # --- Nivel y jugador
     nivel = NivelTiled(MAP_DIR / "nivel1.tmx")
 
-    # Crea el objeto Personaje en cualquier posición inicial (ej: 0, 0)
-    jugador = Personaje(0, 0)
-
-    # LÓGICA DE POSICIONAMIENTO INICIAL:
-    reiniciar_nivel(nivel, jugador)
-    # ELIMINA O COMENTA la siguiente línea si la moviste dentro de reiniciar_nivel:
-    # jugador.en_piso = True
-
+    # 🔑 CREACIÓN INMEDIATA: El jugador existe desde el inicio, pero fuera de la pantalla
+    jugador = Personaje(-100, -100)
     # La cámara se debe inicializar DESPUÉS de posicionar al jugador
     cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
-
-    # 🔑 CORRECCIÓN OPCIONAL: Centrar la cámara incluso en la inicialización
-    # Esto asegura que si el juego salta el menú, el personaje es visible.
-    cam.follow(jugador.forma, lerp=1.0)
 
     # Música del menú (se arranca DESPUÉS de la intro)
     try: musica.play("menu", volumen=0.8)
@@ -629,7 +623,7 @@ def main():
                     menu_leaving = False
                     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
 
-        # -------------------- Update --------------------
+                # -------------------- Update --------------------
         if estado == ESTADO_MENU:
             menu_krab.update(dt)
             if menu_leaving and menu_krab.offscreen(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA):
@@ -637,11 +631,9 @@ def main():
                 pygame.mixer.music.set_volume(VOL_NORMAL)
                 timer = tiempo_total
 
-            # 1. POSICIONAR AL JUGADOR (la función que ya funciona)
+                # jugador = Personaje(0, 0) # <--- ¡ELIMINAR ESTA LÍNEA! Ya se creó en main(
                 reiniciar_nivel(nivel, jugador)
-
-            # 2. ALINEAR LA CÁMARA (la parte que faltaba al inicio)
-            # El parámetro lerp=1.0 fuerza a la cámara a saltar instantáneamente a la posición.
+                # 🔑 PASO 2: Alinear la cámara instantáneamente (es crucial)
                 cam.follow(jugador.forma, lerp=1.0)
 
                 estado = ESTADO_JUEGO
@@ -649,6 +641,7 @@ def main():
         elif estado == ESTADO_JUEGO:
             # --- OBTENER OFFSET DE CÁMARA ---
             ox, oy = cam.offset()
+
 
             # --- DEBUGGING VISUAL: DIBUJAR CAJAS DE COLISIÓN ---
             for rect in nivel.collision_rects:

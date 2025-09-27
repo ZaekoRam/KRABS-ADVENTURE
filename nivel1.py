@@ -40,12 +40,13 @@ class NivelTiled:
 
         # Spawn opcional desde "Spawns" → objeto con name="player"
             # En main.py, dentro de NivelTiled.__init__
-            self.spawn = None
-            if "Spawns" in self.tmx.objectgroups:
-                for obj in self.tmx.objectgroups["Spawns"]:
-                    if getattr(obj, "name", "") == "player":
-                        self.spawn = (int(obj.x), int(obj.y));
-                        break
+
+        self.spawn = None
+        if "Spawns" in self.tmx.objectgroups:
+            for obj in self.tmx.objectgroups["Spawns"]:
+                if getattr(obj, "name", "") == "player":
+                    self.spawn = (int(obj.x), int(obj.y));
+                    break
 
     def draw(self, surface: pygame.Surface, camera_offset):
         ox, oy = camera_offset
