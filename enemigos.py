@@ -47,7 +47,7 @@ class Enemigo(pygame.sprite.Sprite):
 
         # --- ATRIBUTOS PARA EL SALTO ---
         self.fuerza_salto = -500
-        self.INTERVALO_SALTO = 1.5  # Un poco más corto para que no espere tanto
+        self.INTERVALO_SALTO = 2  # Un poco más corto para que no espere tanto
         self.salto_timer = self.INTERVALO_SALTO
 
     def update(self, dt, plataformas):

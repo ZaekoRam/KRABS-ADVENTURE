@@ -269,7 +269,19 @@ class NivelTiled:
         self.height_px = self.tmx.height * self.tile_h
 
         self.goal_rects = []
+        self.enemy_barrier_rects = []
         self.collision_rects = []
+        try:
+            barrier_layer = self.tmx.get_layer_by_name("barrera_enemigos")
+            import pytmx
+            if isinstance(barrier_layer, pytmx.TiledObjectGroup):
+                for obj in barrier_layer:
+                    if obj.width > 0 and obj.height > 0:
+                        rect = pygame.Rect(int(obj.x), int(obj.y), int(obj.width), int(obj.height))
+                        self.enemy_barrier_rects.append(rect)
+        except ValueError:
+            print("ADVERTENCIA: Capa 'barrera_enemigos' no encontrada. Los enemigos podrían caerse.")
+        # -----------------------------------------------
         try:
             # 1. Intenta obtener la capa de objetos por su nombre
             collision_layer = self.tmx.get_layer_by_name("collisions")
@@ -726,7 +738,8 @@ def main():
         elif estado == ESTADO_JUEGO:
             # --- en tu bucle de juego principal ---
             jugador.update(dt, nivel.collision_rects)
-            enemigos.update(dt, nivel.collision_rects)
+            colisiones_para_enemigos = nivel.collision_rects + nivel.enemy_barrier_rects
+            enemigos.update(dt, colisiones_para_enemigos)
             enemigos.draw(ventana)
             if jugador.forma.bottom > nivel.tmx.height * nivel.tmx.tileheight:
                 print("Jugador cayó del nivel, reiniciando...")
