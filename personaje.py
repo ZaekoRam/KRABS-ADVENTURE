@@ -41,7 +41,7 @@ class Personaje(pygame.sprite.Sprite):
 
         # ---- render y rect ----
         self.image = self.frames_idle[0]
-        self.forma = self.image.get_rect()
+        self. forma = self.image.get_rect()
         self.forma.midbottom = (int(spawn_x), int(spawn_y))
 
         self._pos_x = float(self.forma.x)

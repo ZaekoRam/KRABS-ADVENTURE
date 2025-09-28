@@ -7,6 +7,7 @@ from personaje import Personaje
 import musica
 from pytmx.util_pygame import (load_pygame)
 import imageio
+from enemigos import Enemigo
 from fuentes import get_font  # <-- NUEVO: usar tu fuente pixel
 
 
@@ -195,7 +196,7 @@ def draw_timer(surface, font, seconds, pos=(20, 20)):
 
 def reiniciar_nivel(nivel, jugador):
     # Fallback si no hay spawn
-    x, y_spawn = 100, 600
+    x, y_spawn = 100, 670
 
     if nivel.spawn:
         x, y_spawn = int(nivel.spawn[0]), int(nivel.spawn[1])
@@ -294,11 +295,22 @@ class NivelTiled:
         except ValueError:
             print("ADVERTENCIA: Capa de colisiones 'Collisions' no encontrada en el archivo TMX.")
 
-        if "Meta" in self.tmx.objectgroups:
-            for obj in self.tmx.objectgroups["Meta"]:
-                rect = pygame.Rect(int(obj.x), int(obj.y),
-                                   int(obj.width), int(obj.height))
-                self.goal_rects.append(rect)
+        Meta_layer = self.tmx.get_layer_by_name("Meta")
+        # Si el nombre es en minúsculas en Tiled, usa "collisions"
+
+        # 2. Verifica que sea una capa de objetos (clase TiledObjectGroup)
+        import pytmx
+        if isinstance(Meta_layer, pytmx.TiledObjectGroup):
+            for obj in Meta_layer:
+                # 3. Solo añadimos objetos con tamaño real
+                if obj.width > 0 and obj.height > 0:
+                    rect = pygame.Rect(
+                        int(obj.x),
+                        int(obj.y),
+                        int(obj.width),
+                        int(obj.height)
+                    )
+                    self.goal_rects.append(rect)
 
         self.spawn = None
         if "Spawns" in self.tmx.objectgroups:
@@ -569,9 +581,10 @@ def main():
     nivel = NivelTiled(MAP_DIR / "nivel1.tmx")
 
     # 🔑 CREACIÓN INMEDIATA: El jugador existe desde el inicio, pero fuera de la pantalla
-    jugador = Personaje(-100, -100)
+    jugador = Personaje(1000000, 100000)
     # La cámara se debe inicializar DESPUÉS de posicionar al jugador
     cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
+    enemigos = pygame.sprite.Group()
 
     # Música del menú (se arranca DESPUÉS de la intro)
     try: musica.play("menu", volumen=0.8)
@@ -636,15 +649,17 @@ def main():
             elif estado == ESTADO_CONTINUE:
                 action = continue_ui.handle_event(event)
                 if action == "continue":
-                    reiniciar_nivel(nivel, jugador)  # <-- Esto posiciona el personaje en el spawn
-                        # --- ELIMINA LAS LÍNEAS OBSOLETAS DE SUELO FIJO ---
-                        # jugador.forma.bottom = constantes.ALTO_VENTANA - constantes.ALTURA_SUELO
-                        # jugador.vel_y = 0; jugador.en_piso = True
-                        # --------------------------------------------------
+                    reiniciar_nivel(nivel, jugador)
+                    enemigos = pygame.sprite.Group()
+                    enemigos.add(Enemigo(x=400, y=670, velocidad=constantes.VEL_ENEM, escala=2),
+                                 Enemigo(x=700, y=670, velocidad=constantes.VEL_ENEM, escala=2))
                     timer = tiempo_total
                     pygame.mixer.music.set_volume(VOL_NORMAL)
                     estado = ESTADO_JUEGO
                     freeze_cam_offset = None
+
+
+
 
                 elif action == "menu":
                     pygame.mixer.music.set_volume(VOL_NORMAL)
@@ -653,6 +668,16 @@ def main():
                     freeze_cam_offset = None
                     menu_leaving = False
                     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+
+            elif estado == ESTADO_VICTORIA:
+               if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN,
+                                                                   pygame.K_SPACE,
+                                                                   pygame.K_ESCAPE):
+                     musica.switch("menu")
+                     estado = ESTADO_MENU
+                     menu_leaving = False
+                     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+
 
                 # -------------------- Update --------------------
         if estado == ESTADO_MENU:
@@ -681,6 +706,12 @@ def main():
                 cam.follow(jugador.forma, lerp=1.0)
 
                 limite_y = nivel.tmx.height * nivel.tmx.tileheight
+                enemigos = pygame.sprite.Group()
+                eenemigos = pygame.sprite.Group()
+                # Pasa el nuevo parámetro de escala al crear los enemigos
+                enemigos.add(Enemigo(x= 450, y = 600, velocidad = 30,escala = 2.5),
+                             Enemigo(x = 800,y = 600,velocidad = 30,escala = 2.5))
+
 
                 # Verificación ÚNICA al iniciar
                 if jugador.forma.top > limite_y:
@@ -695,7 +726,9 @@ def main():
         elif estado == ESTADO_JUEGO:
             # --- en tu bucle de juego principal ---
             jugador.update(dt, nivel.collision_rects)
-            if jugador.forma.top > nivel.tmx.height * nivel.tmx.tileheight:
+            enemigos.update(dt, nivel.collision_rects)
+            enemigos.draw(ventana)
+            if jugador.forma.bottom > nivel.tmx.height * nivel.tmx.tileheight:
                 print("Jugador cayó del nivel, reiniciando...")
                 try:
                     musica.sfx("death", volume=0.9)
@@ -778,6 +811,20 @@ def main():
                     print("¡Has ganado!")
                     break
 
+
+            for e in enemigos:
+                if e.tocar_jugador(jugador):
+                    # Aquí puedes añadir efectos de sonido o visuales antes de cambiar de estado
+                    try:
+                        musica.sfx("death", volume=0.9)
+                    except Exception:
+                        pass
+                    freeze_cam_offset = cam.offset()
+                    iniciar_muerte(jugador)
+                    pygame.mixer.music.set_volume(0.35)
+                    estado = ESTADO_MUERTE
+                    break  # Termina el bucle si un enemigo ya te ha golpeado
+
         elif estado == ESTADO_MUERTE:
             jugador.aplicar_gravedad(dt)
             dy = int(jugador.vel_y * dt)
@@ -799,20 +846,6 @@ def main():
                 menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
 
 
-        elif estado == ESTADO_VICTORIA:
-            # Animación simple: el jugador puede seguir con una pose
-            jugador.state = "idle"
-            jugador.animar(dt)
-            # Espera entrada para volver al menú
-            for event in pygame.event.get():
-                if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN,
-                                                                  pygame.K_SPACE,
-                                                                  pygame.K_ESCAPE):
-                    musica.switch("menu")  # cambia la música al menú si quieres
-                    estado = ESTADO_MENU
-                    menu_leaving = False
-                    menu_krab = MenuKrab(midbottom=KRAB_MENU_POS,
-                                         scale=KRAB_MENU_SCALE)
 
 
         # -------------------- Draw --------------------
@@ -829,6 +862,10 @@ def main():
         elif estado in ("JUEGO", "PAUSA"):
             nivel.draw(ventana, cam.offset())
             ox, oy = cam.offset()
+
+            for enemigo in enemigos:
+                ventana.blit(enemigo.image, (enemigo.rect.x - ox, enemigo.rect.y - oy))
+
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
             draw_timer(ventana, font_hud, timer, pos=(20, 20))
             if estado == "PAUSA":

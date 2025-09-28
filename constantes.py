@@ -10,6 +10,7 @@ COLOR_PERSONAJE = (255,255,0)
 JUMP_REPEAT_EVERY = 0.25  # segundos entre saltos mientras se mantiene
 FPS = 60
 VELOCIDAD = 300
+VEL_ENEM = 80
 # --- Muerte / vidas / tiempo ---
 VIDAS_INICIALES = 4              # cuántas vidas tiene el jugador
 TIEMPO_NIVEL1   = 150             # segundos (si no quieres timer, comenta esta línea)
