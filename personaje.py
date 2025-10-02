@@ -41,7 +41,7 @@ class Personaje(pygame.sprite.Sprite):
 
         # ---- render y rect ----
         self.image = self.frames_idle[0]
-        self.forma = self.image.get_rect()
+        self. forma = self.image.get_rect()
         self.forma.midbottom = (int(spawn_x), int(spawn_y))
 
         self._pos_x = float(self.forma.x)
@@ -104,5 +104,11 @@ class Personaje(pygame.sprite.Sprite):
         else:
             frame = self.frames_idle[0]
 
+
+
         # flip según dirección
         self.image = frame if self.facing_right else pygame.transform.flip(frame, True, False)
+
+    def verificar_caida(self, altura_mapa):
+        if self.forma.top > altura_mapa:
+            self.morir()  # o cualquier lógica de muerte/reinici
