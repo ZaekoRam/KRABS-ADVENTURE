@@ -637,6 +637,8 @@ def main():
 
             elif estado == ESTADO_JUEGO:
                 if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_f:  # tecla F
+                        jugador.start_attack()
                     if event.key == pygame.K_ESCAPE:
                         estado = ESTADO_PAUSA
                         pygame.mixer.music.set_volume(VOL_PAUSA)
@@ -664,7 +666,8 @@ def main():
                     reiniciar_nivel(nivel, jugador)
                     enemigos = pygame.sprite.Group()
                     enemigos.add(Enemigo(x=400, y=670, velocidad=constantes.VEL_ENEM, escala=2),
-                                 Enemigo(x=700, y=670, velocidad=constantes.VEL_ENEM, escala=2))
+                                 Enemigo(x=700, y=670, velocidad=constantes.VEL_ENEM, escala=2),
+                                 Enemigo(x=700, y=400, velocidad=constantes.VEL_ENEM, escala=2))
                     timer = tiempo_total
                     pygame.mixer.music.set_volume(VOL_NORMAL)
                     estado = ESTADO_JUEGO
@@ -736,6 +739,8 @@ def main():
 
 
         elif estado == ESTADO_JUEGO:
+            # --- AVANZAR TIMERS / ESTADO DEL JUGADOR ---
+            jugador.actualizar(dt)  # <-- NUEVO: enfría el ataque, etc.
             # --- en tu bucle de juego principal ---
             jugador.update(dt, nivel.collision_rects)
             colisiones_para_enemigos = nivel.collision_rects + nivel.enemy_barrier_rects
@@ -810,10 +815,18 @@ def main():
                         jugador.forma.top = rect.bottom
                         jugador.vel_y = 0
 
-            # --- Lógica de estado final ---
-            if jugador.en_piso:
-                jugador.state = "run" if vx != 0 else "idle"
+            jugador.set_dx(vx)  # solo cambia orientación
 
+            if jugador.attacking:
+                jugador.state = "attack"  # ⬅ prioridad: no lo sobrescribas
+            else:
+                if not jugador.en_piso:
+                    # opcional: si quieres distinguir salto/caída
+                    jugador.state = "jump" if jugador.vel_y < 0 else "fall"
+                else:
+                    jugador.state = "run" if vx != 0 else "idle"
+
+            jugador.animar(dt)
             jugador.set_dx(vx)
             jugador.animar(dt)
             cam.follow(jugador.forma, lerp=1.0)
@@ -823,6 +836,15 @@ def main():
                     estado = ESTADO_VICTORIA  # o llama a una función ganar()
                     print("¡Has ganado!")
                     break
+
+            if jugador.attacking and jugador.attack_timer > 0:
+                atk = jugador.get_attack_rect()
+                for e in list(enemigos):
+                    if atk.colliderect(e.rect):
+                        if hasattr(e, "hurt"):
+                            e.hurt(jugador.attack_damage)
+                        else:
+                            e.kill()
 
 
             for e in enemigos:
