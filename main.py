@@ -162,6 +162,8 @@ MAP_DIR  = BASE_DIR / "assets" / "maps"
 VID_DIR  = BASE_DIR / "assets" / "video"    # <--- carpeta de video
 
 # -------------------- Helpers --------------------
+
+
 def scale_to_width(surf: pygame.Surface, target_w: int) -> pygame.Surface:
     ratio = target_w / surf.get_width()
     target_h = int(surf.get_height() * ratio)
@@ -194,6 +196,18 @@ def draw_timer(surface, font, seconds, pos=(20, 20)):
     surface.blit(surf, (x, y))
 
 
+def draw_hud(surface, jugador, img_lleno, img_vacio):
+    if not img_lleno: return  # Ahora comprueba el argumento que le pasamos
+
+    for i in range(jugador.vida_maxima):
+        pos_x = 20 + i * 40
+        pos_y = 50
+        if i < jugador.vida_actual:
+            surface.blit(img_lleno, (pos_x, pos_y))  # Y usa ese argumento para dibujar
+        else:
+            surface.blit(img_vacio, (pos_x, pos_y))
+
+
 def reiniciar_nivel(nivel, jugador):
     # Fallback si no hay spawn
     x, y_spawn = 100, 670
@@ -214,7 +228,7 @@ def reiniciar_nivel(nivel, jugador):
     jugador.vel_y = 0
     jugador.en_piso = True
     jugador.state = "idle"
-
+    jugador.vida_actual = jugador.vida_maxima
     # DEBUG opcional: imprime valores para verificar que el spawn es correcto
     print(f"[DEBUG] reiniciar_nivel -> spawn=({x},{y_spawn}), jugador.rect={jugador.forma}")
 
@@ -529,6 +543,7 @@ class MenuKrab:
 
 # -------------------- Estados --------------------
 ESTADO_MENU, ESTADO_JUEGO, ESTADO_OPC, ESTADO_PAUSA = "MENU", "JUEGO", "OPCIONES", "PAUSA"
+ESTADO_CARGANDO = "CARGANDO"
 ESTADO_MUERTE   = "MUERTE"
 ESTADO_CONTINUE = "CONTINUE"
 ESTADO_GAMEOVER = "GAMEOVER"
@@ -545,6 +560,19 @@ def main():
     pygame.display.set_caption("Krab's adventure")
     reloj = pygame.time.Clock()
 
+    try:
+        # Usamos tus nombres de variable preferidos
+        vida_lleno_img = pygame.image.load(IMG_DIR / "vidas/vida_llena.png").convert_alpha()
+        vida_vacio_img = pygame.image.load(
+            IMG_DIR / "vidas/vida_vacia.png").convert_alpha()  # Asegúrate que el archivo se llame así
+
+        # Y los escalamos
+        vida_lleno_img = pygame.transform.scale(vida_lleno_img, (32, 32))
+        vida_vacio_img = pygame.transform.scale(vida_vacio_img, (32, 32))
+    except pygame.error as e:
+        print(f"ERROR AL CARGAR IMÁGENES DEL HUD: {e}")
+        vida_lleno_img = vida_vacio_img = None
+
     # --- INTRO: solo una vez por sesión ---
     video_path = VID_DIR / "intro.mp4"
     audio_path = VID_DIR / "intro.wav"  # tu audio real (WAV/OGG recomendado)
@@ -554,9 +582,9 @@ def main():
         ventana,
         video_path,
         audio_path,
-        FPS_OVERRIDE=25.0,     # <-- tu video a 30 fps
+        FPS_OVERRIDE=25,     # <-- tu video a 30 fps
         AV_OFFSET=0.0,         # mueve el video vs audio si hay desfase fijo (ej. -0.08)
-        audio_delay=1.2,        # <-- retrasa el audio X s sin parar el video (prueba 0.0 / 0.8 / 1.2 / 1.5)
+        audio_delay=0.1,        # <-- retrasa el audio X s sin parar el video (prueba 0.0 / 0.8 / 1.2 / 1.5)
     )
 
     font_hud = get_font(constantes.FONT_HUD)  # <-- cambiado
@@ -637,6 +665,8 @@ def main():
 
             elif estado == ESTADO_JUEGO:
                 if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_f:  # tecla F
+                        jugador.start_attack()
                     if event.key == pygame.K_ESCAPE:
                         estado = ESTADO_PAUSA
                         pygame.mixer.music.set_volume(VOL_PAUSA)
@@ -661,13 +691,7 @@ def main():
             elif estado == ESTADO_CONTINUE:
                 action = continue_ui.handle_event(event)
                 if action == "continue":
-                    reiniciar_nivel(nivel, jugador)
-                    enemigos = pygame.sprite.Group()
-                    enemigos.add(Enemigo(x=400, y=670, velocidad=constantes.VEL_ENEM, escala=2),
-                                 Enemigo(x=700, y=670, velocidad=constantes.VEL_ENEM, escala=2))
-                    timer = tiempo_total
-                    pygame.mixer.music.set_volume(VOL_NORMAL)
-                    estado = ESTADO_JUEGO
+                    estado = ESTADO_CARGANDO
                     freeze_cam_offset = None
 
 
@@ -731,11 +755,42 @@ def main():
                     estado = ESTADO_MUERTE
                     print("El jugador apareció fuera del mapa. Pasando a ESTADO_MUERTE")
                 else:
-                    estado = ESTADO_JUEGO
+                    estado = ESTADO_CARGANDO
+
+        elif estado == ESTADO_CARGANDO:
+            # --- AQUÍ OCURRE TODA LA CARGA DEL NIVEL ---
+            print("[DEBUG] Estado de carga: Iniciando...")
+
+            # 1. Carga la música del nivel
+            musica.switch("nivel1")
+            pygame.mixer.music.set_volume(VOL_NORMAL)
+
+            # 2. Reinicia el temporizador
+            timer = tiempo_total
+
+            # 3. Carga el nivel desde Tiled (esto puede ser lento)
+            nivel_actual = 1  # O la variable que uses para el nivel
+            nivel = NivelTiled(MAP_DIR / f"nivel{nivel_actual}.tmx")
+
+            # 4. Posiciona al jugador y la cámara
+            reiniciar_nivel(nivel, jugador)
+            cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
+            cam.follow(jugador.forma, lerp=1.0)  # Forzar cámara sin suavizado inicial
+
+            # 5. Crea los enemigos
+            enemigos = pygame.sprite.Group()
+            enemigos.add(Enemigo(x=450, y=600, velocidad=30, escala=2.5),
+                         Enemigo(x=800, y=600, velocidad=30, escala=2.5))
+
+            # 6. ¡Listo! Cambia al estado de juego
+            print("[DEBUG] Carga completa. Pasando a ESTADO_JUEGO.")
+            estado = ESTADO_JUEGO
 
 
 
         elif estado == ESTADO_JUEGO:
+            # --- AVANZAR TIMERS / ESTADO DEL JUGADOR ---
+            jugador.actualizar(dt)  # <-- NUEVO: enfría el ataque, etc.
             # --- en tu bucle de juego principal ---
             jugador.update(dt, nivel.collision_rects)
             colisiones_para_enemigos = nivel.collision_rects + nivel.enemy_barrier_rects
@@ -763,7 +818,10 @@ def main():
                 debug_rect = rect.move(-ox, -oy)
                 pygame.draw.rect(ventana, (255, 0, 0), debug_rect, 2)  # Rojo: Colisiones
 
-            # ... (Tu código de movimiento horizontal con colisión) ...
+            if jugador.invencible:
+                jugador.invencible_timer -= dt
+                if jugador.invencible_timer <= 0:
+                    jugador.invencible = False
 
             # Dibuja el jugador (también con offset de cámara)
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
@@ -810,10 +868,18 @@ def main():
                         jugador.forma.top = rect.bottom
                         jugador.vel_y = 0
 
-            # --- Lógica de estado final ---
-            if jugador.en_piso:
-                jugador.state = "run" if vx != 0 else "idle"
+            jugador.set_dx(vx)  # solo cambia orientación
 
+            if jugador.attacking:
+                jugador.state = "attack"  # ⬅ prioridad: no lo sobrescribas
+            else:
+                if not jugador.en_piso:
+                    # opcional: si quieres distinguir salto/caída
+                    jugador.state = "jump" if jugador.vel_y < 0 else "fall"
+                else:
+                    jugador.state = "run" if vx != 0 else "idle"
+
+            jugador.animar(dt)
             jugador.set_dx(vx)
             jugador.animar(dt)
             cam.follow(jugador.forma, lerp=1.0)
@@ -824,19 +890,25 @@ def main():
                     print("¡Has ganado!")
                     break
 
+            if jugador.attacking and jugador.attack_timer > 0:
+                atk = jugador.get_attack_rect()
+                for e in list(enemigos):
+                    if atk.colliderect(e.rect):
+                        if hasattr(e, "hurt"):
+                            e.hurt(jugador.attack_damage)
+                        else:
+                            e.kill()
+
 
             for e in enemigos:
                 if e.tocar_jugador(jugador):
-                    # Aquí puedes añadir efectos de sonido o visuales antes de cambiar de estado
-                    try:
-                        musica.sfx("death", volume=0.9)
-                    except Exception:
-                        pass
-                    freeze_cam_offset = cam.offset()
-                    iniciar_muerte(jugador)
-                    pygame.mixer.music.set_volume(0.35)
-                    estado = ESTADO_MUERTE
-                    break  # Termina el bucle si un enemigo ya te ha golpeado
+                    jugador.recibir_dano(1)
+
+            if jugador.vida_actual <= 0 and estado == ESTADO_JUEGO:
+                # Esta es la lógica de muerte que ya tenías
+                freeze_cam_offset = cam.offset()
+                iniciar_muerte(jugador)
+                estado = ESTADO_MUERTE
 
         elif estado == ESTADO_MUERTE:
             jugador.aplicar_gravedad(dt)
@@ -875,6 +947,9 @@ def main():
         elif estado in ("JUEGO", "PAUSA"):
             nivel.draw(ventana, cam.offset())
             ox, oy = cam.offset()
+
+            draw_timer(ventana, font_hud, timer, pos=(20, 20))
+            draw_hud(ventana, jugador, vida_lleno_img, vida_vacio_img)
 
             for enemigo in enemigos:
                 ventana.blit(enemigo.image, (enemigo.rect.x - ox, enemigo.rect.y - oy))
