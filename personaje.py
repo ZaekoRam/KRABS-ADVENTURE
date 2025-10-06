@@ -64,7 +64,49 @@ class Personaje(pygame.sprite.Sprite):
         self.attack_offset_x = -extra_x // 2  # para centrar en X
         self.attack_offset_y = -extra_y // 2  # para centrar en Y
 
+        # --- ATRIBUTOS DE VIDA Y DAÑO ---
+        self.vida_maxima = 3
+        self.vida_actual = self.vida_maxima
+        self.invencible = False
+        self.invencible_timer = 0
+        self.INVENCIBLE_DURACION = .5  # 1.5 segundos de invencibilidad
+
+        # --- ATRIBUTOS DE KNOCKBACK (NUEVO) ---
+        self.knockback_speed_y = -400  # Impulso vertical (hacia arriba)
+        self.knockback_speed_x = 200  # Impulso horizontal
+
     # ---------------- API ----------------
+
+    # ---- METODO PARA REINICIAR AL JUGADOR (AÑADE ESTO) ----
+    def reset(self, spawn_pos):
+        # Resetea la posición y velocidad
+        self.forma.x, self.forma.y = spawn_pos
+        self.vel_y = 0
+
+        # Resetea el estado de la animación
+        self.state = "idle"
+        self.attacking = False
+
+        # ¡LA LÍNEA CLAVE! Resetea la vida
+        self.vida_actual = self.vida_maxima
+
+        # Resetea también la invencibilidad
+        self.invencible = False
+        self.invencible_timer = 0
+
+    def recibir_dano(self, cantidad):
+        # El jugador solo recibe daño si no es invencible
+        if not self.invencible:
+            self.vida_actual -= cantidad
+            print(f"Vida restante: {self.vida_actual}")  # Mensaje para depurar
+            self.vel_y = self.knockback_speed_y
+
+            if self.vida_actual < 0:
+                self.vida_actual = 0
+
+            # Activa la invencibilidad para que no reciba daño múltiple
+            self.invencible = True
+            self.invencible_timer = self.INVENCIBLE_DURACION
 
     def start_attack(self):
         if not self.attacking and self.attack_cooldown_timer <= 0:

@@ -8,7 +8,9 @@ import musica
 from pytmx.util_pygame import (load_pygame)
 import imageio
 from enemigos import Enemigo
+from items import Manzana
 from fuentes import get_font  # <-- NUEVO: usar tu fuente pixel
+from parallax import create_parallax_nivel1  # <-- PARALLAX
 
 
 # --- Reproductor de intro usando imageio con sync estable, fps robusto y delay de audio por evento ---
@@ -162,6 +164,8 @@ MAP_DIR  = BASE_DIR / "assets" / "maps"
 VID_DIR  = BASE_DIR / "assets" / "video"    # <--- carpeta de video
 
 # -------------------- Helpers --------------------
+
+
 def scale_to_width(surf: pygame.Surface, target_w: int) -> pygame.Surface:
     ratio = target_w / surf.get_width()
     target_h = int(surf.get_height() * ratio)
@@ -181,6 +185,7 @@ def escalar_a_ventana(surf: pygame.Surface) -> pygame.Surface:
         surf, (constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA)
     )
 
+
 # ---- HUD helpers ----
 def draw_timer(surface, font, seconds, pos=(20, 20)):
     s = max(0, int(seconds))
@@ -194,9 +199,30 @@ def draw_timer(surface, font, seconds, pos=(20, 20)):
     surface.blit(surf, (x, y))
 
 
+def draw_hud(surface, jugador, img_lleno, img_vacio):
+    if not img_lleno: return  # Ahora comprueba el argumento que le pasamos
+
+    for i in range(jugador.vida_maxima):
+        pos_x = 20 + i * 40
+        pos_y = 50
+        if i < jugador.vida_actual:
+            surface.blit(img_lleno, (pos_x, pos_y))  # Y usa ese argumento para dibujar
+        else:
+            surface.blit(img_vacio, (pos_x, pos_y))
+
+
+def draw_puntuacion(surface, font, puntuacion, pos=(20, 80)):
+    # Formatea el texto que se va a mostrar
+    texto = font.render(f"Puntos: {puntuacion}", True, (255, 255, 255))
+
+    # Dibuja el texto en la posición especificada
+    surface.blit(texto, pos)
+
+
 def reiniciar_nivel(nivel, jugador):
     # Fallback si no hay spawn
     x, y_spawn = 100, 670
+
 
     if nivel.spawn:
         x, y_spawn = int(nivel.spawn[0]), int(nivel.spawn[1])
@@ -214,7 +240,7 @@ def reiniciar_nivel(nivel, jugador):
     jugador.vel_y = 0
     jugador.en_piso = True
     jugador.state = "idle"
-
+    jugador.vida_actual = jugador.vida_maxima
     # DEBUG opcional: imprime valores para verificar que el spawn es correcto
     print(f"[DEBUG] reiniciar_nivel -> spawn=({x},{y_spawn}), jugador.rect={jugador.forma}")
 
@@ -529,8 +555,11 @@ class MenuKrab:
 
 # -------------------- Estados --------------------
 ESTADO_MENU, ESTADO_JUEGO, ESTADO_OPC, ESTADO_PAUSA = "MENU", "JUEGO", "OPCIONES", "PAUSA"
+ESTADO_CARGANDO = "CARGANDO"
 ESTADO_MUERTE   = "MUERTE"
 ESTADO_CONTINUE = "CONTINUE"
+ESTADO_DIFICULTAD = "DIFICULTAD"
+ESTADO_NIVELES = "NIVELES"
 ESTADO_GAMEOVER = "GAMEOVER"
 ESTADO_VICTORIA = "VICTORIA"
 
@@ -544,6 +573,19 @@ def main():
     ventana = pygame.display.set_mode((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     pygame.display.set_caption("Krab's adventure")
     reloj = pygame.time.Clock()
+
+    try:
+        # Usamos tus nombres de variable preferidos
+        vida_lleno_img = pygame.image.load(IMG_DIR / "vidas/vida_llena.png").convert_alpha()
+        vida_vacio_img = pygame.image.load(
+            IMG_DIR / "vidas/vida_vacia.png").convert_alpha()  # Asegúrate que el archivo se llame así
+
+        # Y los escalamos
+        vida_lleno_img = pygame.transform.scale(vida_lleno_img, (32, 32))
+        vida_vacio_img = pygame.transform.scale(vida_vacio_img, (32, 32))
+    except pygame.error as e:
+        print(f"ERROR AL CARGAR IMÁGENES DEL HUD: {e}")
+        vida_lleno_img = vida_vacio_img = None
 
     # --- INTRO: solo una vez por sesión ---
     video_path = VID_DIR / "intro.mp4"
@@ -590,13 +632,24 @@ def main():
     # ... dentro de def main():
 
     # --- Nivel y jugador
+    dificultad_seleccionada = "NORMAL"  # Valor por defecto
+    nivel_a_cargar = 1  # Nivel por defecto
     nivel = NivelTiled(MAP_DIR / "nivel1.tmx")
+    opciones_dificultad = ["NORMAL", "DIFICIL (Próximamente)"]
+    menu_dificultad = (opciones_dificultad, constantes.FONT_UI_ITEM, constantes.FONT_UI_TITLE, "Elige Dificultad")
 
     # 🔑 CREACIÓN INMEDIATA: El jugador existe desde el inicio, pero fuera de la pantalla
     jugador = Personaje(1000000, 100000)
     # La cámara se debe inicializar DESPUÉS de posicionar al jugador
     cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
+
+    # --- PARALLAX: variables iniciales ---
+    parallax = None
+    prev_cam_offset_x = 0  # delta horizontal de cámara por frame
+
     enemigos = pygame.sprite.Group()
+    items = pygame.sprite.Group()  # <-- AÑADE ESTA LÍNEA
+    puntuacion = 0
 
     # Música del menú (se arranca DESPUÉS de la intro)
     try: musica.play("menu", volumen=0.8)
@@ -608,6 +661,8 @@ def main():
 
     pause_menu = PauseMenu((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     continue_ui = ContinueOverlay((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), seconds=8)
+
+
 
     freeze_cam_offset = None
 
@@ -663,18 +718,8 @@ def main():
             elif estado == ESTADO_CONTINUE:
                 action = continue_ui.handle_event(event)
                 if action == "continue":
-                    reiniciar_nivel(nivel, jugador)
-                    enemigos = pygame.sprite.Group()
-                    enemigos.add(Enemigo(x=400, y=670, velocidad=constantes.VEL_ENEM, escala=2),
-                                 Enemigo(x=700, y=670, velocidad=constantes.VEL_ENEM, escala=2),
-                                 Enemigo(x=700, y=400, velocidad=constantes.VEL_ENEM, escala=2))
-                    timer = tiempo_total
-                    pygame.mixer.music.set_volume(VOL_NORMAL)
-                    estado = ESTADO_JUEGO
+                    estado = ESTADO_CARGANDO
                     freeze_cam_offset = None
-
-
-
 
                 elif action == "menu":
                     pygame.mixer.music.set_volume(VOL_NORMAL)
@@ -685,16 +730,15 @@ def main():
                     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
 
             elif estado == ESTADO_VICTORIA:
-               if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN,
+                if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN,
                                                                    pygame.K_SPACE,
                                                                    pygame.K_ESCAPE):
-                     musica.switch("menu")
-                     estado = ESTADO_MENU
-                     menu_leaving = False
-                     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+                    musica.switch("menu")
+                    estado = ESTADO_MENU
+                    menu_leaving = False
+                    menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
 
-
-                # -------------------- Update --------------------
+        # -------------------- Update --------------------
         if estado == ESTADO_MENU:
             menu_krab.update(dt)
             if menu_leaving and menu_krab.offscreen(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA):
@@ -720,6 +764,10 @@ def main():
                 # opcional: asegurar que follow deja el mismo valor
                 cam.follow(jugador.forma, lerp=1.0)
 
+                # --- PARALLAX: crear y sincronizar con la cámara actual
+                parallax = create_parallax_nivel1()
+                prev_cam_offset_x = cam.offset()[0]
+
                 limite_y = nivel.tmx.height * nivel.tmx.tileheight
                 enemigos = pygame.sprite.Group()
                 eenemigos = pygame.sprite.Group()
@@ -727,25 +775,69 @@ def main():
                 enemigos.add(Enemigo(x= 450, y = 600, velocidad = 30,escala = 2.5),
                              Enemigo(x = 800,y = 600,velocidad = 30,escala = 2.5))
 
-
                 # Verificación ÚNICA al iniciar
                 if jugador.forma.top > limite_y:
-                    # Por ejemplo, cambiar a estado de muerte en vez de jugar
                     estado = ESTADO_MUERTE
                     print("El jugador apareció fuera del mapa. Pasando a ESTADO_MUERTE")
                 else:
-                    estado = ESTADO_JUEGO
+                    estado = ESTADO_CARGANDO
 
+        elif estado == ESTADO_CARGANDO:
+            # --- AQUÍ OCURRE TODA LA CARGA DEL NIVEL ---
+            print("[DEBUG] Estado de carga: Iniciando...")
+
+            # 1. Carga la música del nivel
+            musica.switch("nivel1")
+            pygame.mixer.music.set_volume(VOL_NORMAL)
+            puntuacion = 0
+
+            # 2. Reinicia el temporizador
+            timer = tiempo_total
+
+            # 3. Carga el nivel desde Tiled (esto puede ser lento)
+            nivel_actual = 1  # O la variable que uses para el nivel
+            nivel = NivelTiled(MAP_DIR / f"nivel{nivel_actual}.tmx")
+
+            # 4. Posiciona al jugador y la cámara
+            reiniciar_nivel(nivel, jugador)
+            cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
+            cam.follow(jugador.forma, lerp=1.0)  # Forzar cámara sin suavizado inicial
+
+            # --- PARALLAX: crear y sincronizar con la cámara actual
+            parallax = create_parallax_nivel1()
+            prev_cam_offset_x = cam.offset()[0]
+
+            mover_derecha = False
+            mover_izquierda = False
+
+
+            # 5. Crea los enemigos
+            enemigos = pygame.sprite.Group()
+            enemigors.add(Enemigo(x=450, y=675, velocidad=30, escala=2.5),
+                         Enemigo(x=800, y=675, velocidad=30, escala=2.5),
+                         Enemigo(x= 760, y=450,velocidad=30, escala=2.5))
+
+            items.add(Manzana(x=300, y=645),
+                      Manzana(x=600, y=645))
+
+            # 6. ¡Listo! Cambia al estado de juego
+            print("[DEBUG] Carga completa. Pasando a ESTADO_JUEGO.")
+            estado = ESTADO_JUEGO
 
 
         elif estado == ESTADO_JUEGO:
             # --- AVANZAR TIMERS / ESTADO DEL JUGADOR ---
+            # Actualiza tiempo
+            timer -= dt
+            if timer < 0:
+                timer = 0
+
             jugador.actualizar(dt)  # <-- NUEVO: enfría el ataque, etc.
-            # --- en tu bucle de juego principal ---
             jugador.update(dt, nivel.collision_rects)
             colisiones_para_enemigos = nivel.collision_rects + nivel.enemy_barrier_rects
             enemigos.update(dt, colisiones_para_enemigos)
             enemigos.draw(ventana)
+
             if jugador.forma.bottom > nivel.tmx.height * nivel.tmx.tileheight:
                 print("Jugador cayó del nivel, reiniciando...")
                 try:
@@ -756,57 +848,50 @@ def main():
                 iniciar_muerte(jugador)
                 pygame.mixer.music.set_volume(0.35)
                 estado = ESTADO_MUERTE
-            # Si el jugador cae por debajo del mapa
 
             # --- OBTENER OFFSET DE CÁMARA ---
             ox, oy = cam.offset()
 
+            for item in list(items.sprites()):
+                if item.tocar_jugador(jugador):
+                    puntuacion += item.puntos
+                    item.kill()
+                    print(f"¡Manzana recogida! Puntuación actual: {puntuacion}")
 
             # --- DEBUGGING VISUAL: DIBUJAR CAJAS DE COLISIÓN ---
             for rect in nivel.collision_rects:
-                # Dibuja el rect de colisión, movido por el offset de la cámara
                 debug_rect = rect.move(-ox, -oy)
                 pygame.draw.rect(ventana, (255, 0, 0), debug_rect, 2)  # Rojo: Colisiones
 
-            # ... (Tu código de movimiento horizontal con colisión) ...
+            if jugador.invencible:
+                jugador.invencible_timer -= dt
+                if jugador.invencible_timer <= 0:
+                    jugador.invencible = False
 
-            # Dibuja el jugador (también con offset de cámara)
-            ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
-            timer -= dt
-            if timer <= 0:
-                timer = 0
-                try: musica.sfx("death", volume=0.9)
-                except Exception: pass
-                freeze_cam_offset = cam.offset()
-                iniciar_muerte(jugador)
-                pygame.mixer.music.set_volume(0.35)
-                estado = ESTADO_MUERTE
-            vx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
-            dx = vx * dt  # Este es el desplazamiento horizontal
+            # Movimiento / física player
+            if jugador.invencible:
+                direccion_knockback = -1 if jugador.facing_right else 1
+                dx = jugador.knockback_speed_x * direccion_knockback * dt
+            else:
+                vx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
+                dx = vx * dt
 
             jugador.aplicar_gravedad(dt)
-            dy = int(jugador.vel_y * dt)  # Este es el desplazamiento vertical
+            dy = int(jugador.vel_y * dt)
 
-            # ----------------------------------------------------
-            # --- CORRECCIÓN 1: Movimiento horizontal + colisión ---
-            # ----------------------------------------------------
-            jugador.forma.x += int(dx)  # 1. Aplicar movimiento horizontal
-
+            # --- Movimiento horizontal + colisión ---
+            jugador.forma.x += int(dx)
             for rect in nivel.collision_rects:
-                # 2. Chequear y corregir colisión horizontal
                 if jugador.forma.colliderect(rect):
-                    if dx > 0:  # Movimiento hacia la derecha
-                        jugador.forma.right = rect.left  # Lo empuja hacia atrás (a la izquierda)
-                    elif dx < 0:  # Movimiento hacia la izquierda
-                        jugador.forma.left = rect.right  # Lo empuja hacia adelante (a la derecha)
+                    if dx > 0:
+                        jugador.forma.right = rect.left
+                    elif dx < 0:
+                        jugador.forma.left = rect.right
 
-            # ----------------------------------------------------
             # --- Movimiento vertical + colisión ---
-            # ----------------------------------------------------
-            jugador.forma.y += dy  # 3. Aplicar movimiento vertical
-
+            jugador.forma.y += dy
             for rect in nivel.collision_rects:
-                if jugador.forma.colliderect(rect):
+                if jugador.foma.colliderect(rect):
                     if dy > 0:  # cayendo
                         jugador.forma.bottom = rect.top
                         jugador.vel_y = 0
@@ -815,13 +900,14 @@ def main():
                         jugador.forma.top = rect.bottom
                         jugador.vel_y = 0
 
-            jugador.set_dx(vx)  # solo cambia orientación
+            # Estado/animación
+            if not getattr(jugador, "invencible", False):
+                jugador.set_dx(vx)  # solo cambia orientación
 
             if jugador.attacking:
-                jugador.state = "attack"  # ⬅ prioridad: no lo sobrescribas
+                jugador.state = "attack"
             else:
                 if not jugador.en_piso:
-                    # opcional: si quieres distinguir salto/caída
                     jugador.state = "jump" if jugador.vel_y < 0 else "fall"
                 else:
                     jugador.state = "run" if vx != 0 else "idle"
@@ -829,14 +915,25 @@ def main():
             jugador.animar(dt)
             jugador.set_dx(vx)
             jugador.animar(dt)
+
+            # --- Cámara sigue al jugador ---
             cam.follow(jugador.forma, lerp=1.0)
 
+            # --- PARALLAX: actualizar por delta horizontal de la cámara ---
+            if parallax is not None:
+                new_ox = cam.offset()[0]
+                camera_dx = new_ox - prev_cam_offset_x
+                prev_cam_offset_x = new_ox
+                parallax.update_by_camera(camera_dx)
+
+            # Meta / victoria
             for goal in nivel.goal_rects:
                 if jugador.forma.colliderect(goal):
-                    estado = ESTADO_VICTORIA  # o llama a una función ganar()
+                    estado = ESTADO_VICTORIA
                     print("¡Has ganado!")
                     break
 
+            # Ataque colisiones
             if jugador.attacking and jugador.attack_timer > 0:
                 atk = jugador.get_attack_rect()
                 for e in list(enemigos):
@@ -846,19 +943,16 @@ def main():
                         else:
                             e.kill()
 
-
+            # Daño del enemigo
             for e in enemigos:
                 if e.tocar_jugador(jugador):
-                    # Aquí puedes añadir efectos de sonido o visuales antes de cambiar de estado
-                    try:
-                        musica.sfx("death", volume=0.9)
-                    except Exception:
-                        pass
-                    freeze_cam_offset = cam.offset()
-                    iniciar_muerte(jugador)
-                    pygame.mixer.music.set_volume(0.35)
-                    estado = ESTADO_MUERTE
-                    break  # Termina el bucle si un enemigo ya te ha golpeado
+                    jugador.recibir_dano(1)
+
+            # Muerte por vida
+            if jugador.vida_actual <= 0 and estado == ESTADO_JUEGO:
+                freeze_cam_offset = cam.offset()
+                iniciar_muerte(jugador)
+                estado = ESTADO_MUERTE
 
         elif estado == ESTADO_MUERTE:
             jugador.aplicar_gravedad(dt)
@@ -880,9 +974,6 @@ def main():
                 menu_leaving = False
                 menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
 
-
-
-
         # -------------------- Draw --------------------
         if estado == ESTADO_MENU:
             ventana.blit(fondo_menu, (0, 0))
@@ -895,11 +986,24 @@ def main():
             ventana.blit(sub, (constantes.ANCHO_VENTANA//2 - sub.get_width()//2, 60))
 
         elif estado in ("JUEGO", "PAUSA"):
+            # --- PARALLAX primero ---
+            if parallax is not None:
+                parallax.draw(ventana)
+
+            # --- Luego el nivel con offset ---
             nivel.draw(ventana, cam.offset())
             ox, oy = cam.offset()
 
+            # HUD + sprites
+            draw_timer(ventana, font_hud, timer, pos=(20, 20))
+            draw_hud(ventana, jugador, vida_lleno_img, vida_vacio_img)
+            draw_puntuacion(ventana, font_hud, puntuacion)
+
             for enemigo in enemigos:
                 ventana.blit(enemigo.image, (enemigo.rect.x - ox, enemigo.rect.y - oy))
+
+            for item in items:
+                ventana.blit(item.image, (item.rect.x - ox, item.rect.y - oy))
 
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
             draw_timer(ventana, font_hud, timer, pos=(20, 20))
@@ -907,6 +1011,9 @@ def main():
                 pause_menu.draw(ventana)
 
         elif estado in ("MUERTE", "CONTINUE"):
+            # Fondo congelado: dibuja parallax y nivel sin actualizar
+            if parallax is not None:
+                parallax.draw(ventana)
             if freeze_cam_offset is None:
                 freeze_cam_offset = cam.offset()
             nivel.draw(ventana, freeze_cam_offset)
@@ -917,7 +1024,9 @@ def main():
                 continue_ui.draw(ventana)
 
         elif estado == ESTADO_VICTORIA:
-            # Fondo del nivel congelado
+            # Parallax + fondo del nivel congelado
+            if parallax is not None:
+                parallax.draw(ventana)
             nivel.draw(ventana, cam.offset())
             ox, oy = cam.offset()
             ventana.blit(jugador.image,

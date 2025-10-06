@@ -50,7 +50,30 @@ class Enemigo(pygame.sprite.Sprite):
         self.INTERVALO_SALTO = 2  # Un poco más corto para que no espere tanto
         self.salto_timer = self.INTERVALO_SALTO
 
+        # --- ATRIBUTOS DE VIDA Y DAÑO ---
+        self.vida = 3
+        self.hit_flash_timer = 0
+        self.HIT_FLASH_DURACION = 0.5  # Duración del destello rojo
+
+    # --- METODO PARA RECIBIR DAÑO ---
+    def hurt(self, damage):
+        # Solo puede recibir daño si no está ya dañado y su vida es > 0
+        if self.hit_flash_timer <= 0 and self.vida > 0:
+            self.vida -= damage
+            # Al recibir daño, se activa el temporizador. Mientras sea > 0,
+            # la condición de arriba no se cumplirá y el enemigo será invencible.
+            self.hit_flash_timer = self.HIT_FLASH_DURACION
+
+            print(f"Enemigo golpeado, vida restante: {self.vida}")
+            if self.vida <= 0:
+                self.kill()
+
     def update(self, dt, plataformas):
+
+        # --- MANEJO DEL DESTELLO ROJO ---
+        if self.hit_flash_timer > 0:
+            self.hit_flash_timer -= dt
+
         # 1. LÓGICA DE DECISIÓN
         # ---------------------
         if self.salto_timer > 0:
@@ -142,12 +165,18 @@ class Enemigo(pygame.sprite.Sprite):
                 elif self.estado in ('jumping', 'falling'):
                     self.frame_index = len(frames_actuales) - 1
 
-        # Asigna la imagen correcta y la voltea si es necesario
-        # (Control de error por si frames_actuales está vacío momentáneamente)
-        if self.frame_index < len(frames_actuales):
-            self.image = frames_actuales[self.frame_index]
-            if self.direccion == -1:
-                self.image = pygame.transform.flip(self.image, True, False)
+        self.image = frames_actuales[self.frame_index]
+
+        # --- APLICA EL EFECTO DE DESTELLO ROJO (NUEVO) ---
+        if self.hit_flash_timer > 0:
+            # Crea una copia para no modificar el frame original de la animación
+            self.image = self.image.copy()
+            # Rellena la imagen con rojo usando un modo de mezcla especial
+            self.image.fill((150, 0, 0), special_flags=pygame.BLEND_RGB_ADD)
+
+        # Voltea la imagen si es necesario (después de aplicar el destello)
+        if self.direccion == -1:
+            self.image = pygame.transform.flip(self.image, True, False)
 
     def tocar_jugador(self, jugador):
         return self.rect.colliderect(jugador.forma)
