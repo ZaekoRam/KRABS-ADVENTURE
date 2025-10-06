@@ -8,6 +8,7 @@ import musica
 from pytmx.util_pygame import (load_pygame)
 import imageio
 from enemigos import Enemigo
+from items import Manzana
 from fuentes import get_font  # <-- NUEVO: usar tu fuente pixel
 
 
@@ -206,6 +207,14 @@ def draw_hud(surface, jugador, img_lleno, img_vacio):
             surface.blit(img_lleno, (pos_x, pos_y))  # Y usa ese argumento para dibujar
         else:
             surface.blit(img_vacio, (pos_x, pos_y))
+
+
+def draw_puntuacion(surface, font, puntuacion, pos=(20, 80)):
+    # Formatea el texto que se va a mostrar
+    texto = font.render(f"Puntos: {puntuacion}", True, (255, 255, 255))
+
+    # Dibuja el texto en la posición especificada
+    surface.blit(texto, pos)
 
 
 def reiniciar_nivel(nivel, jugador):
@@ -546,6 +555,8 @@ ESTADO_MENU, ESTADO_JUEGO, ESTADO_OPC, ESTADO_PAUSA = "MENU", "JUEGO", "OPCIONES
 ESTADO_CARGANDO = "CARGANDO"
 ESTADO_MUERTE   = "MUERTE"
 ESTADO_CONTINUE = "CONTINUE"
+ESTADO_DIFICULTAD = "DIFICULTAD"
+ESTADO_NIVELES = "NIVELES"
 ESTADO_GAMEOVER = "GAMEOVER"
 ESTADO_VICTORIA = "VICTORIA"
 
@@ -618,13 +629,21 @@ def main():
     # ... dentro de def main():
 
     # --- Nivel y jugador
+    dificultad_seleccionada = "NORMAL"  # Valor por defecto
+    nivel_a_cargar = 1  # Nivel por defecto
     nivel = NivelTiled(MAP_DIR / "nivel1.tmx")
+    opciones_dificultad = ["NORMAL", "DIFICIL (Próximamente)"]
+    menu_dificultad = (opciones_dificultad, constantes.FONT_UI_ITEM, constantes.FONT_UI_TITLE, "Elige Dificultad")
+
+
 
     # 🔑 CREACIÓN INMEDIATA: El jugador existe desde el inicio, pero fuera de la pantalla
     jugador = Personaje(1000000, 100000)
     # La cámara se debe inicializar DESPUÉS de posicionar al jugador
     cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
     enemigos = pygame.sprite.Group()
+    items = pygame.sprite.Group()  # <-- AÑADE ESTA LÍNEA
+    puntuacion = 0
 
     # Música del menú (se arranca DESPUÉS de la intro)
     try: musica.play("menu", volumen=0.8)
@@ -779,13 +798,15 @@ def main():
 
             # 5. Crea los enemigos
             enemigos = pygame.sprite.Group()
-            enemigos.add(Enemigo(x=450, y=600, velocidad=30, escala=2.5),
-                         Enemigo(x=800, y=600, velocidad=30, escala=2.5))
+            enemigos.add(Enemigo(x=450, y=675, velocidad=30, escala=2.5),
+                         Enemigo(x=800, y=675, velocidad=30, escala=2.5))
+
+            items.add(Manzana(x=300, y=645),
+                      Manzana(x=600, y=645))
 
             # 6. ¡Listo! Cambia al estado de juego
             print("[DEBUG] Carga completa. Pasando a ESTADO_JUEGO.")
             estado = ESTADO_JUEGO
-
 
 
         elif estado == ESTADO_JUEGO:
@@ -811,6 +832,12 @@ def main():
             # --- OBTENER OFFSET DE CÁMARA ---
             ox, oy = cam.offset()
 
+            for item in list(items.sprites()):
+                if item.tocar_jugador(jugador):
+                    puntuacion += item.puntos
+                    item.kill()
+                    print(f"¡Manzana recogida! Puntuación actual: {puntuacion}")
+
 
             # --- DEBUGGING VISUAL: DIBUJAR CAJAS DE COLISIÓN ---
             for rect in nivel.collision_rects:
@@ -834,8 +861,14 @@ def main():
                 iniciar_muerte(jugador)
                 pygame.mixer.music.set_volume(0.35)
                 estado = ESTADO_MUERTE
-            vx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
-            dx = vx * dt  # Este es el desplazamiento horizontal
+            if jugador.invencible:
+                # Determina la dirección del empuje (opuesta a la que mira)
+                direccion_knockback = -1 if jugador.facing_right else 1
+                dx = jugador.knockback_speed_x * direccion_knockback * dt
+            else:
+                # Si no, se mueve normalmente con los controles del teclado
+                vx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
+                dx = vx * dt  # Este es el desplazamiento horizontal
 
             jugador.aplicar_gravedad(dt)
             dy = int(jugador.vel_y * dt)  # Este es el desplazamiento vertical
@@ -894,15 +927,20 @@ def main():
                 atk = jugador.get_attack_rect()
                 for e in list(enemigos):
                     if atk.colliderect(e.rect):
+                        # 1. Revisa si el enemigo tiene el método "hurt".
                         if hasattr(e, "hurt"):
+                            # 2. Si lo tiene, lo llama y le pasa el daño del jugador.
                             e.hurt(jugador.attack_damage)
                         else:
+                            # 3. Si no, lo mata de un golpe (útil para enemigos simples).
                             e.kill()
 
 
             for e in enemigos:
                 if e.tocar_jugador(jugador):
                     jugador.recibir_dano(1)
+
+
 
             if jugador.vida_actual <= 0 and estado == ESTADO_JUEGO:
                 # Esta es la lógica de muerte que ya tenías
@@ -950,9 +988,13 @@ def main():
 
             draw_timer(ventana, font_hud, timer, pos=(20, 20))
             draw_hud(ventana, jugador, vida_lleno_img, vida_vacio_img)
+            draw_puntuacion(ventana, font_hud, puntuacion)
 
             for enemigo in enemigos:
                 ventana.blit(enemigo.image, (enemigo.rect.x - ox, enemigo.rect.y - oy))
+
+            for item in items:
+                ventana.blit(item.image, (item.rect.x - ox, item.rect.y - oy))
 
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
             draw_timer(ventana, font_hud, timer, pos=(20, 20))

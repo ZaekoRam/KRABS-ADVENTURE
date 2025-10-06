@@ -69,7 +69,11 @@ class Personaje(pygame.sprite.Sprite):
         self.vida_actual = self.vida_maxima
         self.invencible = False
         self.invencible_timer = 0
-        self.INVENCIBLE_DURACION = 1.5  # 1.5 segundos de invencibilidad
+        self.INVENCIBLE_DURACION = .5  # 1.5 segundos de invencibilidad
+
+        # --- ATRIBUTOS DE KNOCKBACK (NUEVO) ---
+        self.knockback_speed_y = -400  # Impulso vertical (hacia arriba)
+        self.knockback_speed_x = 200  # Impulso horizontal
 
     # ---------------- API ----------------
 
@@ -95,6 +99,8 @@ class Personaje(pygame.sprite.Sprite):
         if not self.invencible:
             self.vida_actual -= cantidad
             print(f"Vida restante: {self.vida_actual}")  # Mensaje para depurar
+            self.vel_y = self.knockback_speed_y
+
             if self.vida_actual < 0:
                 self.vida_actual = 0
 

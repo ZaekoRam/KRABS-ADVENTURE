@@ -51,16 +51,20 @@ class Enemigo(pygame.sprite.Sprite):
         self.salto_timer = self.INTERVALO_SALTO
 
         # --- ATRIBUTOS DE VIDA Y DAÑO ---
-        self.vida = 2
+        self.vida = 3
         self.hit_flash_timer = 0
-        self.HIT_FLASH_DURACION = 0.2  # Duración del destello rojo
+        self.HIT_FLASH_DURACION = 0.5  # Duración del destello rojo
 
     # --- METODO PARA RECIBIR DAÑO ---
-    def recibir_dano(self):
-        # Solo puede recibir daño si no está ya en estado de "hit"
-        if self.hit_flash_timer <= 0:
-            self.vida -= 1
+    def hurt(self, damage):
+        # Solo puede recibir daño si no está ya dañado y su vida es > 0
+        if self.hit_flash_timer <= 0 and self.vida > 0:
+            self.vida -= damage
+            # Al recibir daño, se activa el temporizador. Mientras sea > 0,
+            # la condición de arriba no se cumplirá y el enemigo será invencible.
             self.hit_flash_timer = self.HIT_FLASH_DURACION
+
+            print(f"Enemigo golpeado, vida restante: {self.vida}")
             if self.vida <= 0:
                 self.kill()
 
@@ -165,10 +169,10 @@ class Enemigo(pygame.sprite.Sprite):
 
         # --- APLICA EL EFECTO DE DESTELLO ROJO (NUEVO) ---
         if self.hit_flash_timer > 0:
-            # Crea una copia para no modificar el frame original
+            # Crea una copia para no modificar el frame original de la animación
             self.image = self.image.copy()
-            # Rellena la imagen con rojo usando un modo de mezcla que suma colores
-            self.image.fill((200, 0, 0, 100), special_flags=pygame.BLEND_RGB_ADD)
+            # Rellena la imagen con rojo usando un modo de mezcla especial
+            self.image.fill((150, 0, 0), special_flags=pygame.BLEND_RGB_ADD)
 
         # Voltea la imagen si es necesario (después de aplicar el destello)
         if self.direccion == -1:
