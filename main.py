@@ -813,7 +813,7 @@ def main():
 
             # 5. Crea los enemigos
             enemigos = pygame.sprite.Group()
-            enemigors.add(Enemigo(x=450, y=675, velocidad=30, escala=2.5),
+            enemigos.add(Enemigo(x=450, y=675, velocidad=30, escala=2.5),
                          Enemigo(x=800, y=675, velocidad=30, escala=2.5),
                          Enemigo(x= 760, y=450,velocidad=30, escala=2.5))
 
