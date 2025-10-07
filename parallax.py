@@ -84,6 +84,6 @@ def create_parallax_nivel1() -> ParallaxBackground:
     # Tip: si usas cámara que se mueve +X a la derecha, near tendrá mayor desplazamiento.
     far_layer  = ParallaxLayer(far_img,  speed_factor=0.10, y=0)  # 20% de la cámara
     mid_layer  = ParallaxLayer(mid_img,  speed_factor=0.35, y=0)  # 45%
-    near_layer = ParallaxLayer(near_img, speed_factor=0.70, y=0)  # 80%
+    near_layer = ParallaxLayer(near_img, speed_factor=0.75, y=0)  # 80%
 
     return ParallaxBackground([far_layer, mid_layer, near_layer])
