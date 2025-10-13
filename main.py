@@ -692,10 +692,8 @@ def main():
     # --- Nivel y jugador ---
     dificultad_seleccionada = "NORMAL"
     nivel_a_cargar = 1
-    nivel = NivelTiled(MAP_DIR / "nivel1.tmx")
 
     jugador = Personaje(1000000, 100000)  # creado fuera, recolocado al iniciar
-    cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
 
     # PARALLAX
     parallax = None
@@ -816,46 +814,41 @@ def main():
         if estado == ESTADO_MENU:
             menu_krab.update(dt)
             if menu_leaving and menu_krab.offscreen(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA):
-                print("[DEBUG] Transición MENU -> JUEGO")
-                print(f" nivel.spawn = {nivel.spawn}")
-                print(f" jugador antes reiniciar = {jugador.forma}")
                 musica.switch("nivel1")
                 pygame.mixer.music.set_volume(VOL_NORMAL)
                 timer = tiempo_total
 
-                reiniciar_nivel(nivel, jugador)
-                print(f" jugador después reiniciar = {jugador.forma}")
-                print(f" cam.offset() = {cam.offset()}")
 
                 # Forzar la cámara inmediatamente al centro del jugador
-                cx = jugador.forma.centerx - cam.vw // 2
-                cy = jugador.forma.centery - cam.vh // 2
-                cx = max(0, min(cx, cam.ww - cam.vw))
-                cy = max(0, min(cy, cam.wh - cam.vh))
-                cam.set_offset(cx, cy)
-                cam.follow(jugador.forma, lerp=1.0)
+
 
                 # PARALLAX: crear y sincronizar con la cámara actual
-                parallax = create_parallax_nivel1()
-                prev_cam_offset_x = cam.offset()[0]
 
-                limite_y = nivel.tmx.height * nivel.tmx.tileheight
 
-                if jugador.forma.top > limite_y:
-                    estado = ESTADO_MUERTE
-                    print("El jugador apareció fuera del mapa. Pasando a ESTADO_MUERTE")
-                else:
-                    estado = ESTADO_CARGANDO
+
+
+
+                estado = ESTADO_CARGANDO
 
         elif estado == ESTADO_CARGANDO:
+            nivel = NivelTiled(MAP_DIR / f"nivel1.tmx")
+            cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
+            cx = jugador.forma.centerx - cam.vw // 2
+            cy = jugador.forma.centery - cam.vh // 2
+            cx = max(0, min(cx, cam.ww - cam.vw))
+            cy = max(0, min(cy, cam.wh - cam.vh))
+            limite_y = nivel.tmx.height * nivel.tmx.tileheight
+            cam.set_offset(cx, cy)
+            cam.follow(jugador.forma, lerp=1.0)
             print("[DEBUG] Estado de carga: Iniciando...")
             musica.switch("nivel1")
             pygame.mixer.music.set_volume(VOL_NORMAL)
             puntuacion = 0
             timer = tiempo_total
-
+            parallax = create_parallax_nivel1()
+            prev_cam_offset_x = cam.offset()[0]
             nivel_actual = 1
-            nivel = NivelTiled(MAP_DIR / f"nivel{nivel_actual}.tmx")
+
 
             reiniciar_nivel(nivel, jugador)
             cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
@@ -1043,6 +1036,8 @@ def main():
 
             # Muerte por vida
             if jugador.vida_actual <= 0 and estado == ESTADO_JUEGO:
+                musica.sfx("death", volume=0.9)  # 🔊 reproducir sonido de muerte
+                pygame.mixer.music.set_volume(0.35)  # opcional, baja un poco la música de fondo
                 freeze_cam_offset = cam.offset()
                 iniciar_muerte(jugador)
                 estado = ESTADO_MUERTE
