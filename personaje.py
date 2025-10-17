@@ -5,6 +5,8 @@ from pathlib import Path
 class Personaje(pygame.sprite.Sprite):
     def __init__(self, spawn_x: int, spawn_y: int):
         super().__init__()
+        self.hit_sound_played = False  # 🔊 evita repetir sonido de golpe
+        self.stun_sound_played = False
 
         base_dir = Path(__file__).resolve().parent
         krab_dir = base_dir / "assets" / "images" / "characters" / "krabby"

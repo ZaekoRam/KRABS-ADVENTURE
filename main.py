@@ -694,6 +694,10 @@ def main():
     nivel_a_cargar = 1
 
     jugador = Personaje(1000000, 100000)  # creado fuera, recolocado al iniciar
+    # justo después de crear 'jugador'
+    jugador.knockback_activo = False
+    jugador.knockback_timer = 0.0
+    jugador.stun_sound_played = False  # si no lo tienes aún
 
     # PARALLAX
     parallax = None
@@ -892,6 +896,7 @@ def main():
                       bolsa(x=5342, y=254),
                       bolsa(x= 3715, y=260))
 
+
             # Mostrar tutorial SOLO la primera vez que se abre el juego
             if nivel_actual == 1 and (not tutorial_shown_level1) and tutorial_overlay:
                 tutorial_context = "game"
@@ -945,16 +950,27 @@ def main():
             for item in list(items.sprites()):
                 if item.tocar_jugador(jugador):
                     puntuacion += item.puntos
+                    musica.sfx("coin", volume=0.8)  # 🔊 sonido al recoger
                     item.kill()
                     print(f"¡Manzana recogida! Puntuación actual: {puntuacion}")
 
             # Movimiento / física player
+            # Movimiento / física player
+            # Timers de invencibilidad (sólo resetea bandera al terminar)
             if getattr(jugador, "invencible", False):
                 jugador.invencible_timer -= dt
                 if jugador.invencible_timer <= 0:
                     jugador.invencible = False
+                    jugador.stun_sound_played = False  # listo para el próximo golpe
 
-            if getattr(jugador, "invencible", False):
+            # Timers de knockback (independientes de 'invencible')
+            if getattr(jugador, "knockback_activo", False):
+                jugador.knockback_timer -= dt
+                if jugador.knockback_timer <= 0:
+                    jugador.knockback_activo = False
+
+            # Aplicación de movimiento: si hay knockback, empuja; si no, movimiento normal
+            if getattr(jugador, "knockback_activo", False):
                 direccion_knockback = -1 if jugador.facing_right else 1
                 dx = jugador.knockback_speed_x * direccion_knockback * dt
                 vx = 0
@@ -1026,21 +1042,54 @@ def main():
                     if atk.colliderect(e.rect):
                         if hasattr(e, "hurt"):
                             e.hurt(jugador.attack_damage)
+                            if not jugador.hit_sound_played:
+                                musica.sfx("golpe", volume=0.9)
+                                jugador.hit_sound_played = True
                         else:
                             e.kill()
 
+            # al terminar el ataque:
+            if jugador.attack_timer <= 0:
+                jugador.hit_sound_played = False
+
             # Daño del enemigo
+            # Daño del enemigo (sonido y knockback sólo si NO está invencible)
+            # Daño del enemigo (una sola vez por golpe real)
             for e in enemigos:
-                if e.tocar_jugador(jugador):
+                if e.tocar_jugador(jugador) and not getattr(jugador, "invencible", False):
+                    # 1️⃣ Aplicar daño primero
                     jugador.recibir_dano(1)
 
+                    # 2️⃣ Sonido de golpe (solo una vez)
+                    try:
+                        musica.sfx("stun", volume=0.9)
+                    except Exception:
+                        pass
+
+                    # 3️⃣ Activar invencibilidad post-golpe (i-frames)
+                    jugador.invencible = True
+                    jugador.invencible_timer = 0.45
+
+                    # 4️⃣ Activar knockback
+                    jugador.knockback_activo = True
+                    jugador.knockback_timer = 0.22
+                    if not hasattr(jugador, "knockback_speed_x") or jugador.knockback_speed_x == 0:
+                        jugador.knockback_speed_x = 650
+
+            # Muerte por vida
             # Muerte por vida
             if jugador.vida_actual <= 0 and estado == ESTADO_JUEGO:
-                musica.sfx("death", volume=0.9)  # 🔊 reproducir sonido de muerte
-                pygame.mixer.music.set_volume(0.35)  # opcional, baja un poco la música de fondo
+                vx = 0
+                # apaga efectos de golpe para no arrastrarlos al respawn
+                jugador.knockback_activo = False
+                jugador.knockback_timer = 0.0
+
+                musica.sfx("death", volume=0.9)
+                pygame.mixer.music.set_volume(0.35)
                 freeze_cam_offset = cam.offset()
                 iniciar_muerte(jugador)
                 estado = ESTADO_MUERTE
+
 
         elif estado == ESTADO_MUERTE:
             jugador.aplicar_gravedad(dt)
