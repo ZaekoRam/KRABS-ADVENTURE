@@ -54,7 +54,9 @@ SFX_LIB = {
     "jump":  SFX_DIR / "jump.wav",
     "coin":  SFX_DIR / "coin.wav",
     "click": SFX_DIR / "click.wav",
-    "death": SFX_DIR / "death.wav",  # <-- añade esto
+    "death": SFX_DIR / "death.wav",# <-- añade esto
+    "golpe": SFX_DIR / "golpe.wav",
+    "stun":  SFX_DIR / "stun.wav",
 }
 
 # Caché de pygame.mixer.Sound

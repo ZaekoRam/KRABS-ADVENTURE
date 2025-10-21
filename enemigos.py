@@ -1,4 +1,5 @@
 import pygame
+
 import constantes
 from pathlib import Path
 
@@ -63,6 +64,7 @@ class Enemigo(pygame.sprite.Sprite):
             # Al recibir daño, se activa el temporizador. Mientras sea > 0,
             # la condición de arriba no se cumplirá y el enemigo será invencible.
             self.hit_flash_timer = self.HIT_FLASH_DURACION
+
 
             print(f"Enemigo golpeado, vida restante: {self.vida}")
             if self.vida <= 0:
