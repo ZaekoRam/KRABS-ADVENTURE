@@ -609,32 +609,55 @@ class LevelSelectUI:
 # -------------------- Difficulty Select UI --------------------
 # -------------------- Difficulty Select UI (gap corregido) --------------------
 # -------------------- Difficulty Select UI (hover fijo y sin 'Recomendado') --------------------
+# -------------------- Difficulty Select UI (con íconos y handle_event) --------------------
 class DifficultySelectUI:
-    """Pantalla con dos tarjetas: FÁCIL (default) y DIFÍCIL, con hover consistente."""
-    def __init__(self, size):
+    """Pantalla con dos tarjetas: FÁCIL (default) y DIFÍCIL, con hover e íconos opcionales."""
+    def __init__(self, size, icon_easy: pygame.Surface | None = None, icon_hard: pygame.Surface | None = None):
         self.w, self.h = size
         self.font_title = get_font(constantes.FONT_UI_TITLE)
         self.font_item  = get_font(constantes.FONT_UI_ITEM)
 
+        # geometría de tarjetas
         self.card_w, self.card_h = 260, 220
-        self.gap = self.card_w // 2 + 50   # separación cómoda
+        self.gap = self.card_w // 2 + 50   # separación
 
-        cy  = self.h // 2 + 10
-        cx  = self.w // 2
+        cy = self.h // 2 + 10
+        cx = self.w // 2
 
-        self.rect_easy = pygame.Rect(0,0,self.card_w,self.card_h); self.rect_easy.center = (cx - self.gap, cy)
-        self.rect_hard = pygame.Rect(0,0,self.card_w,self.card_h); self.rect_hard.center = (cx + self.gap, cy)
+        self.rect_easy = pygame.Rect(0, 0, self.card_w, self.card_h); self.rect_easy.center = (cx - self.gap, cy)
+        self.rect_hard = pygame.Rect(0, 0, self.card_w, self.card_h); self.rect_hard.center = (cx + self.gap, cy)
 
-        self.lbl_easy = self.font_item.render("FÁCIL",   True, (20,30,60))
-        self.lbl_hard = self.font_item.render("DIFÍCIL", True, (20,30,60))
+        self.lbl_easy = self.font_item.render("FÁCIL",   True, (20, 30, 60))
+        self.lbl_hard = self.font_item.render("DIFÍCIL", True, (20, 30, 60))
+
+        # íconos (opcional)
+        def _fit_icon(surf: pygame.Surface | None) -> pygame.Surface | None:
+            if not surf:
+                return None
+            # Tamaño máximo deseado del ícono
+            max_w, max_h = 200, 160
+            iw, ih = surf.get_size()
+
+            # ✅ Quitamos el límite que impedía escalar hacia arriba
+            scale = min(max_w / iw, max_h / ih)
+
+            # Puedes usar smoothscale si quieres íconos suaves, o scale si quieres pixel art
+            surf = pygame.transform.scale(surf, (int(iw * scale), int(ih * scale)))
+            return surf.convert_alpha()
+
+        self.icon_easy = _fit_icon(icon_easy)
+        self.icon_hard = _fit_icon(icon_hard)
 
         self.hover = None            # 'easy' | 'hard' | None
         self.selected = "FACIL"      # por defecto FÁCIL
 
     def handle_event(self, event):
+        """Devuelve 'FACIL', 'DIFICIL', 'BACK' o None."""
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.rect_easy.collidepoint(event.pos):  self.selected = "FACIL";   return "FACIL"
-            if self.rect_hard.collidepoint(event.pos):  self.selected = "DIFICIL"; return "DIFICIL"
+            if self.rect_easy.collidepoint(event.pos):
+                self.selected = "FACIL";   return "FACIL"
+            if self.rect_hard.collidepoint(event.pos):
+                self.selected = "DIFICIL"; return "DIFICIL"
 
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_LEFT, pygame.K_a, pygame.K_1, pygame.K_KP1):
@@ -647,53 +670,63 @@ class DifficultySelectUI:
                 return "BACK"
         return None
 
-    def _draw_card(self, surface, rect, label_surf, selected=False, hover=False):
+    def _draw_card(self, surface, rect, label_surf, icon=None, selected=False, hover=False):
         # marco externo
-        pygame.draw.rect(surface, (15,70,130), rect, border_radius=8, width=5)
+        pygame.draw.rect(surface, (15, 70, 130), rect, border_radius=8, width=5)
         inner = rect.inflate(-12, -12)
 
         # fondo
-        base = (200,230,255)
+        base = (200, 230, 255)
         pygame.draw.rect(surface, base, inner, border_radius=6)
 
-        # borde de selección (sutil)
+        # borde de selección / hover
         if selected:
-            pygame.draw.rect(surface, (120,170,230), inner.inflate(-6, -6), width=3, border_radius=6)
-
-        # borde de hover (brillo azul)
+            pygame.draw.rect(surface, (120, 170, 230), inner.inflate(-6, -6), width=3, border_radius=6)
         if hover:
-            pygame.draw.rect(surface, (80,180,255), inner, width=4, border_radius=6)
+            pygame.draw.rect(surface, (80, 180, 255), inner, width=4, border_radius=6)
 
-        # barra inferior con el texto
-        bar = pygame.Rect(inner.left+8, inner.bottom-56, inner.width-16, 40)
-        pygame.draw.rect(surface, (170,210,255), bar, border_radius=6)
+        # icono
+        if icon:
+            ir = icon.get_rect(center=(inner.centerx, inner.top + 75))
+            surface.blit(icon, ir)
+        else:
+            # placeholder
+            ph = pygame.Surface((100, 70)); ph.fill((170, 210, 255))
+            pr = ph.get_rect(center=(inner.centerx, inner.top + 70))
+            surface.blit(ph, pr)
+
+        # barra inferior con texto
+        bar = pygame.Rect(inner.left + 8, inner.bottom - 56, inner.width - 16, 40)
+        pygame.draw.rect(surface, (170, 210, 255), bar, border_radius=6)
         lr = label_surf.get_rect(center=bar.center)
         surface.blit(label_surf, lr)
 
     def draw(self, surface):
         # título
-        title = self.font_title.render("DIFICULTAD", True, (15,40,80))
-        band = pygame.Surface((title.get_width()+40, title.get_height()+18), pygame.SRCALPHA)
-        pygame.draw.rect(band, (180,210,255,230), band.get_rect(), border_radius=8)
-        band.blit(title, (20,9))
-        surface.blit(band, band.get_rect(center=(self.w//2, 90)))
+        title = self.font_title.render("DIFICULTAD", True, (15, 40, 80))
+        band = pygame.Surface((title.get_width() + 40, title.get_height() + 18), pygame.SRCALPHA)
+        pygame.draw.rect(band, (180, 210, 255, 230), band.get_rect(), border_radius=8)
+        band.blit(title, (20, 9))
+        surface.blit(band, band.get_rect(center=(self.w // 2, 90)))
 
-        # calcular hover cada frame (más robusto que depender de MOUSEMOTION)
+        # hover
         mx, my = pygame.mouse.get_pos()
         if   self.rect_easy.collidepoint((mx, my)): self.hover = 'easy'
         elif self.rect_hard.collidepoint((mx, my)): self.hover = 'hard'
         else: self.hover = None
 
-        # dibujar tarjetas
-        self._draw_card(surface, self.rect_easy, self.lbl_easy,
+        # tarjetas
+        self._draw_card(surface, self.rect_easy, self.lbl_easy, icon=self.icon_easy,
                         selected=(self.selected == "FACIL"),  hover=(self.hover == 'easy'))
-        self._draw_card(surface, self.rect_hard, self.lbl_hard,
+        self._draw_card(surface, self.rect_hard, self.lbl_hard, icon=self.icon_hard,
                         selected=(self.selected == "DIFICIL"), hover=(self.hover == 'hard'))
 
         # hint
-        hint_txt = "Clic o ←/→ para jugar!  •  ESC para volver"
-        hint = self.font_item.render(hint_txt, True, (20,20,20))
-        surface.blit(hint, hint.get_rect(center=(self.w//2, self.h - 40)))
+        hint_txt = "Clic o ←/→ para jugar • ESC para volver"
+        hint = self.font_item.render(hint_txt, True, (20, 20, 20))
+        surface.blit(hint, hint.get_rect(center=(self.w // 2, self.h - 40)))
+
+
 
 
 
@@ -855,6 +888,17 @@ def main():
         print("Aviso portraits:", e)
         portrait_krabby = pygame.Surface((160, 160), pygame.SRCALPHA); portrait_krabby.fill((30, 140, 220))
         portrait_karol  = pygame.Surface((160, 160), pygame.SRCALPHA); portrait_karol.fill((220, 60, 140))
+    # ---------- Iconos de dificultad ----------
+    # Rutas sugeridas: assets/images/ui/dificultad/facil.png y dificil.png
+    try:
+        icon_easy = pygame.image.load(IMG_DIR / "ui" / "dificultad" / "facil.png").convert_alpha()
+        icon_hard = pygame.image.load(IMG_DIR / "ui" / "dificultad" / "dificil.png").convert_alpha()
+        # tamaño agradable para la tarjeta
+        icon_easy = pygame.transform.smoothscale(icon_easy, (96, 96))
+        icon_hard = pygame.transform.smoothscale(icon_hard, (96, 96))
+    except Exception as e:
+        print("[WARN] No se pudieron cargar iconos de dificultad:", e)
+        icon_easy = icon_hard = None
 
     # Botones del menú
     COL_X = int(constantes.ANCHO_VENTANA * 0.28)
@@ -959,7 +1003,7 @@ def main():
                 if choice == 1:
                     nivel_actual = 1
                     # Ir a dificultad
-                    diff_ui = DifficultySelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
+                    diff_ui = DifficultySelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), icon_easy, icon_hard)
                     selected_difficulty = "FACIL"
                     estado = ESTADO_DIFICULTAD
                 elif choice == 2:
