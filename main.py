@@ -12,6 +12,11 @@ from items import Manzana, bolsa
 from fuentes import get_font
 from parallax import create_parallax_nivel1
 
+# === SPAWN FIX ===
+# Pequeña ventana de invencibilidad y 2 frames sin física al entrar al nivel.
+SPAWN_GRACE = 1.0        # segundos invencible al cargar/cerrar tutorial
+SPAWN_SKIP_FRAMES = 2     # frames sin física para estabilizar
+
 # -------------------- Intro video --------------------
 def play_intro(
     screen,
@@ -210,6 +215,24 @@ def reiniciar_nivel(nivel, jugador):
     jugador.en_piso = True
     jugador.state = "idle"
     jugador.vida_actual = jugador.vida_maxima
+
+    # === SPAWN FIX: pegar al piso justo tras colocar midbottom ===
+    px = jugador.forma.centerx
+    mejor_top = None
+    for r in nivel.collision_rects:
+        if r.left - 2 <= px <= r.right + 2:           # bajo la misma X
+            if r.top >= jugador.forma.bottom - 120:    # plataforma bajo nosotros (tolerancia)
+                if (mejor_top is None) or (r.top < mejor_top):
+                    mejor_top = r.top
+    if mejor_top is not None:
+        jugador.forma.bottom = int(mejor_top)
+        jugador.vel_y = 0
+        jugador.en_piso = True
+    else:
+        # si no hay piso detectado cerca, al menos no caigas disparado
+        jugador.vel_y = 0
+        jugador.en_piso = False
+
     print(f"[DEBUG] reiniciar_nivel -> spawn=({x},{y_spawn}), jugador.rect={jugador.forma}")
 
 def iniciar_muerte(jugador):
@@ -814,11 +837,9 @@ def main():
         t2 = pygame.image.load(IMG_DIR / "ui" / "niveles" / "nivel2_thumb.png").convert_alpha()
         t3 = pygame.image.load(IMG_DIR / "ui" / "niveles" / "nivel3_thumb.png").convert_alpha()
 
-        # Escalado recomendado para que encajen bien en la tarjeta
-        # (ajusta a 120x80 o 120x90 según te guste)
-        t1 = pygame.transform.scale(t1, (160, 140))
-        t2 = pygame.transform.scale(t2, (160, 140))
-        t3 = pygame.transform.scale(t3, (160, 140))
+        t1 = pygame.transform.scale(t1, (190, 185))
+        t2 = pygame.transform.scale(t2, (190, 185))
+        t3 = pygame.transform.scale(t3, (190, 185))
 
         thumbs = {1: t1, 2: t2, 3: t3}
     except Exception as e:
@@ -879,6 +900,10 @@ def main():
     tutorial_shown_level1 = False
     tutorial_context = None
 
+    # === SPAWN FIX: contadores de gracia/frames ===
+    spawn_grace = 0.0
+    spawn_skip_frames = 0
+
     # Música menú
     try: musica.play("menu", volumen=0.8)
     except Exception as e: print("Aviso música:", e)
@@ -921,7 +946,11 @@ def main():
                         select_lock = True
                         last_select_time = now_ms
                         selected_gender = "M" if choice == "male" else "F"
-                        # Pasamos a SELECCIÓN DE NIVEL
+                        # Crear al jugador según el personaje seleccionado
+                        if selected_gender == "M":
+                            jugador = Personaje(100, 670, gender="M")  # Krabby
+                        else:
+                            jugador = Personaje(100, 670, gender="F")  # Karol
                         level_select_ui = LevelSelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), thumbs)
                         estado = ESTADO_SELECT_NIVEL
 
@@ -973,14 +1002,30 @@ def main():
                     if event.key in (pygame.K_a, pygame.K_LEFT):  mover_izquierda = False
                     if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha   = False
 
+            # === BLOQUE NUEVO: MANEJO DE PAUSA ===
             elif estado == ESTADO_PAUSA:
                 action = pause_menu.handle_event(event)
                 if action == "resume":
-                    estado = ESTADO_JUEGO; pygame.mixer.music.set_volume(VOL_NORMAL)
+                    estado = ESTADO_JUEGO
+                    pygame.mixer.music.set_volume(VOL_NORMAL)
+                    # limpiar entradas pegadas
+                    mover_izquierda = False
+                    mover_derecha = False
+                    try:
+                        _clear_input_state()
+                    except Exception:
+                        pass
                 elif action == "menu":
-                    estado = ESTADO_MENU; pygame.mixer.music.set_volume(VOL_NORMAL); musica.switch("menu")
+                    estado = ESTADO_MENU
+                    pygame.mixer.music.set_volume(VOL_NORMAL)
+                    musica.switch("menu")
                     menu_leaving = False
                     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+                    try:
+                        _clear_input_state()
+                    except Exception:
+                        pass
+            # === FIN BLOQUE NUEVO ===
 
             elif estado == ESTADO_CONTINUE:
                 action = continue_ui.handle_event(event)
@@ -999,13 +1044,28 @@ def main():
                 if tutorial_overlay:
                     action = tutorial_overlay.handle_event(event)
                     if action == "close":
-                        try: _clear_input_state()
-                        except Exception: pass
-                        if not prefs.get("tutorial_seen", False):
-                            prefs["tutorial_seen"] = True
-                            _save_prefs(prefs)
+                        try:
+                            _clear_input_state()
+                        except Exception:
+                            pass
+
+                        tutorial_shown_level1 = True  # ✅ marcar como visto
+                        prefs["tutorial_seen"] = True
+                        _save_prefs(prefs)
+
+                        # === SPAWN FIX: al cerrar tutorial, dar protección de spawn ===
+                        spawn_grace = SPAWN_GRACE
+                        spawn_skip_frames = SPAWN_SKIP_FRAMES
+                        jugador.invencible = True
+                        jugador.invencible_timer = SPAWN_GRACE
+                        jugador.knockback_activo = False
+                        jugador.knockback_timer = 0.0
+                        jugador.vel_y = 0
+                        jugador.en_piso = True
+
                         estado = ESTADO_JUEGO
                         pygame.mixer.music.set_volume(VOL_NORMAL)
+
 
             elif estado == ESTADO_VICTORIA:
                 if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE):
@@ -1090,27 +1150,83 @@ def main():
 
             # === Ajustes por dificultad ===
             if selected_difficulty == "DIFICIL":
-                timer = tiempo_total * 0.8
+                timer = tiempo_total * 0.8  # menos tiempo
                 for e in enemigos:
                     if hasattr(e, "velocidad"):
-                        try: e.velocidad = int(e.velocidad * 1.25)
-                        except Exception: pass
-                if hasattr(jugador, "vida_maxima"):
-                    jugador.vida_actual = max(1, int(jugador.vida_maxima * 0.8))
+                        try:
+                            e.velocidad = int(e.velocidad * 1.25)  # enemigos más rápidos
+                        except Exception:
+                            pass
+                jugador.vida_actual = jugador.vida_maxima
             else:
                 timer = tiempo_total
+                jugador.vida_actual = jugador.vida_maxima
 
-            if nivel_actual == 1 and (not tutorial_shown_level1) and tutorial_overlay:
+            # Mostrar tutorial solo en nivel 1, fácil y primera vez
+            if (
+                    nivel_actual == 1
+                    and selected_difficulty == "FACIL"
+                    and not tutorial_shown_level1
+                    and tutorial_overlay
+            ):
                 tutorial_context = "game"
                 estado = ESTADO_TUTORIAL
                 pygame.mixer.music.set_volume(VOL_PAUSA)
             else:
+                # === SPAWN FIX: al entrar directo al juego, activar gracia/frames ===
+                spawn_grace = SPAWN_GRACE
+                spawn_skip_frames = SPAWN_SKIP_FRAMES
+                jugador.invencible = True
+                jugador.invencible_timer = SPAWN_GRACE
+                jugador.knockback_activo = False
+                jugador.knockback_timer = 0.0
+                jugador.vel_y = 0
+                jugador.en_piso = True
                 estado = ESTADO_JUEGO
+
 
         elif estado == ESTADO_TUTORIAL:
             pass  # la interacción se maneja en eventos
 
         elif estado == ESTADO_JUEGO:
+            # === SPAWN FIX: protección de los primeros frames y gracia ===
+            if spawn_skip_frames > 0:
+                spawn_skip_frames -= 1
+
+            if spawn_grace > 0.0:
+                spawn_grace = max(0.0, spawn_grace - dt)
+                jugador.invencible = True
+                jugador.invencible_timer = max(getattr(jugador, "invencible_timer", 0.0), spawn_grace)
+                jugador.knockback_activo = False
+                jugador.knockback_timer = 0.0
+
+                # Repegar al piso durante la gracia (por si la física movió algo)
+                px = jugador.forma.centerx
+                best_top = None
+                for r in nivel.collision_rects:
+                    if r.left - 2 <= px <= r.right + 2:
+                        if r.top >= jugador.forma.bottom - 120:
+                            if (best_top is None) or (r.top < best_top):
+                                best_top = r.top
+                if best_top is not None:
+                    jugador.forma.bottom = int(best_top)
+                jugador.vel_y = 0
+                jugador.en_piso = True
+
+                # En los frames de spawn evitamos el resto de la lógica/peligros
+                # Mantén HUD, cámara y animación suaves:
+                jugador.actualizar(dt)
+                jugador.animar(dt)
+                cam.follow(jugador.forma, lerp=1.0)
+                if parallax is not None:
+                    new_ox = cam.offset()[0]
+                    camera_dx = new_ox - prev_cam_offset_x
+                    prev_cam_offset_x = new_ox
+                    parallax.update_by_camera(camera_dx)
+
+                # saltamos el resto del update de juego este frame
+                continue
+
             # Tiempo
             timer -= dt
             if timer <= 0:
@@ -1359,3 +1475,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

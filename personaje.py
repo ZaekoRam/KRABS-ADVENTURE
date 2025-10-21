@@ -3,17 +3,23 @@ import constantes
 from pathlib import Path
 
 class Personaje(pygame.sprite.Sprite):
-    def __init__(self, spawn_x: int, spawn_y: int):
+    def __init__(self, spawn_x: int, spawn_y: int, gender = "M"):
         super().__init__()
         self.hit_sound_played = False  # 🔊 evita repetir sonido de golpe
         self.stun_sound_played = False
 
+        self.gender = gender
+
+        if self.gender == "M":
+            sprite_folder = "assets/images/characters/krabby"  # Carpeta o sprites de Krabby
+        else:
+            sprite_folder = "assets/images/characters/karol"  # Carpeta o sprites de Karol
+
         base_dir = Path(__file__).resolve().parent
-        krab_dir = base_dir / "assets" / "images" / "characters" / "krabby"
 
         # ---- helpers de carga/escala ----
         def load(name: str) -> pygame.Surface:
-            return pygame.image.load(str(krab_dir / name)).convert_alpha()
+            return pygame.image.load(f"{sprite_folder}/{name}").convert_alpha()
 
         def scale(img: pygame.Surface) -> pygame.Surface:
             return pygame.transform.scale(
@@ -24,10 +30,10 @@ class Personaje(pygame.sprite.Sprite):
                 ),
             )
 
-        # ---- FRAMES ----
-        self.frames_idle = [scale(load(f"idle{i}.png")) for i in range(1, 3)]   # 2 frames
-        self.frames_run  = [scale(load(f"krabby{i}.png")) for i in range(1, 5)]
-        self.frames_jump = [scale(load(f"jump{i}.png"))   for i in range(1, 8)]  # 7 frames de salto
+        # ---- FRAMES ---- (IGUAL QUE TENÍAS, PERO DEPENDIENDO DEL PERSONAJE)
+        self.frames_idle = [scale(load(f"idle{i}.png")) for i in range(1, 3)]
+        self.frames_run = [scale(load(f"run{i}.png")) for i in range(1, 5)]
+        self.frames_jump = [scale(load(f"jump{i}.png")) for i in range(1, 8)]
         self.frames_attack = [scale(load(f"ataque{i}.png")) for i in range(1, 6)]
 
         # Estados de ataque
@@ -43,9 +49,9 @@ class Personaje(pygame.sprite.Sprite):
         self.state        = "idle"
         self.facing_right = True
         self.anim_index   = 0.0
-        self.run_fps      = 10.0   # velocidad al correr
-        self.jump_fps     = 8.0    # salto
-        self.idle_fps     = 2.0    # idle lento (2 frames por segundo)
+        self.run_fps      = 5.0   # velocidad al correr
+        self.jump_fps     = 4.0    # salto
+        self.idle_fps     = 1.0    # idle lento (2 frames por segundo)
 
         # ---- física ----
         self.vel_y   = 0.0
@@ -53,7 +59,7 @@ class Personaje(pygame.sprite.Sprite):
 
         # ---- render y rect ----
         self.image = self.frames_idle[0]
-        self. forma = self.image.get_rect()
+        self.forma = self.image.get_rect()
         self.forma.midbottom = (int(spawn_x), int(spawn_y))
 
         self._pos_x = float(self.forma.x)
@@ -67,7 +73,7 @@ class Personaje(pygame.sprite.Sprite):
         self.attack_offset_y = -extra_y // 2  # para centrar en Y
 
         # --- ATRIBUTOS DE VIDA Y DAÑO ---
-        self.vida_maxima = 3
+        self.vida_maxima = 4
         self.vida_actual = self.vida_maxima
         self.invencible = False
         self.invencible_timer = 0
