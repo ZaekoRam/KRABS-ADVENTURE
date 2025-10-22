@@ -11,6 +11,70 @@ from enemigos import Enemigo
 from items import Manzana, bolsa
 from fuentes import get_font
 from parallax import create_parallax_nivel1
+import sys
+# -------------------- Secuencia de Victoria (animación tipo Mario) --------------------
+class SecuenciaVictoria:
+    def __init__(self, jugador, bandera_rect, nivel, on_finish):
+        self.jugador = jugador
+        self.bandera_rect = bandera_rect
+        self.nivel = nivel
+        self.on_finish = on_finish
+        self.activa = False
+        self.etapa = 0
+        self.timer = 0.0
+        self.trash_y_inicial = None
+        self.trash_y_final = None
+
+    def iniciar(self):
+        self.activa = True
+        self.etapa = 0
+        self.timer = 0.0
+        self.jugador.set_dx(0)
+        self.jugador.en_piso = True
+
+    def actualizar(self, dt):
+        if not self.activa:
+            return
+
+        if self.etapa == 0:
+            # caminar hacia la derecha
+            self.jugador.forma.x += int(90 * dt)
+            if self.jugador.forma.centerx >= self.bandera_rect.centerx - 30:
+                self.etapa = 1
+                self.jugador.state = "idle"
+        elif self.etapa == 1:
+            # voltear a la izquierda
+            self.jugador.facing_right = False
+            self.timer += dt
+            if self.timer > 0.5:
+                self.etapa = 2
+                self.timer = 0
+        elif self.etapa == 2:
+            # subir bandera (o basura)
+            if self.trash_y_inicial is None:
+                self.trash_y_inicial = self.bandera_rect.bottom
+                self.trash_y_final = self.bandera_rect.bottom - 120  # altura de subida
+            if self.bandera_rect.bottom > self.trash_y_final:
+                RAISE_SPEED = 120  # píxeles/segundo; cambia a 160–200 si la quieres más rápida
+                self.bandera_rect.bottom -= int(RAISE_SPEED * dt)
+            else:
+                self.etapa = 3
+                self.timer = 0
+        elif self.etapa == 3:
+            # esperar 2 segundos
+            self.timer += dt
+            if self.timer > 2:
+                self.etapa = 4
+                self.jugador.facing_right = True
+        elif self.etapa == 4:
+            # caminar hacia la derecha hasta salir del mapa
+            self.jugador.forma.x += int(140 * dt)
+            if self.jugador.forma.left > self.nivel.width_px:
+                self.etapa = 5
+        elif self.etapa == 5:
+            # terminar nivel
+            self.activa = False
+            self.on_finish()
 
 # === SPAWN FIX ===
 # Pequeña ventana de invencibilidad y 2 frames sin física al entrar al nivel.
@@ -158,6 +222,15 @@ def _save_prefs(data: dict):
         print("[WARN] No se pudo guardar settings.json:", e)
 
 # -------------------- Helpers/HUD --------------------
+def esta_en_suelo(j, col_rects) -> bool:
+    """Chequeo inmediato de suelo: mira 1px por debajo del jugador."""
+    probe = j.forma.copy()
+    probe.y += 1
+    for r in col_rects:
+        if probe.colliderect(r):
+            return True
+    return False
+
 def scale_to_width(surf: pygame.Surface, target_w: int) -> pygame.Surface:
     ratio = target_w / surf.get_width()
     target_h = int(surf.get_height() * ratio)
@@ -846,6 +919,24 @@ def main():
     except pygame.error as e:
         print(f"ERROR AL CARGAR IMÁGENES DEL HUD: {e}")
         vida_lleno_img = vida_vacio_img = None
+    # --- Bandera (sprite) ---
+    try:
+        # Tamaño original: NO la escales
+        flag_img = pygame.image.load(IMG_DIR / "props" / "bandera.png").convert_alpha()
+    except Exception as e:
+        print("[WARN] No se pudo cargar bandera:", e)
+        flag_img = None
+
+    # Posición por nivel (mundo, en píxeles) de la base de la bandera (bottom-left)
+    # Ajusta estos valores a tu mapa:
+    FLAG_POS_BY_LEVEL = {
+        1: (5491, 683),  # NIVEL 1
+        2: (6485, 845),  # NIVEL 2 (ejemplo)
+        3: (0, 0),  # si algún día agregas nivel 3
+    }
+
+    # variable que usaremos al dibujar (se actualiza al cargar cada nivel)
+    flag_pos_world = FLAG_POS_BY_LEVEL.get(1, (0, 0))
 
     # Intro
     video_path = VID_DIR / "intro.mp4"
@@ -1007,7 +1098,12 @@ def main():
                     selected_difficulty = "FACIL"
                     estado = ESTADO_DIFICULTAD
                 elif choice == 2:
-                    print("Nivel 2 aún no disponible.")
+                    nivel_actual = 2
+                    # Ir a dificultad
+                    diff_ui = DifficultySelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), icon_easy,
+                                                 icon_hard)
+                    selected_difficulty = "FACIL"
+                    estado = ESTADO_DIFICULTAD
                 elif choice == 3:
                     print("Nivel 3 aún no disponible.")
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -1037,14 +1133,22 @@ def main():
                     if event.key in (pygame.K_a, pygame.K_LEFT):  mover_izquierda = True
                     if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha   = True
                     if event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
-                        if getattr(jugador, "en_piso", False): musica.sfx("jump", volume=0.9)
-                        jugador.saltar()
+                        # Solo permite saltar si REALMENTE hay suelo ahora mismo
+                        if esta_en_suelo(jugador, nivel.collision_rects):
+                            try:
+                                if getattr(jugador, "en_piso", False):
+                                    musica.sfx("jump", volume=0.9)
+                            except Exception:
+                                pass
+                            jugador.saltar()
                     if event.key == pygame.K_F1 and tutorial_overlay:
                         estado = ESTADO_TUTORIAL
                         pygame.mixer.music.set_volume(VOL_PAUSA)
                 if event.type == pygame.KEYUP:
                     if event.key in (pygame.K_a, pygame.K_LEFT):  mover_izquierda = False
                     if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha   = False
+                    if event.key == pygame.K_F9:
+                        print("Jugador midbottom:", jugador.forma.midbottom)
 
             # === BLOQUE NUEVO: MANEJO DE PAUSA ===
             elif estado == ESTADO_PAUSA:
@@ -1132,6 +1236,7 @@ def main():
             # Carga el TMX según nivel_actual
             nivel = NivelTiled(MAP_DIR / f"nivel{nivel_actual}.tmx")
             cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
+            flag_pos_world = FLAG_POS_BY_LEVEL.get(nivel_actual, FLAG_POS_BY_LEVEL.get(1, (0, 0)))
             cx = jugador.forma.centerx - cam.vw // 2
             cy = jugador.forma.centery - cam.vh // 2
             cx = max(0, min(cx, cam.ww - cam.vw))
@@ -1140,8 +1245,11 @@ def main():
             cam.follow(jugador.forma, lerp=1.0)
 
             print("[DEBUG] Estado de carga: Iniciando nivel", nivel_actual)
-            musica.switch("nivel1")
-            pygame.mixer.music.set_volume(VOL_NORMAL)
+            try:
+                musica.switch(f"nivel{nivel_actual}")  # ← reproduce nivel1, nivel2, nivel3 según corresponda
+                pygame.mixer.music.set_volume(VOL_NORMAL)
+            except Exception as e:
+                print("Aviso música de nivel:", e)
             puntuacion = 0
             timer = tiempo_total
             parallax = create_parallax_nivel1()
@@ -1156,6 +1264,18 @@ def main():
             mover_izquierda = False
 
             enemigos = pygame.sprite.Group()
+
+            def _ir_a_victoria():
+                nonlocal estado
+                estado = ESTADO_VICTORIA
+
+            secuencia_victoria = SecuenciaVictoria(
+                jugador,
+                pygame.Rect(flag_pos_world[0], flag_pos_world[1] - 200, 32, 200),
+                nivel,
+                on_finish=_ir_a_victoria
+            )
+
             if nivel_actual == 1:
                 enemigos.add(
                     Enemigo(x=450, y=675, velocidad=34, escala=2.5),
@@ -1168,7 +1288,18 @@ def main():
                     Enemigo(x=2830, y=643, velocidad=35, escala=2.5),
                     Enemigo(x=3725, y=320, escala=2.5)
                 )
-
+            elif nivel_actual == 2:
+                enemigos.add(
+                    Enemigo(x=450, y=675, velocidad=34, escala=2.5),
+                    Enemigo(x=800, y=675, velocidad=35, escala=2.5),
+                    Enemigo(x=760, y=450, velocidad=35, escala=2.5),
+                    Enemigo(x=2176, y=640, velocidad=35, escala=2.5),
+                    Enemigo(x=2750, y=381, velocidad=35, escala=2.5),
+                    Enemigo(x=4000, y=640, velocidad=35, escala=2.5),
+                    Enemigo(x=5100, y=420, velocidad=35, escala=2.5),
+                    Enemigo(x=2830, y=643, velocidad=35, escala=2.5),
+                    Enemigo(x=3725, y=320, velocidad=35, escala=2.5)
+                )
             items = pygame.sprite.Group()
             if nivel_actual == 1:
                 items.add(
@@ -1198,7 +1329,7 @@ def main():
                 for e in enemigos:
                     if hasattr(e, "velocidad"):
                         try:
-                            e.velocidad = int(e.velocidad * 1.25)  # enemigos más rápidos
+                            e.velocidad = int(e.velocidad * 3)  # enemigos más rápidos
                         except Exception:
                             pass
                 jugador.vida_actual = jugador.vida_maxima
@@ -1236,6 +1367,30 @@ def main():
             # === SPAWN FIX: protección de los primeros frames y gracia ===
             if spawn_skip_frames > 0:
                 spawn_skip_frames -= 1
+            # --- CUTSCENE DE VICTORIA: prioridad total ---
+            if "secuencia_victoria" in locals() and secuencia_victoria.activa:
+                # anula la gracia de spawn para que no nos saque con el 'continue' de abajo
+                spawn_grace = 0.0
+                spawn_skip_frames = 0
+
+                # congela controles/física del player
+                jugador.set_dx(0)
+                jugador.vel_y = 0
+                jugador.en_piso = True
+
+                # avanza la cinemática (sube basura, espera, camina y termina)
+                secuencia_victoria.actualizar(dt)
+
+                # cámara y parallax siguen al jugador durante la escena
+                cam.follow(jugador.forma, lerp=1.0)
+                if parallax is not None:
+                    new_ox = cam.offset()[0]
+                    camera_dx = new_ox - prev_cam_offset_x
+                    prev_cam_offset_x = new_ox
+                    parallax.update_by_camera(camera_dx)
+
+                # ¡muy importante! saltar TODO el resto del update normal este frame
+                continue
 
             if spawn_grace > 0.0:
                 spawn_grace = max(0.0, spawn_grace - dt)
@@ -1269,6 +1424,45 @@ def main():
                     parallax.update_by_camera(camera_dx)
 
                 # saltamos el resto del update de juego este frame
+                continue
+            # ⛳ Si la secuencia de victoria está activa, congelar jugabilidad normal
+            if "secuencia_victoria" in locals() and secuencia_victoria.activa:
+                jugador.set_dx(0)
+                jugador.vel_y = 0
+                jugador.en_piso = True
+
+                secuencia_victoria.actualizar(dt)
+
+                cam.follow(jugador.forma, lerp=1.0)
+                if parallax is not None:
+                    new_ox = cam.offset()[0]
+                    camera_dx = new_ox - prev_cam_offset_x
+                    prev_cam_offset_x = new_ox
+                    parallax.update_by_camera(camera_dx)
+
+                # No bajar el tiempo ni procesar daño/inputs/física este frame
+                continue
+            # --- CUTSCENE DE VICTORIA: si está activa, solo actualizamos la secuencia y saltamos el resto ---
+            if "secuencia_victoria" in locals() and secuencia_victoria.activa:
+                jugador.set_dx(0)
+                jugador.vel_y = 0
+                jugador.en_piso = True
+
+                # velocidad/altura recomendadas (por si las quieres ajustar)
+                # en SecuenciaVictoria.actualizar usa: self.bandera_rect.bottom -= int(120 * dt)
+                # y self.trash_y_final = self.bandera_rect.bottom - 120
+
+                secuencia_victoria.actualizar(dt)
+
+                # cámara/parallax siguen al jugador durante la escena
+                cam.follow(jugador.forma, lerp=1.0)
+                if parallax is not None:
+                    new_ox = cam.offset()[0]
+                    camera_dx = new_ox - prev_cam_offset_x
+                    prev_cam_offset_x = new_ox
+                    parallax.update_by_camera(camera_dx)
+
+                # saltar TODO el resto del update de juego este frame
                 continue
 
             # Tiempo
@@ -1371,8 +1565,21 @@ def main():
             # Meta
             for goal in nivel.goal_rects:
                 if jugador.forma.colliderect(goal):
-                    estado = ESTADO_VICTORIA
+                    if not getattr(secuencia_victoria, "activa", False):
+                        secuencia_victoria.iniciar()
                     break
+            # --- DIBUJAR BANDERA / BASURA ---
+            ox, oy = cam.offset()
+            if flag_img:
+                if "secuencia_victoria" in locals() and secuencia_victoria.activa:
+                    # Usa la posición animada de la secuencia
+                    bx = secuencia_victoria.bandera_rect.x - ox
+                    by = secuencia_victoria.bandera_rect.bottom - oy
+                    fr = flag_img.get_rect(bottomleft=(bx, by))
+                else:
+                    # Posición normal (si aún no se activó la animación)
+                    fr = flag_img.get_rect(bottomleft=(flag_pos_world[0] - ox, flag_pos_world[1] - oy))
+                ventana.blit(flag_img, fr)
 
             # Ataque
             if jugador.attacking and jugador.attack_timer > 0:
@@ -1456,21 +1663,41 @@ def main():
             ventana.blit(fondo_menu, (0, 0))
             diff_ui.draw(ventana)
 
-        elif estado in ("JUEGO", "PAUSA"):
+        elif estado == ESTADO_JUEGO:
+            # Fondo/parallax y mapa
             if parallax is not None:
                 parallax.draw(ventana)
             nivel.draw(ventana, cam.offset())
+
+            # Offset de cámara (úsalo para TODO lo que dibujas)
             ox, oy = cam.offset()
-            draw_timer(ventana, font_hud, timer, pos=(20, 20))
-            draw_hud(ventana, jugador, vida_lleno_img, vida_vacio_img)
-            draw_puntuacion(ventana, font_hud, puntuacion)
+
+            # --- DIBUJAR BANDERA / BASURA ---
+            if flag_img:
+                if "secuencia_victoria" in locals() and secuencia_victoria.activa:
+                    bx = secuencia_victoria.bandera_rect.x - ox
+                    by = secuencia_victoria.bandera_rect.bottom - oy
+                    fr = flag_img.get_rect(bottomleft=(bx, by))
+                else:
+                    fr = flag_img.get_rect(
+                        bottomleft=(flag_pos_world[0] - ox, flag_pos_world[1] - oy)
+                    )
+                ventana.blit(flag_img, fr)
+
+            # Enemigos e ítems
             for enemigo in enemigos:
                 ventana.blit(enemigo.image, (enemigo.rect.x - ox, enemigo.rect.y - oy))
             for item in items:
                 ventana.blit(item.image, (item.rect.x - ox, item.rect.y - oy))
+
+            # Jugador
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
-            if estado == "PAUSA":
-                pause_menu.draw(ventana)
+
+            # HUD
+            draw_timer(ventana, font_hud, timer, pos=(20, 20))
+            draw_hud(ventana, jugador, vida_lleno_img, vida_vacio_img)
+            draw_puntuacion(ventana, font_hud, puntuacion)
+
 
         elif estado in ("MUERTE", "CONTINUE"):
             if parallax is not None:

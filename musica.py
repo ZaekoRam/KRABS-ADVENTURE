@@ -10,6 +10,9 @@ SFX_DIR   = AUDIO_DIR / "sfx"
 LIB = {
     "menu":   AUDIO_DIR / "menu.ogg",
     "nivel1": AUDIO_DIR / "nivel1.ogg",
+    "nivel2": AUDIO_DIR / "nivel2.ogg",  # ← NUEVO
+    # "nivel3": BASE / "nivel3.ogg",
+
 }
 
 _inited = False
