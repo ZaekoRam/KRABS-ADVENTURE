@@ -93,7 +93,7 @@
 </data>
  </layer>
  <objectgroup id="8" name="Meta">
-  <object id="56" x="5569.83" y="-81.5606" width="33.3333" height="667.333"/>
+  <object id="56" x="5569.83" y="-81.5606" width="33.3333" height="751.333"/>
  </objectgroup>
  <objectgroup id="9" name="enemigos" visible="0"/>
  <objectgroup id="6" name="collisions">
@@ -114,7 +114,7 @@
   <object id="25" x="1535.33" y="608" width="21.6667" height="179"/>
   <object id="26" x="1567.67" y="639.333" width="21" height="143"/>
   <object id="27" x="1600.67" y="673" width="1418.67" height="127.545"/>
-  <object id="28" x="3116" y="674.667" width="2638.67" height="126.667"/>
+  <object id="28" x="3116" y="674.667" width="2932" height="126.667"/>
   <object id="29" x="2989.33" y="545.167" width="40.5" height="254.833"/>
   <object id="30" x="2952" y="577" width="34.6667" height="221.667"/>
   <object id="31" x="2920" y="609.667" width="25.3333" height="187.833"/>
@@ -145,7 +145,6 @@
   <object id="68" x="4938" y="606.5" width="30.5" height="68.5"/>
   <object id="69" x="4904.5" y="639" width="35" height="38.5"/>
   <object id="70" x="4420.67" y="512" width="344" height="16.6667"/>
-  <object id="78" x="5555.67" y="586.833" width="65.1667" height="83.6667"/>
  </objectgroup>
  <objectgroup id="10" name="barrera_enemigos" visible="0">
   <object id="58" x="655" y="351.666" width="25.3333" height="91.3333"/>

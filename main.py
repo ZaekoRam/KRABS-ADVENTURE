@@ -19,63 +19,79 @@ class SecuenciaVictoria:
         self.bandera_rect = bandera_rect
         self.nivel = nivel
         self.on_finish = on_finish
+
         self.activa = False
         self.etapa = 0
         self.timer = 0.0
         self.trash_y_inicial = None
         self.trash_y_final = None
 
+        self._finish_lanzado = False  # ← evita llamar on_finish más de una vez
+
     def iniciar(self):
         self.activa = True
         self.etapa = 0
         self.timer = 0.0
+        self.trash_y_inicial = None
+        self.trash_y_final = None
+        self._finish_lanzado = False
+
         self.jugador.set_dx(0)
         self.jugador.en_piso = True
+        self.jugador.facing_right = True
+        self.jugador.state = "idle"
 
     def actualizar(self, dt):
         if not self.activa:
             return
 
         if self.etapa == 0:
-            # caminar hacia la derecha
+            # caminar hacia la derecha hasta quedar frente a la bandera
             self.jugador.forma.x += int(90 * dt)
             if self.jugador.forma.centerx >= self.bandera_rect.centerx - 30:
                 self.etapa = 1
                 self.jugador.state = "idle"
+
         elif self.etapa == 1:
-            # voltear a la izquierda
+            # voltear a la izquierda un instante
             self.jugador.facing_right = False
             self.timer += dt
             if self.timer > 0.5:
                 self.etapa = 2
-                self.timer = 0
+                self.timer = 0.0
+
+
         elif self.etapa == 2:
-            # subir bandera (o basura)
+            # SUBIR LA BANDERA HASTA ARRIBA DEL NIVEL (y=0), más lento
             if self.trash_y_inicial is None:
                 self.trash_y_inicial = self.bandera_rect.bottom
-                self.trash_y_final = self.bandera_rect.bottom - 120  # altura de subida
-            if self.bandera_rect.bottom > self.trash_y_final:
-                RAISE_SPEED = 120  # píxeles/segundo; cambia a 160–200 si la quieres más rápida
+            RAISE_SPEED = 120  # ⇦ baja este número si la quieres aún más lenta
+            # sigue subiendo hasta que la bandera salga por arriba (bottom <= 0)
+            if self.bandera_rect.bottom > 0:
                 self.bandera_rect.bottom -= int(RAISE_SPEED * dt)
             else:
+                # bandera ya salió por arriba; ahora sí, pasamos a mover al jugador
                 self.etapa = 3
-                self.timer = 0
+                self.timer = 0.0
+
         elif self.etapa == 3:
-            # esperar 2 segundos
+            # pequeña pausa antes de caminar (opcional)
             self.timer += dt
-            if self.timer > 2:
-                self.etapa = 4
+            if self.timer >= 0.20:
                 self.jugador.facing_right = True
+                self.etapa = 4
+
         elif self.etapa == 4:
-            # caminar hacia la derecha hasta salir del mapa
+            # ahora el jugador camina hacia la derecha hasta salir del mapa
             self.jugador.forma.x += int(140 * dt)
-            if self.jugador.forma.left > self.nivel.width_px:
+            if self.jugador.forma.left > self.nivel.width_px + 64:
                 self.etapa = 5
+
         elif self.etapa == 5:
             # terminar nivel
             self.activa = False
-            self.on_finish()
-
+            if callable(self.on_finish):
+                self.on_finish()
 # === SPAWN FIX ===
 # Pequeña ventana de invencibilidad y 2 frames sin física al entrar al nivel.
 SPAWN_GRACE = 1.0        # segundos invencible al cargar/cerrar tutorial
@@ -575,7 +591,7 @@ class CharacterSelectUI:
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_LEFT, pygame.K_a):   return "male"
             if event.key in (pygame.K_RIGHT, pygame.K_d):  return "female"
-            if event.key in (pygame.K_RETURN, pygame.K_SPACE): return "male"
+            if event.key in (pygame.K_SPACE, pygame.K_BACKSPACE): return "male"
         return None
     def _draw_card(self, surface, rect, portrait, name_surf, enabled=True, hover=False):
         pygame.draw.rect(surface, (15,70,130), rect, border_radius=8, width=6)
@@ -1088,6 +1104,22 @@ def main():
                             jugador = Personaje(100, 670, gender="F")  # Karol
                         level_select_ui = LevelSelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), thumbs)
                         estado = ESTADO_SELECT_NIVEL
+                        # Permitir volver al menú con ESC
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                        estado = ESTADO_MENU
+                        menu_leaving = False
+                        menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+                        try:
+                            _clear_input_state()
+                        except Exception:
+                            pass
+                        pygame.mixer.music.set_volume(VOL_NORMAL)
+                        musica.switch("menu")
+
+
+
+
+
 
             elif estado == ESTADO_SELECT_NIVEL:
                 choice = level_select_ui.handle_event(event)
@@ -1216,11 +1248,13 @@ def main():
 
 
             elif estado == ESTADO_VICTORIA:
-                if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE):
+                if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE,
+                                                                  pygame.K_ESCAPE):
                     musica.switch("menu")
                     estado = ESTADO_MENU
                     menu_leaving = False
                     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+
 
         # -------------------- UPDATE --------------------
         if estado == ESTADO_MENU:
@@ -1367,30 +1401,6 @@ def main():
             # === SPAWN FIX: protección de los primeros frames y gracia ===
             if spawn_skip_frames > 0:
                 spawn_skip_frames -= 1
-            # --- CUTSCENE DE VICTORIA: prioridad total ---
-            if "secuencia_victoria" in locals() and secuencia_victoria.activa:
-                # anula la gracia de spawn para que no nos saque con el 'continue' de abajo
-                spawn_grace = 0.0
-                spawn_skip_frames = 0
-
-                # congela controles/física del player
-                jugador.set_dx(0)
-                jugador.vel_y = 0
-                jugador.en_piso = True
-
-                # avanza la cinemática (sube basura, espera, camina y termina)
-                secuencia_victoria.actualizar(dt)
-
-                # cámara y parallax siguen al jugador durante la escena
-                cam.follow(jugador.forma, lerp=1.0)
-                if parallax is not None:
-                    new_ox = cam.offset()[0]
-                    camera_dx = new_ox - prev_cam_offset_x
-                    prev_cam_offset_x = new_ox
-                    parallax.update_by_camera(camera_dx)
-
-                # ¡muy importante! saltar TODO el resto del update normal este frame
-                continue
 
             if spawn_grace > 0.0:
                 spawn_grace = max(0.0, spawn_grace - dt)
@@ -1424,45 +1434,6 @@ def main():
                     parallax.update_by_camera(camera_dx)
 
                 # saltamos el resto del update de juego este frame
-                continue
-            # ⛳ Si la secuencia de victoria está activa, congelar jugabilidad normal
-            if "secuencia_victoria" in locals() and secuencia_victoria.activa:
-                jugador.set_dx(0)
-                jugador.vel_y = 0
-                jugador.en_piso = True
-
-                secuencia_victoria.actualizar(dt)
-
-                cam.follow(jugador.forma, lerp=1.0)
-                if parallax is not None:
-                    new_ox = cam.offset()[0]
-                    camera_dx = new_ox - prev_cam_offset_x
-                    prev_cam_offset_x = new_ox
-                    parallax.update_by_camera(camera_dx)
-
-                # No bajar el tiempo ni procesar daño/inputs/física este frame
-                continue
-            # --- CUTSCENE DE VICTORIA: si está activa, solo actualizamos la secuencia y saltamos el resto ---
-            if "secuencia_victoria" in locals() and secuencia_victoria.activa:
-                jugador.set_dx(0)
-                jugador.vel_y = 0
-                jugador.en_piso = True
-
-                # velocidad/altura recomendadas (por si las quieres ajustar)
-                # en SecuenciaVictoria.actualizar usa: self.bandera_rect.bottom -= int(120 * dt)
-                # y self.trash_y_final = self.bandera_rect.bottom - 120
-
-                secuencia_victoria.actualizar(dt)
-
-                # cámara/parallax siguen al jugador durante la escena
-                cam.follow(jugador.forma, lerp=1.0)
-                if parallax is not None:
-                    new_ox = cam.offset()[0]
-                    camera_dx = new_ox - prev_cam_offset_x
-                    prev_cam_offset_x = new_ox
-                    parallax.update_by_camera(camera_dx)
-
-                # saltar TODO el resto del update de juego este frame
                 continue
 
             # Tiempo
@@ -1568,18 +1539,6 @@ def main():
                     if not getattr(secuencia_victoria, "activa", False):
                         secuencia_victoria.iniciar()
                     break
-            # --- DIBUJAR BANDERA / BASURA ---
-            ox, oy = cam.offset()
-            if flag_img:
-                if "secuencia_victoria" in locals() and secuencia_victoria.activa:
-                    # Usa la posición animada de la secuencia
-                    bx = secuencia_victoria.bandera_rect.x - ox
-                    by = secuencia_victoria.bandera_rect.bottom - oy
-                    fr = flag_img.get_rect(bottomleft=(bx, by))
-                else:
-                    # Posición normal (si aún no se activó la animación)
-                    fr = flag_img.get_rect(bottomleft=(flag_pos_world[0] - ox, flag_pos_world[1] - oy))
-                ventana.blit(flag_img, fr)
 
             # Ataque
             if jugador.attacking and jugador.attack_timer > 0:
@@ -1619,6 +1578,45 @@ def main():
                 freeze_cam_offset = cam.offset()
                 iniciar_muerte(jugador)
                 estado = ESTADO_MUERTE
+
+                # ⛳ Si la secuencia de victoria está activa, congelar jugabilidad normal
+            if "secuencia_victoria" in locals() and secuencia_victoria.activa:
+                mover_izquierda = False
+                mover_derecha = False
+
+                # congela al jugador
+                jugador.state = "idle"
+                jugador.set_dx(0)
+                jugador.vx = 0  # ← asegura velocidad horizontal 0
+
+                # avanzar la cinemática (caminar → girar → subir bandera → esperar → salir)
+                secuencia_victoria.actualizar(dt)
+                # animación del sprite aquí (NUNCA en EVENTOS)
+                jugador.animar(dt)
+                # cámara/parallax pueden seguir al jugador durante la escena
+                cam.follow(jugador.forma, lerp=1.0)
+                if parallax is not None:
+                    new_ox = cam.offset()[0]
+                    camera_dx = new_ox - prev_cam_offset_x
+                    prev_cam_offset_x = new_ox
+                    parallax.update_by_camera(camera_dx)
+
+                # saltar TODO lo demás de la lógica de juego este frame
+
+
+
+        elif estado == ESTADO_VICTORIA:
+            # Mantén al jugador animando en idle (sin freeze)
+            jugador.set_dx(0)
+            jugador.state = "idle"
+            jugador.animar(dt)
+            # Mantén cámara/parallax vivos (aunque no se muevan ya)
+            cam.follow(jugador.forma, lerp=1.0)
+            if parallax is not None:
+                new_ox = cam.offset()[0]
+                camera_dx = new_ox - prev_cam_offset_x
+                prev_cam_offset_x = new_ox
+                parallax.update_by_camera(camera_dx)
 
         elif estado == ESTADO_MUERTE:
             jugador.aplicar_gravedad(dt)
@@ -1663,7 +1661,8 @@ def main():
             ventana.blit(fondo_menu, (0, 0))
             diff_ui.draw(ventana)
 
-        elif estado == ESTADO_JUEGO:
+
+        elif estado in ("JUEGO", "PAUSA"):
             # Fondo/parallax y mapa
             if parallax is not None:
                 parallax.draw(ventana)
@@ -1679,9 +1678,8 @@ def main():
                     by = secuencia_victoria.bandera_rect.bottom - oy
                     fr = flag_img.get_rect(bottomleft=(bx, by))
                 else:
-                    fr = flag_img.get_rect(
-                        bottomleft=(flag_pos_world[0] - ox, flag_pos_world[1] - oy)
-                    )
+                    # fallback por si no existe la variable (usa la posición fija del mapa)
+                    fr = flag_img.get_rect(bottomleft=(flag_pos_world[0] - ox, flag_pos_world[1] - oy))
                 ventana.blit(flag_img, fr)
 
             # Enemigos e ítems
@@ -1692,11 +1690,13 @@ def main():
 
             # Jugador
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
-
-            # HUD
-            draw_timer(ventana, font_hud, timer, pos=(20, 20))
-            draw_hud(ventana, jugador, vida_lleno_img, vida_vacio_img)
-            draw_puntuacion(ventana, font_hud, puntuacion)
+            if estado == "PAUSA":
+                pause_menu.draw(ventana)
+            # HUD solo si NO hay cutscene de victoria (para que no parezca congelado)
+            if not ("secuencia_victoria" in locals() and secuencia_victoria.activa):
+                draw_timer(ventana, font_hud, timer, pos=(20, 20))
+                draw_hud(ventana, jugador, vida_lleno_img, vida_vacio_img)
+                draw_puntuacion(ventana, font_hud, puntuacion)
 
 
         elif estado in ("MUERTE", "CONTINUE"):
@@ -1727,19 +1727,39 @@ def main():
             if tutorial_overlay:
                 tutorial_overlay.draw(ventana)
 
+
         elif estado == ESTADO_VICTORIA:
             if parallax is not None:
                 parallax.draw(ventana)
             nivel.draw(ventana, cam.offset())
             ox, oy = cam.offset()
-            ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
-            msg = get_font(constantes.FONT_UI_TITLE).render("¡VICTORIA!", True, (255, 255, 0))
-            ventana.blit(msg, (constantes.ANCHO_VENTANA // 2 - msg.get_width() // 2,
-                               constantes.ALTO_VENTANA // 2 - msg.get_height() // 2))
-            hint = get_font(constantes.FONT_UI_ITEM).render("Pulsa ENTER para volver al menú", True, (255, 255, 255))
-            ventana.blit(hint, (constantes.ANCHO_VENTANA // 2 - hint.get_width() // 2,
-                                constantes.ALTO_VENTANA // 2 + 60))
 
+            # Dibuja la bandera en su posición final (usa bandera_rect si existe, si no, fallback)
+            if flag_img:
+                if "secuencia_victoria" in locals():
+                    bx = secuencia_victoria.bandera_rect.x - ox
+                    by = secuencia_victoria.bandera_rect.bottom - oy
+                    fr = flag_img.get_rect(bottomleft=(bx, by))
+                else:
+                    fr = flag_img.get_rect(bottomleft=(flag_pos_world[0] - ox, flag_pos_world[1] - oy))
+                ventana.blit(flag_img, fr)
+
+            # Jugador
+            ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
+
+            # Mensaje
+            msg = get_font(constantes.FONT_UI_TITLE).render("¡VICTORIA!", True, (255, 255, 0))
+            ventana.blit(
+                msg,
+                (constantes.ANCHO_VENTANA // 2 - msg.get_width() // 2,
+                 constantes.ALTO_VENTANA // 2 - msg.get_height() // 2)
+            )
+            hint = get_font(constantes.FONT_UI_ITEM).render("Pulsa ENTER para volver al menú", True, (255, 255, 255))
+            ventana.blit(
+                hint,
+                (constantes.ANCHO_VENTANA // 2 - hint.get_width() // 2,
+                 constantes.ALTO_VENTANA // 2 + 60)
+            )
         pygame.display.flip()
 
     pygame.quit()
