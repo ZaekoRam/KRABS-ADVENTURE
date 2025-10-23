@@ -69,7 +69,7 @@
 75,17,30,93,77,192,18,94,18,18,76,17,76,29,82,82,77,75,17,180,0,0,0,0,0,0,77,81,0,0,0,0,18,94,77,192,81,64,77,75,81,75,18,77,94,192,192,30,192,93,30,0,0,0,0,0,0,0,82,30,192,18,81,64,75,64,192,30,76,94,180,82,77,180,17,77,0,0,0,0,0,0,0,0,0,13,17,17,75,94,76,82,94,64,76,192,94,15,0,0,0,0,0,0,0,0,192,180,75,81,18,94,82,76,81,18,76,64,18,75,93,82,81,81,81,81,17,94,82,82,81,17,64,76,93,82,94,77,77,30,0,192,77,75,77,75,192,64,0,94,0,0,94,30,94,30,82,77,75,64,94,81,76,64,30,76,77,18,17,30,94,18,93,180,180,64,76,94,82,93,77,75,94,18,30,93,76,93,180,77,18,82,77,180,18,76,75,93,76,18,77,75,81,17,81,93,17,30,94,18
 </data>
  </layer>
- <objectgroup id="3" name="collisions" visible="0">
+ <objectgroup id="3" name="collisions">
   <object id="1" x="0" y="833" width="597" height="124"/>
   <object id="2" x="394" y="800" width="205" height="31"/>
   <object id="3" x="426.333" y="767.667" width="173.333" height="32.3333"/>
@@ -126,26 +126,22 @@
   <object id="85" x="4951" y="605.5" width="30.5" height="353"/>
   <object id="86" x="4980.5" y="639.5" width="35.5" height="320"/>
   <object id="87" x="5016" y="671" width="28.5" height="289.5"/>
-  <object id="88" x="5045.5" y="703.5" width="33.5" height="265.5"/>
-  <object id="89" x="5079.5" y="736.5" width="30.5" height="230"/>
-  <object id="90" x="5110" y="767.5" width="32" height="214.5"/>
-  <object id="91" x="5139.5" y="798" width="34.5" height="196.5"/>
+  <object id="88" x="5045.5" y="703.5" width="33.5" height="256.25"/>
+  <object id="89" x="5079.5" y="736.5" width="30.5" height="221.5"/>
+  <object id="90" x="5110" y="767.5" width="32" height="190.5"/>
+  <object id="91" x="5139.5" y="798" width="34.5" height="160.5"/>
   <object id="92" x="5318.5" y="683" width="17" height="141.5"/>
   <object id="93" x="5544" y="684.5" width="17.5" height="141.5"/>
-  <object id="94" x="5175" y="832" width="1545" height="128"/>
-  <object id="95" x="5393.94" y="1118.18"/>
+  <object id="94" x="5175" y="832" width="1748" height="128"/>
   <object id="96" x="5375.33" y="574.667" width="126" height="20"/>
-  <object id="98" x="576.667" y="640" width="24.6667" height="410.667"/>
+  <object id="98" x="576.667" y="640" width="24.6667" height="319.667"/>
   <object id="99" x="1032" y="640.667" width="46" height="320"/>
   <object id="100" x="915.333" y="835.333" width="5.33333" height="7.33333"/>
  </objectgroup>
- <objectgroup id="4" name="barrera_enemigos" visible="0">
+ <objectgroup id="4" name="barrera_enemigos">
   <object id="51" x="2434" y="678" width="30" height="153.333"/>
  </objectgroup>
- <objectgroup id="5" name="Meta" visible="0">
-  <object id="59" x="6526" y="-2" width="64" height="832"/>
+ <objectgroup id="5" name="Meta">
+  <object id="59" x="6553.33" y="-2" width="64" height="832"/>
  </objectgroup>
- <imagelayer id="7" name="Capa de Imagen 1" offsetx="6464" offsety="176">
-  <image source="../../../Users/ramir/Downloads/final/final/bandera.png" width="171" height="665"/>
- </imagelayer>
 </map>

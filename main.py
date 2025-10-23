@@ -35,11 +35,15 @@ class SecuenciaVictoria:
         self.trash_y_inicial = None
         self.trash_y_final = None
         self._finish_lanzado = False
-
+        # <<< NUEVO: música de victoria >>>
+        musica.switch("victoria")  # jingle no-loop (o como lo manejes en musica.py)
+        pygame.mixer.music.set_volume(0.9)
         self.jugador.set_dx(0)
         self.jugador.en_piso = True
         self.jugador.facing_right = True
         self.jugador.state = "idle"
+
+
 
     def actualizar(self, dt):
         if not self.activa:
@@ -51,6 +55,7 @@ class SecuenciaVictoria:
             if self.jugador.forma.centerx >= self.bandera_rect.centerx - 30:
                 self.etapa = 1
                 self.jugador.state = "idle"
+
 
         elif self.etapa == 1:
             # voltear a la izquierda un instante
@@ -65,7 +70,7 @@ class SecuenciaVictoria:
             # SUBIR LA BANDERA HASTA ARRIBA DEL NIVEL (y=0), más lento
             if self.trash_y_inicial is None:
                 self.trash_y_inicial = self.bandera_rect.bottom
-            RAISE_SPEED = 120  # ⇦ baja este número si la quieres aún más lenta
+            RAISE_SPEED = 190  # ⇦ baja este número si la quieres aún más lenta
             # sigue subiendo hasta que la bandera salga por arriba (bottom <= 0)
             if self.bandera_rect.bottom > 0:
                 self.bandera_rect.bottom -= int(RAISE_SPEED * dt)
@@ -1440,11 +1445,21 @@ def main():
             timer -= dt
             if timer <= 0:
                 timer = 0
-                try: musica.sfx("death", volume=0.9)
-                except Exception: pass
+                try:
+                    musica.sfx("death", volume=0.9)
+                except Exception:
+                    pass
+
+                # Música de derrota (sin loop)
+                try:
+                    musica.switch("derrota", crossfade_ms=200)
+                    pygame.mixer.music.set_volume(0.9)
+                except Exception as e:
+                    print("Aviso música derrota (timeout):", e)
+
                 freeze_cam_offset = cam.offset()
                 iniciar_muerte(jugador)
-                pygame.mixer.music.set_volume(0.35)
+
                 estado = ESTADO_MUERTE
 
             jugador.actualizar(dt)
@@ -1454,11 +1469,20 @@ def main():
 
             # Caída del nivel
             if jugador.forma.bottom > nivel.tmx.height * nivel.tmx.tileheight:
-                try: musica.sfx("death", volume=0.9)
-                except Exception: pass
+                try:
+                    musica.sfx("death", volume=0.9)
+                except Exception:
+                    pass
+
+                try:
+                    musica.switch("derrota", crossfade_ms=200)
+                    pygame.mixer.music.set_volume(0.9)
+                except Exception as e:
+                    print("Aviso música derrota (caída):", e)
+
                 freeze_cam_offset = cam.offset()
                 iniciar_muerte(jugador)
-                pygame.mixer.music.set_volume(0.35)
+                # pygame.mixer.music.set_volume(0.35)
                 estado = ESTADO_MUERTE
 
             # Items
@@ -1550,8 +1574,9 @@ def main():
                             if not jugador.hit_sound_played:
                                 musica.sfx("golpe", volume=0.9)
                                 jugador.hit_sound_played = True
-                        else:
-                            e.kill()
+                        if e.vida <= 0:
+                            puntuacion += e.puntos
+
             if jugador.attack_timer <= 0:
                 jugador.hit_sound_played = False
 
@@ -1574,7 +1599,13 @@ def main():
                 jugador.knockback_activo = False
                 jugador.knockback_timer = 0.0
                 musica.sfx("death", volume=0.9)
-                pygame.mixer.music.set_volume(0.35)
+
+                try:
+                    musica.switch("derrota", crossfade_ms=200)
+                    pygame.mixer.music.set_volume(0.9)
+                except Exception as e:
+                    print("Aviso música derrota (hp=0):", e)
+
                 freeze_cam_offset = cam.offset()
                 iniciar_muerte(jugador)
                 estado = ESTADO_MUERTE
@@ -1588,7 +1619,6 @@ def main():
                 jugador.state = "idle"
                 jugador.set_dx(0)
                 jugador.vx = 0  # ← asegura velocidad horizontal 0
-
                 # avanzar la cinemática (caminar → girar → subir bandera → esperar → salir)
                 secuencia_victoria.actualizar(dt)
                 # animación del sprite aquí (NUNCA en EVENTOS)

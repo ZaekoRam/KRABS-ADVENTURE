@@ -1,11 +1,11 @@
 import pygame
-
 import constantes
 from pathlib import Path
 
 class Enemigo(pygame.sprite.Sprite):
     def __init__(self, x, y, velocidad=2, escala=2):  # <-- Añade el parámetro escala
         super().__init__()
+        self.puntos = 100
         base_dir = Path(__file__).resolve().parent
         enemy1_dir = base_dir / "assets" / "images" / "enemigos" / "enemigo1"
 
