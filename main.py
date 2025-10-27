@@ -1014,7 +1014,12 @@ def main():
                     selected_difficulty = "FACIL"
                     estado = ESTADO_DIFICULTAD
                 elif choice == 3:
-                    print("Nivel 3 aún no disponible.")
+                    nivel_actual = 3
+                    # Ir a dificultad
+                    diff_ui = DifficultySelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), icon_easy,
+                                                 icon_hard)
+                    selected_difficulty = "FACIL"
+                    estado = ESTADO_DIFICULTAD
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     estado = ESTADO_SELECT_PERSONAJE
                     select_lock = False
