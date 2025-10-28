@@ -8,10 +8,13 @@ import musica
 from pytmx.util_pygame import load_pygame
 import imageio
 from enemigos import Enemigo
+from enemigos import Enemigo_walk
 from items import Manzana, bolsa
 from fuentes import get_font
 from parallax import create_parallax_nivel1
 import sys
+
+
 # -------------------- Secuencia de Victoria (animación tipo Mario) --------------------
 class SecuenciaVictoria:
     def __init__(self, jugador, bandera_rect, nivel, on_finish):
@@ -43,8 +46,6 @@ class SecuenciaVictoria:
         self.jugador.facing_right = True
         self.jugador.state = "idle"
 
-
-
     def actualizar(self, dt):
         if not self.activa:
             return
@@ -56,7 +57,6 @@ class SecuenciaVictoria:
                 self.etapa = 1
                 self.jugador.state = "idle"
 
-
         elif self.etapa == 1:
             # voltear a la izquierda un instante
             self.jugador.facing_right = False
@@ -64,7 +64,6 @@ class SecuenciaVictoria:
             if self.timer > 0.5:
                 self.etapa = 2
                 self.timer = 0.0
-
 
         elif self.etapa == 2:
             # SUBIR LA BANDERA HASTA ARRIBA DEL NIVEL (y=0), más lento
@@ -97,23 +96,26 @@ class SecuenciaVictoria:
             self.activa = False
             if callable(self.on_finish):
                 self.on_finish()
+
+
 # === SPAWN FIX ===
 # Pequeña ventana de invencibilidad y 2 frames sin física al entrar al nivel.
-SPAWN_GRACE = 1.0        # segundos invencible al cargar/cerrar tutorial
-SPAWN_SKIP_FRAMES = 2     # frames sin física para estabilizar
+SPAWN_GRACE = 1.0  # segundos invencible al cargar/cerrar tutorial
+SPAWN_SKIP_FRAMES = 2  # frames sin física para estabilizar
+
 
 # -------------------- Intro video --------------------
 def play_intro(
-    screen,
-    video_path: Path,
-    audio_path: Path,
-    size=(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA),
-    skip_keys=(pygame.K_SPACE, pygame.K_RETURN, pygame.K_ESCAPE),
-    FPS_MIN=5.0,
-    FPS_MAX=60.0,
-    FPS_OVERRIDE=30,
-    AV_OFFSET=0.0,
-    audio_delay=0.0,
+        screen,
+        video_path: Path,
+        audio_path: Path,
+        size=(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA),
+        skip_keys=(pygame.K_SPACE, pygame.K_RETURN, pygame.K_ESCAPE),
+        FPS_MIN=5.0,
+        FPS_MAX=60.0,
+        FPS_OVERRIDE=30,
+        AV_OFFSET=0.0,
+        audio_delay=0.0,
 ):
     if not video_path.exists():
         return
@@ -218,12 +220,14 @@ def play_intro(
             pass
         pygame.mixer.music.stop()
 
+
 # -------------------- Paths/prefs --------------------
 BASE_DIR = Path(__file__).resolve().parent
-IMG_DIR  = BASE_DIR / "assets" / "images"
-MAP_DIR  = BASE_DIR / "assets" / "maps"
-VID_DIR  = BASE_DIR / "assets" / "video"
+IMG_DIR = BASE_DIR / "assets" / "images"
+MAP_DIR = BASE_DIR / "assets" / "maps"
+VID_DIR = BASE_DIR / "assets" / "video"
 PREFS_PATH = BASE_DIR / "settings.json"
+
 
 def _load_prefs() -> dict:
     try:
@@ -235,12 +239,14 @@ def _load_prefs() -> dict:
         pass
     return {"tutorial_seen": False}
 
+
 def _save_prefs(data: dict):
     try:
         with open(PREFS_PATH, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print("[WARN] No se pudo guardar settings.json:", e)
+
 
 # -------------------- Helpers/HUD --------------------
 def esta_en_suelo(j, col_rects) -> bool:
@@ -252,10 +258,12 @@ def esta_en_suelo(j, col_rects) -> bool:
             return True
     return False
 
+
 def scale_to_width(surf: pygame.Surface, target_w: int) -> pygame.Surface:
     ratio = target_w / surf.get_width()
     target_h = int(surf.get_height() * ratio)
     return pygame.transform.scale(surf, (target_w, target_h))
+
 
 def cargar_primera_imagen(carpeta_rel: str, usa_alpha: bool) -> pygame.Surface:
     carpeta = IMG_DIR / carpeta_rel
@@ -266,8 +274,10 @@ def cargar_primera_imagen(carpeta_rel: str, usa_alpha: bool) -> pygame.Surface:
             return surf.convert_alpha() if usa_alpha else surf.convert()
     raise FileNotFoundError(f"No encontré imágenes en {carpeta}")
 
+
 def escalar_a_ventana(surf: pygame.Surface) -> pygame.Surface:
     return pygame.transform.smoothscale(surf, (constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
+
 
 def draw_timer(surface, font, seconds, pos=(20, 20)):
     s = max(0, int(seconds))
@@ -277,8 +287,9 @@ def draw_timer(surface, font, seconds, pos=(20, 20)):
     surf = font.render(txt, True, color)
     shad = font.render(txt, True, sombra)
     x, y = pos
-    surface.blit(shad, (x+2, y+2))
+    surface.blit(shad, (x + 2, y + 2))
     surface.blit(surf, (x, y))
+
 
 def draw_hud(surface, jugador, img_lleno, img_vacio):
     if not img_lleno: return
@@ -290,9 +301,11 @@ def draw_hud(surface, jugador, img_lleno, img_vacio):
         else:
             surface.blit(img_vacio, (pos_x, pos_y))
 
+
 def draw_puntuacion(surface, font, puntuacion, pos=(20, 80)):
     texto = font.render(f"Puntos: {puntuacion}", True, (255, 255, 255))
     surface.blit(texto, pos)
+
 
 def reiniciar_nivel(nivel, jugador):
     x, y_spawn = 100, 670
@@ -314,8 +327,8 @@ def reiniciar_nivel(nivel, jugador):
     px = jugador.forma.centerx
     mejor_top = None
     for r in nivel.collision_rects:
-        if r.left - 2 <= px <= r.right + 2:           # bajo la misma X
-            if r.top >= jugador.forma.bottom - 120:    # plataforma bajo nosotros (tolerancia)
+        if r.left - 2 <= px <= r.right + 2:  # bajo la misma X
+            if r.top >= jugador.forma.bottom - 120:  # plataforma bajo nosotros (tolerancia)
                 if (mejor_top is None) or (r.top < mejor_top):
                     mejor_top = r.top
     if mejor_top is not None:
@@ -329,12 +342,14 @@ def reiniciar_nivel(nivel, jugador):
 
     print(f"[DEBUG] reiniciar_nivel -> spawn=({x},{y_spawn}), jugador.rect={jugador.forma}")
 
+
 def iniciar_muerte(jugador):
     death_jump = getattr(constantes, "DEATH_JUMP_VEL",
                          max(-700, int(getattr(constantes, "SALTO_VEL", -750) * 1.1)))
     jugador.vel_y = death_jump
     jugador.en_piso = False
     jugador.state = "fall"
+
 
 def _reset_player_combat_state(p):
     for name, value in [
@@ -359,10 +374,12 @@ def _reset_player_combat_state(p):
     if hasattr(p, "vx"):
         p.vx = 0.0
 
+
 def _clear_input_state():
     pygame.key.set_mods(0)
     pygame.event.clear([pygame.KEYDOWN, pygame.KEYUP])
     pygame.event.pump()
+
 
 # -------------------- UI Button --------------------
 class ImageButton:
@@ -372,31 +389,73 @@ class ImageButton:
         self.hover_scale = hover_scale
         self.image = self._scaled(self.base, self.scale)
         if center:
-            self.rect = self.image.get_rect(center=center); self._anchor = ("center", self.rect.center)
+            self.rect = self.image.get_rect(center=center);
+            self._anchor = ("center", self.rect.center)
         elif midleft:
-            self.rect = self.image.get_rect(midleft=midleft); self._anchor = ("midleft", self.rect.midleft)
+            self.rect = self.image.get_rect(midleft=midleft);
+            self._anchor = ("midleft", self.rect.midleft)
         else:
-            self.rect = self.image.get_rect(); self._anchor = ("topleft", self.rect.topleft)
+            self.rect = self.image.get_rect();
+            self._anchor = ("topleft", self.rect.topleft)
         self._last_size = self.image.get_size()
 
     def _scaled(self, surf, factor):
-        w = int(surf.get_width() * factor); h = int(surf.get_height() * factor)
+        w = int(surf.get_width() * factor);
+        h = int(surf.get_height() * factor)
         return pygame.transform.scale(surf, (w, h))
 
     def update(self, mouse_pos, mouse_down):
         hovering = self.rect.collidepoint(mouse_pos)
         target = self.hover_scale if (hovering and not mouse_down) else self.scale
-        size = (int(self.base.get_width()*target), int(self.base.get_height()*target))
+        size = (int(self.base.get_width() * target), int(self.base.get_height() * target))
         if size != self._last_size:
             self.image = self._scaled(self.base, target)
             self.rect = self.image.get_rect()
             setattr(self.rect, self._anchor[0], self._anchor[1])
             self._last_size = size
 
-    def draw(self, screen): screen.blit(self.image, self.rect)
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
+
     def clicked(self, event):
         return (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
                 and self.rect.collidepoint(event.pos))
+
+
+# -------------------- Simple Button --------------------
+class BotonSimple:
+    def __init__(self, texto, center, width=200, height=50):
+        self.font = get_font(constantes.FONT_UI_ITEM)
+        self.texto = texto
+        self.center = center
+        self.width = width
+        self.height = height
+
+        # Colores estilo marino/azul para coincidir con tu tema
+        self.color_normal = (30, 60, 120)  # Azul oscuro
+        self.color_hover = (50, 100, 180)  # Azul medio
+        self.color_texto = (255, 255, 255)  # Blanco
+
+        self.rect = pygame.Rect(0, 0, width, height)
+        self.rect.center = center
+        self.hover = False
+
+    def update(self, mouse_pos):
+        self.hover = self.rect.collidepoint(mouse_pos)
+
+    def draw(self, surface):
+        # Color del botón
+        color = self.color_hover if self.hover else self.color_normal
+
+        # Dibujar botón con bordes redondeados
+        pygame.draw.rect(surface, color, self.rect, border_radius=6)
+        pygame.draw.rect(surface, (255, 255, 255), self.rect, width=2, border_radius=6)
+
+        # Texto
+        texto_surf = self.font.render(self.texto, True, self.color_texto)
+        texto_rect = texto_surf.get_rect(center=self.rect.center)
+        surface.blit(texto_surf, texto_rect)
+
 
 # -------------------- TMX Level --------------------
 class NivelTiled:
@@ -404,7 +463,7 @@ class NivelTiled:
         self.tmx = load_pygame(str(ruta_tmx))
         self.tile_w = self.tmx.tilewidth
         self.tile_h = self.tmx.tileheight
-        self.width_px  = self.tmx.width  * self.tile_w
+        self.width_px = self.tmx.width * self.tile_w
         self.height_px = self.tmx.height * self.tile_h
 
         self.goal_rects = []
@@ -463,9 +522,11 @@ class NivelTiled:
                     break
 
     def draw(self, surface: pygame.Surface, camera_offset):
-        ox, oy = camera_offset; sw, sh = surface.get_size()
-        x0 = max(0, ox // self.tile_w); y0 = max(0, oy // self.tile_h)
-        x1 = min(self.tmx.width,  (ox + sw) // self.tile_w + 2)
+        ox, oy = camera_offset;
+        sw, sh = surface.get_size()
+        x0 = max(0, ox // self.tile_w);
+        y0 = max(0, oy // self.tile_h)
+        x1 = min(self.tmx.width, (ox + sw) // self.tile_w + 2)
         y1 = min(self.tmx.height, (oy + sh) // self.tile_h + 2)
         for layer in self.tmx.visible_layers:
             if hasattr(layer, "tiles"):
@@ -473,19 +534,30 @@ class NivelTiled:
                     if x0 <= x < x1 and y0 <= y < y1:
                         surface.blit(image, (x * self.tile_w - ox, y * self.tile_h - oy))
 
-    def world_size(self): return self.width_px, self.height_px
+    def world_size(self):
+        return self.width_px, self.height_px
+
 
 # -------------------- Camera --------------------
 class Camara:
     def __init__(self, viewport_size, world_size):
-        self.vw, self.vh = viewport_size; self.ww, self.wh = world_size
-        self.ox = 0.0; self.oy = 0.0
+        self.vw, self.vh = viewport_size;
+        self.ww, self.wh = world_size
+        self.ox = 0.0;
+        self.oy = 0.0
+
     def follow(self, r: pygame.Rect, lerp=1.0):
-        cx = r.centerx - self.vw // 2; cy = r.centery - self.vh // 2
-        cx = max(0, min(cx, self.ww - self.vw)); cy = max(0, min(cy, self.wh - self.vh))
-        self.ox += (cx - self.ox) * lerp; self.oy += (cy - self.oy) * lerp
+        cx = r.centerx - self.vw // 2;
+        cy = r.centery - self.vh // 2
+        cx = max(0, min(cx, self.ww - self.vw));
+        cy = max(0, min(cy, self.wh - self.vh))
+        self.ox += (cx - self.ox) * lerp;
+        self.oy += (cy - self.oy) * lerp
+
     def offset(self): return int(self.ox), int(self.oy)
+
     def set_offset(self, ox, oy): self.ox, self.oy = float(ox), float(oy)
+
 
 # -------------------- Pause Menu --------------------
 class PauseMenu:
@@ -495,8 +567,9 @@ class PauseMenu:
         self.font_item = get_font(constantes.FONT_UI_ITEM)
         self.options = ["Continuar", "Salir al menú"]
         self.selected = 0
-        self.panel = pygame.Surface((int(self.w*0.6), int(self.h*0.5)), pygame.SRCALPHA)
+        self.panel = pygame.Surface((int(self.w * 0.6), int(self.h * 0.5)), pygame.SRCALPHA)
         self.panel.fill((0, 0, 0, 140))
+
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
@@ -507,89 +580,153 @@ class PauseMenu:
                 self.selected = (self.selected + 1) % len(self.options)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mx, my = event.pos
-            x = (self.w - self.panel.get_width())//2
-            y = (self.h - self.panel.get_height())//2
+            x = (self.w - self.panel.get_width()) // 2
+            y = (self.h - self.panel.get_height()) // 2
             items = self._item_rects(x, y)
             for i, r in enumerate(items):
                 if r.collidepoint(mx, my):
                     self.selected = i
                     return "resume" if i == 0 else "menu"
         return None
+
     def _item_rects(self, px, py):
         rects = []
         start_y = py + 120
         for i, _ in enumerate(self.options):
-            r = pygame.Rect(0,0, 300, 48)
-            r.centerx = px + self.panel.get_width()//2
-            r.y = start_y + i*60
+            r = pygame.Rect(0, 0, 300, 48)
+            r.centerx = px + self.panel.get_width() // 2
+            r.y = start_y + i * 60
             rects.append(r)
         return rects
+
     def draw(self, surface):
         dim = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
-        dim.fill((0,0,0,100)); surface.blit(dim, (0,0))
-        px = (self.w - self.panel.get_width())//2
-        py = (self.h - self.panel.get_height())//2
+        dim.fill((0, 0, 0, 100));
+        surface.blit(dim, (0, 0))
+        px = (self.w - self.panel.get_width()) // 2
+        py = (self.h - self.panel.get_height()) // 2
         surface.blit(self.panel, (px, py))
-        title = self.font_title.render("PAUSA", True, (255,255,255))
-        surface.blit(title, (self.w//2 - title.get_width()//2, py + 40))
+        title = self.font_title.render("PAUSA", True, (255, 255, 255))
+        surface.blit(title, (self.w // 2 - title.get_width() // 2, py + 40))
         for i, text in enumerate(self.options):
-            color = (255,230,120) if i == self.selected else (230,230,230)
+            color = (255, 230, 120) if i == self.selected else (230, 230, 230)
             surf = self.font_item.render(text, True, color)
-            r = surf.get_rect(center=(self.w//2, py + 120 + i*60))
+            r = surf.get_rect(center=(self.w // 2, py + 120 + i * 60))
             surface.blit(surf, r)
 
-# -------------------- Continue Overlay --------------------
-class ContinueOverlay:
-    def __init__(self, size, seconds=8):
+
+# -------------------- Game Over Screen --------------------
+# -------------------- Game Over Screen --------------------
+class GameOverScreen:
+    def __init__(self, size):
         self.w, self.h = size
         self.font_title = get_font(constantes.FONT_UI_TITLE)
         self.font_item = get_font(constantes.FONT_UI_ITEM)
-        self.seconds_total = float(seconds)
-        self.remaining = float(seconds)
-        self.panel = pygame.Surface((int(self.w*0.6), int(self.h*0.5)), pygame.SRCALPHA)
-        self.panel.fill((0, 0, 0, 185))
-    def reset(self): self.remaining = float(self.seconds_total)
-    def update(self, dt): self.remaining = max(0.0, self.remaining - dt)
+
+        # Cargar imagen de Game Over - MÁS GRANDE
+        try:
+            game_over_img = pygame.image.load(IMG_DIR / "ui" / "game_over.png").convert_alpha()
+            # Escalar para que sea más grande - 85% del ancho de la pantalla
+            max_width = int(self.w * 1.2)  # <- CAMBIADO de 0.7 a 0.85
+            # Siempre escalar la imagen sin importar su tamaño original
+            ratio = max_width / game_over_img.get_width()
+            new_height = int(game_over_img.get_height() * ratio)
+            game_over_img = pygame.transform.scale(game_over_img, (max_width, new_height))
+            self.game_over_img = game_over_img
+        except Exception as e:
+            print(f"[WARN] No se pudo cargar game_over.png: {e}")
+            self.game_over_img = None
+
+        # Panel semi-transparente un poco más grande también
+        self.panel = pygame.Surface((int(self.w * 0.6), int(self.h * 0.6)), pygame.SRCALPHA)
+        self.panel.fill((0, 0, 0, 180))
+
+        # Botones (coordenadas relativas al centro)
+        self.btn_continuar = BotonSimple("Continuar", (self.w // 2, self.h // 2 + 50), 220,
+                                         50)  # <- Botones más grandes
+        self.btn_menu = BotonSimple("Menú Principal", (self.w // 2, self.h // 2 + 120), 220,
+                                    50)  # <- Botones más grandes
+
+    def reset(self):
+        """Método para mantener compatibilidad con el código existente"""
+        pass
+
+    def update(self, mouse_pos):
+        """Actualizar estado de botones"""
+        self.btn_continuar.update(mouse_pos)
+        self.btn_menu.update(mouse_pos)
+
     def handle_event(self, event):
+        """Manejar eventos - reemplaza la lógica del temporizador"""
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.btn_continuar.rect.collidepoint(event.pos):
+                return "continuar"
+            elif self.btn_menu.rect.collidepoint(event.pos):
+                return "menu"
+
+        # Controles de teclado (manteniendo tu esquema actual)
         if event.type == pygame.KEYDOWN:
-            if event.key in (pygame.K_RETURN, pygame.K_SPACE): return "continue"
-            if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE): return "menu"
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_c):
+                return "continuar"
+            if event.key in (pygame.K_ESCAPE, pygame.K_m, pygame.K_BACKSPACE):
+                return "menu"
+
         return None
+
     def draw(self, surface):
+        """Dibujar la pantalla de Game Over"""
+        # Fondo oscuro semi-transparente
         dim = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
-        dim.fill((0,0,0,140)); surface.blit(dim, (0,0))
-        px = (self.w - self.panel.get_width())//2
-        py = (self.h - self.panel.get_height())//2
+        dim.fill((0, 0, 0, 160))  # <- Un poco más oscuro
+        surface.blit(dim, (0, 0))
+
+        # Panel principal
+        px = (self.w - self.panel.get_width()) // 2
+        py = (self.h - self.panel.get_height()) // 2
         surface.blit(self.panel, (px, py))
-        title = self.font_title.render("¿Continuar?", True, (255,230,120))
-        surface.blit(title, (self.w//2 - title.get_width()//2, py + 50))
-        secs = int(self.remaining)
-        color_secs = (255,100,100) if secs <= 3 else (255,255,255)
-        t_secs = self.font_title.render(f"{secs}", True, color_secs)
-        surface.blit(t_secs, (self.w//2 - t_secs.get_width()//2, py + 120))
-        hint = self.font_item.render("ENTER: Sí   |   ESC: Menú", True, (230,230,230))
-        surface.blit(hint, (self.w//2 - hint.get_width()//2, py + 200))
+
+        # Imagen de Game Over - POSICIÓN MÁS CENTRADA
+        if self.game_over_img:
+            img_rect = self.game_over_img.get_rect(center=(self.w // 2, py + 100))  # <- Bajada un poco
+            surface.blit(self.game_over_img, img_rect)
+        else:
+            # Fallback si no hay imagen - texto grande de GAME OVER
+            title = self.font_title.render("GAME OVER", True, (255, 50, 50))
+            surface.blit(title, (self.w // 2 - title.get_width() // 2, py + 80))
+
+        # Botones
+        self.btn_continuar.draw(surface)
+        self.btn_menu.draw(surface)
+
+        # Instrucciones (similar a tu diseño actual)
+        hint = self.font_item.render("ENTER: Continuar   |   ESC: Menú", True, (230, 230, 230))
+        surface.blit(hint, (self.w // 2 - hint.get_width() // 2, self.h - 80))  # <- Bajada un poco
+
 
 # -------------------- Character Select UI --------------------
 class CharacterSelectUI:
     def __init__(self, size, img_m, img_f):
         self.w, self.h = size
         self.font_title = get_font(constantes.FONT_UI_TITLE)
-        self.font_item  = get_font(constantes.FONT_UI_ITEM)
+        self.font_item = get_font(constantes.FONT_UI_ITEM)
         self.card_w, self.card_h = 260, 300
         gap = 80
         cx = self.w // 2
         cy = self.h // 2 + 20
-        self.rect_m = pygame.Rect(0,0,self.card_w,self.card_h); self.rect_m.center = (cx - (self.card_w//2 + gap), cy)
-        self.rect_f = pygame.Rect(0,0,self.card_w,self.card_h); self.rect_f.center = (cx + (self.card_w//2 + gap), cy)
+        self.rect_m = pygame.Rect(0, 0, self.card_w, self.card_h);
+        self.rect_m.center = (cx - (self.card_w // 2 + gap), cy)
+        self.rect_f = pygame.Rect(0, 0, self.card_w, self.card_h);
+        self.rect_f.center = (cx + (self.card_w // 2 + gap), cy)
         self.pic_m = img_m
         self.pic_f = img_f
-        self.txt_m = self.font_item.render("KRABBY", True, (20,30,60))
-        self.txt_f = self.font_item.render("KAROL",  True, (20,30,60))
+        self.txt_m = self.font_item.render("KRABBY", True, (20, 30, 60))
+        self.txt_f = self.font_item.render("KAROL", True, (20, 30, 60))
         self.hover = None
+
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
-            self.hover = 'm' if self.rect_m.collidepoint(event.pos) else ('f' if self.rect_f.collidepoint(event.pos) else None)
+            self.hover = 'm' if self.rect_m.collidepoint(event.pos) else (
+                'f' if self.rect_f.collidepoint(event.pos) else None)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.rect_m.collidepoint(event.pos): return "male"
             if self.rect_f.collidepoint(event.pos): return "female"
@@ -598,34 +735,39 @@ class CharacterSelectUI:
             if event.key in (pygame.K_RIGHT, pygame.K_d):  return "female"
             if event.key in (pygame.K_SPACE, pygame.K_BACKSPACE): return "male"
         return None
+
     def _draw_card(self, surface, rect, portrait, name_surf, enabled=True, hover=False):
-        pygame.draw.rect(surface, (15,70,130), rect, border_radius=8, width=6)
+        pygame.draw.rect(surface, (15, 70, 130), rect, border_radius=8, width=6)
         inner = rect.inflate(-12, -12)
-        pygame.draw.rect(surface, (200,230,255) if enabled else (200,200,200), inner, border_radius=6)
+        pygame.draw.rect(surface, (200, 230, 255) if enabled else (200, 200, 200), inner, border_radius=6)
         if hover and enabled:
-            pygame.draw.rect(surface, (80,180,255), inner, width=4, border_radius=6)
-        pic_rect = portrait.get_rect(center=(inner.centerx, inner.top + 160//2 + 26))
+            pygame.draw.rect(surface, (80, 180, 255), inner, width=4, border_radius=6)
+        pic_rect = portrait.get_rect(center=(inner.centerx, inner.top + 160 // 2 + 26))
         surface.blit(portrait, pic_rect)
-        name_bar = pygame.Rect(inner.left+8, inner.bottom-56, inner.width-16, 40)
-        pygame.draw.rect(surface, (170,210,255) if enabled else (180,180,180), name_bar, border_radius=6)
-        nr = name_surf.get_rect(center=name_bar.center); surface.blit(name_surf, nr)
+        name_bar = pygame.Rect(inner.left + 8, inner.bottom - 56, inner.width - 16, 40)
+        pygame.draw.rect(surface, (170, 210, 255) if enabled else (180, 180, 180), name_bar, border_radius=6)
+        nr = name_surf.get_rect(center=name_bar.center);
+        surface.blit(name_surf, nr)
+
     def draw(self, surface):
-        title = self.font_title.render("SELECCIÓN DE PERSONAJE", True, (15,40,80))
-        band = pygame.Surface((title.get_width()+40, title.get_height()+18), pygame.SRCALPHA)
-        pygame.draw.rect(band, (180,210,255,230), band.get_rect(), border_radius=8)
-        band.blit(title, (20,9))
-        band_rect = band.get_rect(center=(self.w//2, 90))
+        title = self.font_title.render("SELECCIÓN DE PERSONAJE", True, (15, 40, 80))
+        band = pygame.Surface((title.get_width() + 40, title.get_height() + 18), pygame.SRCALPHA)
+        pygame.draw.rect(band, (180, 210, 255, 230), band.get_rect(), border_radius=8)
+        band.blit(title, (20, 9))
+        band_rect = band.get_rect(center=(self.w // 2, 90))
         surface.blit(band, band_rect)
-        self._draw_card(surface, self.rect_m, self.pic_m, self.txt_m, enabled=True,  hover=(self.hover=='m'))
-        self._draw_card(surface, self.rect_f, self.pic_f, self.txt_f, enabled=True,  hover=(self.hover=='f'))
+        self._draw_card(surface, self.rect_m, self.pic_m, self.txt_m, enabled=True, hover=(self.hover == 'm'))
+        self._draw_card(surface, self.rect_f, self.pic_f, self.txt_f, enabled=True, hover=(self.hover == 'f'))
+
 
 # -------------------- Level Select UI --------------------
 class LevelSelectUI:
     """Selector visual de nivel 1, 2, 3 (front)."""
+
     def __init__(self, size, thumbs=None):
         self.w, self.h = size
         self.font_title = get_font(constantes.FONT_UI_TITLE)
-        self.font_item  = get_font(constantes.FONT_UI_ITEM)
+        self.font_item = get_font(constantes.FONT_UI_ITEM)
         self.card_w, self.card_h = 220, 240
         gap = 60
         cx = self.w // 2
@@ -635,17 +777,18 @@ class LevelSelectUI:
         x1 = cx
         x2 = cx + self.card_w + gap
         for x in (x0, x1, x2):
-            r = pygame.Rect(0,0,self.card_w,self.card_h)
+            r = pygame.Rect(0, 0, self.card_w, self.card_h)
             r.center = (x, cy)
             self.rects.append(r)
         self.thumbs = thumbs or {}
         self.labels = [
-            self.font_item.render("NIVEL 1", True, (20,30,60)),
-            self.font_item.render("NIVEL 2", True, (20,30,60)),
-            self.font_item.render("NIVEL 3", True, (20,30,60)),
+            self.font_item.render("NIVEL 1", True, (20, 30, 60)),
+            self.font_item.render("NIVEL 2", True, (20, 30, 60)),
+            self.font_item.render("NIVEL 3", True, (20, 30, 60)),
         ]
         self.hover = None
         self.selected = None
+
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
             self.hover = None
@@ -664,65 +807,70 @@ class LevelSelectUI:
             if event.key in (pygame.K_3, pygame.K_KP3): self.selected = 3; return 3
             if event.key in (pygame.K_RETURN, pygame.K_SPACE): self.selected = 2; return 2
         return None
+
     def _draw_card(self, surface, rect, n_level, label, hover=False, selected=False):
-        pygame.draw.rect(surface, (15,70,130), rect, border_radius=8, width=5)
+        pygame.draw.rect(surface, (15, 70, 130), rect, border_radius=8, width=5)
         inner = rect.inflate(-12, -12)
-        base_color = (200,230,255)
-        if selected: base_color = (180,220,255)
+        base_color = (200, 230, 255)
+        if selected: base_color = (180, 220, 255)
         pygame.draw.rect(surface, base_color, inner, border_radius=6)
-        if hover: pygame.draw.rect(surface, (80,180,255), inner, width=4, border_radius=6)
+        if hover: pygame.draw.rect(surface, (80, 180, 255), inner, width=4, border_radius=6)
         thumb = self.thumbs.get(n_level)
         if thumb:
             tr = thumb.get_rect(center=(inner.centerx, inner.top + 80))
             surface.blit(thumb, tr)
         else:
-            ph = pygame.Surface((120, 80)); ph.fill((170,210,255))
+            ph = pygame.Surface((120, 80));
+            ph.fill((170, 210, 255))
             pr = ph.get_rect(center=(inner.centerx, inner.top + 80))
             surface.blit(ph, pr)
-        bar = pygame.Rect(inner.left+8, inner.bottom-56, inner.width-16, 40)
-        pygame.draw.rect(surface, (170,210,255), bar, border_radius=6)
+        bar = pygame.Rect(inner.left + 8, inner.bottom - 56, inner.width - 16, 40)
+        pygame.draw.rect(surface, (170, 210, 255), bar, border_radius=6)
         lr = label.get_rect(center=bar.center)
         surface.blit(label, lr)
         if selected:
-            tic = self.font_item.render("✓", True, (15,40,80))
-            trect = tic.get_rect(center=(inner.right-28, inner.top+26))
+            tic = self.font_item.render("✓", True, (15, 40, 80))
+            trect = tic.get_rect(center=(inner.right - 28, inner.top + 26))
             surface.blit(tic, trect)
+
     def draw(self, surface):
-        title = self.font_title.render("SELECCIÓN DE NIVEL", True, (15,40,80))
-        band = pygame.Surface((title.get_width()+40, title.get_height()+18), pygame.SRCALPHA)
-        pygame.draw.rect(band, (180,210,255,230), band.get_rect(), border_radius=8)
-        band.blit(title, (20,9))
-        band_rect = band.get_rect(center=(self.w//2, 90))
+        title = self.font_title.render("SELECCIÓN DE NIVEL", True, (15, 40, 80))
+        band = pygame.Surface((title.get_width() + 40, title.get_height() + 18), pygame.SRCALPHA)
+        pygame.draw.rect(band, (180, 210, 255, 230), band.get_rect(), border_radius=8)
+        band.blit(title, (20, 9))
+        band_rect = band.get_rect(center=(self.w // 2, 90))
         surface.blit(band, band_rect)
         for i, r in enumerate(self.rects):
-            self._draw_card(surface, r, i+1, self.labels[i], hover=(self.hover==i), selected=(self.selected == i+1))
+            self._draw_card(surface, r, i + 1, self.labels[i], hover=(self.hover == i),
+                            selected=(self.selected == i + 1))
         hint_txt = "Dale clic o 1/2/3 • ESC para volver"
         hint = self.font_item.render(hint_txt, True, (20, 20, 20))  # negro para legibilidad
         surface.blit(hint, hint.get_rect(center=(self.w // 2, self.h - 40)))
 
+
 # -------------------- Difficulty Select UI --------------------
-# -------------------- Difficulty Select UI (gap corregido) --------------------
-# -------------------- Difficulty Select UI (hover fijo y sin 'Recomendado') --------------------
-# -------------------- Difficulty Select UI (con íconos y handle_event) --------------------
 class DifficultySelectUI:
     """Pantalla con dos tarjetas: FÁCIL (default) y DIFÍCIL, con hover e íconos opcionales."""
+
     def __init__(self, size, icon_easy: pygame.Surface | None = None, icon_hard: pygame.Surface | None = None):
         self.w, self.h = size
         self.font_title = get_font(constantes.FONT_UI_TITLE)
-        self.font_item  = get_font(constantes.FONT_UI_ITEM)
+        self.font_item = get_font(constantes.FONT_UI_ITEM)
 
         # geometría de tarjetas
         self.card_w, self.card_h = 260, 220
-        self.gap = self.card_w // 2 + 50   # separación
+        self.gap = self.card_w // 2 + 50  # separación
 
         cy = self.h // 2 + 10
         cx = self.w // 2
 
-        self.rect_easy = pygame.Rect(0, 0, self.card_w, self.card_h); self.rect_easy.center = (cx - self.gap, cy)
-        self.rect_hard = pygame.Rect(0, 0, self.card_w, self.card_h); self.rect_hard.center = (cx + self.gap, cy)
+        self.rect_easy = pygame.Rect(0, 0, self.card_w, self.card_h);
+        self.rect_easy.center = (cx - self.gap, cy)
+        self.rect_hard = pygame.Rect(0, 0, self.card_w, self.card_h);
+        self.rect_hard.center = (cx + self.gap, cy)
 
-        self.lbl_easy = self.font_item.render("FÁCIL",   True, (20, 30, 60))
-        self.lbl_hard = self.font_item.render("DIFÍCIL", True, (20, 30, 60))
+        self.lbl_easy = self.font_item.render("PRINCIPIANTE", True, (20, 30, 60))
+        self.lbl_hard = self.font_item.render("DESAFIANTE", True, (20, 30, 60))
 
         # íconos (opcional)
         def _fit_icon(surf: pygame.Surface | None) -> pygame.Surface | None:
@@ -742,22 +890,26 @@ class DifficultySelectUI:
         self.icon_easy = _fit_icon(icon_easy)
         self.icon_hard = _fit_icon(icon_hard)
 
-        self.hover = None            # 'easy' | 'hard' | None
-        self.selected = "FACIL"      # por defecto FÁCIL
+        self.hover = None  # 'easy' | 'hard' | None
+        self.selected = "FACIL"  # por defecto FÁCIL
 
     def handle_event(self, event):
         """Devuelve 'FACIL', 'DIFICIL', 'BACK' o None."""
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.rect_easy.collidepoint(event.pos):
-                self.selected = "FACIL";   return "FACIL"
+                self.selected = "FACIL";
+                return "FACIL"
             if self.rect_hard.collidepoint(event.pos):
-                self.selected = "DIFICIL"; return "DIFICIL"
+                self.selected = "DIFICIL";
+                return "DIFICIL"
 
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_LEFT, pygame.K_a, pygame.K_1, pygame.K_KP1):
-                self.selected = "FACIL";   return "FACIL"
+                self.selected = "FACIL";
+                return "FACIL"
             if event.key in (pygame.K_RIGHT, pygame.K_d, pygame.K_2, pygame.K_KP2):
-                self.selected = "DIFICIL"; return "DIFICIL"
+                self.selected = "DIFICIL";
+                return "DIFICIL"
             if event.key in (pygame.K_RETURN, pygame.K_SPACE):
                 return self.selected
             if event.key == pygame.K_ESCAPE:
@@ -785,7 +937,8 @@ class DifficultySelectUI:
             surface.blit(icon, ir)
         else:
             # placeholder
-            ph = pygame.Surface((100, 70)); ph.fill((170, 210, 255))
+            ph = pygame.Surface((100, 70));
+            ph.fill((170, 210, 255))
             pr = ph.get_rect(center=(inner.centerx, inner.top + 70))
             surface.blit(ph, pr)
 
@@ -805,13 +958,16 @@ class DifficultySelectUI:
 
         # hover
         mx, my = pygame.mouse.get_pos()
-        if   self.rect_easy.collidepoint((mx, my)): self.hover = 'easy'
-        elif self.rect_hard.collidepoint((mx, my)): self.hover = 'hard'
-        else: self.hover = None
+        if self.rect_easy.collidepoint((mx, my)):
+            self.hover = 'easy'
+        elif self.rect_hard.collidepoint((mx, my)):
+            self.hover = 'hard'
+        else:
+            self.hover = None
 
         # tarjetas
         self._draw_card(surface, self.rect_easy, self.lbl_easy, icon=self.icon_easy,
-                        selected=(self.selected == "FACIL"),  hover=(self.hover == 'easy'))
+                        selected=(self.selected == "FACIL"), hover=(self.hover == 'easy'))
         self._draw_card(surface, self.rect_hard, self.lbl_hard, icon=self.icon_hard,
                         selected=(self.selected == "DIFICIL"), hover=(self.hover == 'hard'))
 
@@ -819,9 +975,6 @@ class DifficultySelectUI:
         hint_txt = "Clic o ←/→ para jugar • ESC para volver"
         hint = self.font_item.render(hint_txt, True, (20, 20, 20))
         surface.blit(hint, hint.get_rect(center=(self.w // 2, self.h - 40)))
-
-
-
 
 
 # -------------------- Tutorial Overlay --------------------
@@ -835,22 +988,26 @@ class TutorialOverlay:
         iw, ih = self.img.get_size()
         scale = min(max_w / iw, max_h / ih, 1.0)
         if scale != 1.0:
-            self.img = pygame.transform.smoothscale(self.img, (int(iw*scale), int(ih*scale)))
+            self.img = pygame.transform.smoothscale(self.img, (int(iw * scale), int(ih * scale)))
+
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE):
             return "close"
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             return "close"
         return None
+
     def draw(self, surface):
         dim = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 160))
         surface.blit(dim, (0, 0))
-        r = self.img.get_rect(center=(self.w//2, self.h//2))
+        r = self.img.get_rect(center=(self.w // 2, self.h // 2))
         surface.blit(self.img, r)
         hint_font = get_font(constantes.FONT_UI_ITEM)
-        hint = hint_font.render("Enter para continuar • F1 para volver a ver", True, (230,230,230))
-        surface.blit(hint, (self.w//2 - hint.get_width()//2, r.bottom + 12 if r.bottom + 28 < self.h else self.h - 28))
+        hint = hint_font.render("Enter para continuar • F1 para volver a ver", True, (230, 230, 230))
+        surface.blit(hint,
+                     (self.w // 2 - hint.get_width() // 2, r.bottom + 12 if r.bottom + 28 < self.h else self.h - 28))
+
 
 # -------------------- Menu Krab --------------------
 class MenuKrab:
@@ -863,13 +1020,17 @@ class MenuKrab:
         self.state = "idle"
         self.vx = 0.0
         self.scale = float(scale)
+
     def jump_and_leave(self):
         if self.state != "idle": return
-        try: musica.sfx("jump", volume=0.9)
-        except Exception: pass
+        try:
+            musica.sfx("jump", volume=0.9)
+        except Exception:
+            pass
         self.state = "leaving"
         self.p.saltar(forzado=True)
         self.vx = float(getattr(constantes, "VELOCIDAD", 300)) * 0.9
+
     def update(self, dt):
         if self.state == "idle":
             self.p.set_dx(0)
@@ -883,8 +1044,10 @@ class MenuKrab:
             self.p.movimiento(self.vx * dt, 0.0)
             self.p.forma.y += int(self.p.vel_y * dt)
             self.p.animar(dt)
+
     def offscreen(self, w, h):
         return (self.p.forma.bottom < -40) or (self.p.forma.left > w + 40) or (self.p.forma.top > h + 40)
+
     def draw(self, surface):
         if self.scale != 1.0:
             img = pygame.transform.scale(
@@ -897,10 +1060,11 @@ class MenuKrab:
         else:
             surface.blit(self.p.image, self.p.forma)
 
+
 # -------------------- Estados --------------------
 ESTADO_MENU, ESTADO_JUEGO, ESTADO_OPC, ESTADO_PAUSA = "MENU", "JUEGO", "OPCIONES", "PAUSA"
 ESTADO_CARGANDO = "CARGANDO"
-ESTADO_MUERTE   = "MUERTE"
+ESTADO_MUERTE = "MUERTE"
 ESTADO_CONTINUE = "CONTINUE"
 ESTADO_DIFICULTAD = "DIFICULTAD"
 ESTADO_NIVELES = "NIVELES"
@@ -909,6 +1073,7 @@ ESTADO_TUTORIAL = "TUTORIAL"
 ESTADO_VICTORIA = "VICTORIA"
 ESTADO_SELECT_PERSONAJE = "SELECT_PERSONAJE"
 ESTADO_SELECT_NIVEL = "SELECT_NIVEL"
+
 
 def main():
     pygame.mixer.pre_init(44100, -16, 2, 512)
@@ -953,7 +1118,7 @@ def main():
     FLAG_POS_BY_LEVEL = {
         1: (5491, 683),  # NIVEL 1
         2: (6485, 845),  # NIVEL 2 (ejemplo)
-        3: (0, 0),  # si algún día agregas nivel 3
+        3: (8673, 864),  # si algún día agregas nivel 3
     }
 
     # variable que usaremos al dibujar (se actualiza al cargar cada nivel)
@@ -970,11 +1135,11 @@ def main():
     timer = tiempo_total
 
     # Recursos menú
-    fondo_menu   = escalar_a_ventana(cargar_primera_imagen("menufondo", False))
-    titulo_img   = scale_to_width(cargar_primera_imagen("menu_titulo", True), 360)
-    img_play     = scale_to_width(cargar_primera_imagen("botonplay",     True), 360)
+    fondo_menu = escalar_a_ventana(cargar_primera_imagen("menufondo", False))
+    titulo_img = scale_to_width(cargar_primera_imagen("menu_titulo", True), 360)
+    img_play = scale_to_width(cargar_primera_imagen("botonplay", True), 360)
     img_opciones = scale_to_width(cargar_primera_imagen("botonopciones", True), 340)
-    img_salir    = scale_to_width(cargar_primera_imagen("botonsalir",    True), 345)
+    img_salir = scale_to_width(cargar_primera_imagen("botonsalir", True), 345)
     # -------------- Miniaturas de los niveles --------------
     thumbs = {}
     try:
@@ -993,13 +1158,15 @@ def main():
     # Retratos selección (32x32 → 160x160)
     try:
         portrait_krabby = pygame.image.load(IMG_DIR / "ui" / "select_krabby.png").convert_alpha()
-        portrait_karol  = pygame.image.load(IMG_DIR / "ui" / "select_karol.png").convert_alpha()
+        portrait_karol = pygame.image.load(IMG_DIR / "ui" / "select_karol.png").convert_alpha()
         portrait_krabby = pygame.transform.scale(portrait_krabby, (160, 160))
-        portrait_karol  = pygame.transform.scale(portrait_karol,  (160, 160))
+        portrait_karol = pygame.transform.scale(portrait_karol, (160, 160))
     except Exception as e:
         print("Aviso portraits:", e)
-        portrait_krabby = pygame.Surface((160, 160), pygame.SRCALPHA); portrait_krabby.fill((30, 140, 220))
-        portrait_karol  = pygame.Surface((160, 160), pygame.SRCALPHA); portrait_karol.fill((220, 60, 140))
+        portrait_krabby = pygame.Surface((160, 160), pygame.SRCALPHA);
+        portrait_krabby.fill((30, 140, 220))
+        portrait_karol = pygame.Surface((160, 160), pygame.SRCALPHA);
+        portrait_karol.fill((220, 60, 140))
     # ---------- Iconos de dificultad ----------
     # Rutas sugeridas: assets/images/ui/dificultad/facil.png y dificil.png
     try:
@@ -1018,13 +1185,13 @@ def main():
     COL_TITLE = int(constantes.ANCHO_VENTANA * 0.28)
     COL_play = int(constantes.ANCHO_VENTANA * 0.27)
     Y0, GAP1, GAP = int(constantes.ALTO_VENTANA * 0.35), 60, 64
-    titulo    = ImageButton(titulo_img, midleft=(COL_TITLE, Y1))
-    btn_play  = ImageButton(img_play,     midleft=(COL_play, Y0))
-    btn_opc   = ImageButton(img_opciones, midleft=(COL_X, btn_play.rect.bottom + GAP1))
-    btn_salir = ImageButton(img_salir,    midleft=(COL_X, btn_opc.rect.bottom + GAP))
+    titulo = ImageButton(titulo_img, midleft=(COL_TITLE, Y1))
+    btn_play = ImageButton(img_play, midleft=(COL_play, Y0))
+    btn_opc = ImageButton(img_opciones, midleft=(COL_X, btn_play.rect.bottom + GAP1))
+    btn_salir = ImageButton(img_salir, midleft=(COL_X, btn_opc.rect.bottom + GAP))
 
     # Krabby en el menú
-    KRAB_MENU_POS  = (int(constantes.ANCHO_VENTANA*0.85), int(constantes.ALTO_VENTANA*0.83))
+    KRAB_MENU_POS = (int(constantes.ANCHO_VENTANA * 0.85), int(constantes.ALTO_VENTANA * 0.83))
     KRAB_MENU_SCALE = 2.0
     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
     menu_leaving = False
@@ -1061,25 +1228,30 @@ def main():
     spawn_skip_frames = 0
 
     # Música menú
-    try: musica.play("menu", volumen=0.8)
-    except Exception as e: print("Aviso música:", e)
+    try:
+        musica.play("menu", volumen=0.8)
+    except Exception as e:
+        print("Aviso música:", e)
 
     mover_izquierda = mover_derecha = False
     estado, run = ESTADO_MENU, True
     VOL_NORMAL, VOL_PAUSA = 0.8, 0.3
     pause_menu = PauseMenu((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
-    continue_ui = ContinueOverlay((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), seconds=8)
+    # CAMBIO AQUÍ: ContinueOverlay → GameOverScreen
+    continue_ui = GameOverScreen((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     freeze_cam_offset = None
 
     # --------- Game Loop ---------
     while run:
         dt = reloj.tick(constantes.FPS) / 1000.0
-        mouse_pos = pygame.mouse.get_pos(); mouse_down = pygame.mouse.get_pressed()[0]
+        mouse_pos = pygame.mouse.get_pos();
+        mouse_down = pygame.mouse.get_pressed()[0]
 
         # -------------------- EVENTOS --------------------
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                musica.stop(300); run = False
+                musica.stop(300);
+                run = False
 
             if estado == ESTADO_MENU:
                 if not menu_leaving:
@@ -1092,7 +1264,8 @@ def main():
                     elif btn_opc.clicked(event):
                         estado = ESTADO_OPC
                     elif btn_salir.clicked(event):
-                        musica.stop(300); run = False
+                        musica.stop(300);
+                        run = False
 
             elif estado == ESTADO_SELECT_PERSONAJE:
                 now_ms = pygame.time.get_ticks()
@@ -1121,17 +1294,13 @@ def main():
                         pygame.mixer.music.set_volume(VOL_NORMAL)
                         musica.switch("menu")
 
-
-
-
-
-
             elif estado == ESTADO_SELECT_NIVEL:
                 choice = level_select_ui.handle_event(event)
                 if choice == 1:
                     nivel_actual = 1
                     # Ir a dificultad
-                    diff_ui = DifficultySelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), icon_easy, icon_hard)
+                    diff_ui = DifficultySelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), icon_easy,
+                                                 icon_hard)
                     selected_difficulty = "FACIL"
                     estado = ESTADO_DIFICULTAD
                 elif choice == 2:
@@ -1142,7 +1311,12 @@ def main():
                     selected_difficulty = "FACIL"
                     estado = ESTADO_DIFICULTAD
                 elif choice == 3:
-                    print("Nivel 3 aún no disponible.")
+                    nivel_actual = 3
+                    # Ir a dificultad
+                    diff_ui = DifficultySelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), icon_easy,
+                                                 icon_hard)
+                    selected_difficulty = "FACIL"
+                    estado = ESTADO_DIFICULTAD
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     estado = ESTADO_SELECT_PERSONAJE
                     select_lock = False
@@ -1168,7 +1342,7 @@ def main():
                         estado = ESTADO_PAUSA
                         pygame.mixer.music.set_volume(VOL_PAUSA)
                     if event.key in (pygame.K_a, pygame.K_LEFT):  mover_izquierda = True
-                    if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha   = True
+                    if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha = True
                     if event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
                         # Solo permite saltar si REALMENTE hay suelo ahora mismo
                         if esta_en_suelo(jugador, nivel.collision_rects):
@@ -1183,7 +1357,7 @@ def main():
                         pygame.mixer.music.set_volume(VOL_PAUSA)
                 if event.type == pygame.KEYUP:
                     if event.key in (pygame.K_a, pygame.K_LEFT):  mover_izquierda = False
-                    if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha   = False
+                    if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha = False
                     if event.key == pygame.K_F9:
                         print("Jugador midbottom:", jugador.forma.midbottom)
 
@@ -1213,8 +1387,10 @@ def main():
             # === FIN BLOQUE NUEVO ===
 
             elif estado == ESTADO_CONTINUE:
+                # CAMBIO AQUÍ: Actualizar botones del Game Over
+                continue_ui.update(mouse_pos)
                 action = continue_ui.handle_event(event)
-                if action == "continue":
+                if action == "continuar":
                     estado = ESTADO_CARGANDO
                     freeze_cam_offset = None
                 elif action == "menu":
@@ -1251,7 +1427,6 @@ def main():
                         estado = ESTADO_JUEGO
                         pygame.mixer.music.set_volume(VOL_NORMAL)
 
-
             elif estado == ESTADO_VICTORIA:
                 if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE,
                                                                   pygame.K_ESCAPE):
@@ -1260,13 +1435,13 @@ def main():
                     menu_leaving = False
                     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
 
-
         # -------------------- UPDATE --------------------
         if estado == ESTADO_MENU:
             menu_krab.update(dt)
             if menu_leaving and menu_krab.offscreen(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA):
                 pygame.mixer.music.set_volume(VOL_NORMAL)
-                select_ui = CharacterSelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), portrait_krabby, portrait_karol)
+                select_ui = CharacterSelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), portrait_krabby,
+                                              portrait_karol)
                 estado = ESTADO_SELECT_PERSONAJE
                 select_lock = False
                 last_select_time = pygame.time.get_ticks()
@@ -1320,24 +1495,21 @@ def main():
                     Enemigo(x=450, y=675, velocidad=34, escala=2.5),
                     Enemigo(x=800, y=675, velocidad=35, escala=2.5),
                     Enemigo(x=760, y=450, velocidad=35, escala=2.5),
-                    Enemigo(x=2176, y=640,velocidad=35, escala=2.5),
-                    Enemigo(x=2750, y=381,velocidad=35, escala=2.5),
-                    Enemigo(x=4000, y=640,velocidad=35, escala=2.5),
-                    Enemigo(x=5100, y=420,velocidad=35, escala=2.5),
-                    Enemigo(x=2830, y=643, velocidad=35, escala=2.5),
-                    Enemigo(x=3725, y=320, escala=2.5)
-                )
-            elif nivel_actual == 2:
-                enemigos.add(
-                    Enemigo(x=450, y=675, velocidad=34, escala=2.5),
-                    Enemigo(x=800, y=675, velocidad=35, escala=2.5),
-                    Enemigo(x=760, y=450, velocidad=35, escala=2.5),
                     Enemigo(x=2176, y=640, velocidad=35, escala=2.5),
                     Enemigo(x=2750, y=381, velocidad=35, escala=2.5),
                     Enemigo(x=4000, y=640, velocidad=35, escala=2.5),
                     Enemigo(x=5100, y=420, velocidad=35, escala=2.5),
                     Enemigo(x=2830, y=643, velocidad=35, escala=2.5),
-                    Enemigo(x=3725, y=320, velocidad=35, escala=2.5)
+                    Enemigo(x=3725, y=320, escala=2.5)
+                )
+            elif nivel_actual == 2:
+                enemigos.add(
+                    Enemigo_walk(x=299, y=833, velocidad = 40),
+                    Enemigo(x=450, y=675, velocidad=35, escala=2.5),
+                    Enemigo_walk(x=1578, y=831, velocidad=40),
+                    Enemigo(x=2331, y=830, velocidad=35, escala=2.5),
+                    Enemigo(x=2903, y=607, velocidad=35, escala=2.5),
+                    Enemigo_walk(x=2922, y=832, velocidad=40),
                 )
             items = pygame.sprite.Group()
             if nivel_actual == 1:
@@ -1364,13 +1536,27 @@ def main():
 
             # === Ajustes por dificultad ===
             if selected_difficulty == "DIFICIL":
-                timer = tiempo_total * 0.8  # menos tiempo
+                timer = tiempo_total * 0.7  # menos tiempo
                 for e in enemigos:
-                    if hasattr(e, "velocidad"):
-                        try:
-                            e.velocidad = int(e.velocidad * 3)  # enemigos más rápidos
-                        except Exception:
-                            pass
+                    # + VIDA (duplica vida y, si existe, vida máxima)
+                    if hasattr(e, "vida_maxima"):
+                        e.vida_maxima = int(e.vida_maxima * 1.7)
+                        if hasattr(e, "vida"):
+                            # Aumenta la vida actual en proporción sin exceder el nuevo máximo
+                            e.vida = min(int(e.vida * 1.7), e.vida_maxima)
+                    elif hasattr(e, "vida"):
+                        e.vida = int(e.vida * 1.7)
+
+                    # x2 DAÑO (intenta cubrir distintos nombres de atributo)
+                    if hasattr(e, "attack_damage"):
+                        e.attack_damage = int(e.attack_damage * 2)
+                    elif hasattr(e, "dano"):
+                        e.dano = int(e.dano * 2)
+                    elif hasattr(e, "daño"):
+                        setattr(e, "daño", int(getattr(e, "daño") * 2))
+                    elif hasattr(e, "damage"):
+                        e.damage = int(e.damage * 2)
+
                 jugador.vida_actual = jugador.vida_maxima
             else:
                 timer = tiempo_total
@@ -1397,7 +1583,6 @@ def main():
                 jugador.vel_y = 0
                 jugador.en_piso = True
                 estado = ESTADO_JUEGO
-
 
         elif estado == ESTADO_TUTORIAL:
             pass  # la interacción se maneja en eventos
@@ -1520,8 +1705,10 @@ def main():
             jugador.forma.x += int(dx)
             for rect in nivel.collision_rects:
                 if jugador.forma.colliderect(rect):
-                    if dx > 0:  jugador.forma.right = rect.left
-                    elif dx < 0: jugador.forma.left  = rect.right
+                    if dx > 0:
+                        jugador.forma.right = rect.left
+                    elif dx < 0:
+                        jugador.forma.left = rect.right
 
             jugador.forma.y += dy
             for rect in nivel.collision_rects:
@@ -1583,15 +1770,30 @@ def main():
             # Daño del enemigo
             for e in enemigos:
                 if e.tocar_jugador(jugador) and not getattr(jugador, "invencible", False):
-                    jugador.recibir_dano(1)
-                    try: musica.sfx("stun", volume=0.9)
-                    except Exception: pass
-                    jugador.invencible = True
-                    jugador.invencible_timer = 0.45
-                    jugador.knockback_activo = True
-                    jugador.knockback_timer = 0.22
-                    if not hasattr(jugador, "knockback_speed_x") or jugador.knockback_speed_x == 0:
-                        jugador.knockback_speed_x = 650
+                    if selected_difficulty == "DIFICIL":
+                        jugador.recibir_dano(2)
+                        try:
+                            musica.sfx("stun", volume=0.9)
+                        except Exception:
+                            pass
+                        jugador.invencible = True
+                        jugador.invencible_timer = 0.45
+                        jugador.knockback_activo = True
+                        jugador.knockback_timer = 0.22
+                        if not hasattr(jugador, "knockback_speed_x") or jugador.knockback_speed_x == 0:
+                            jugador.knockback_speed_x = 650
+                    else:
+                        jugador.recibir_dano(1)
+                        try:
+                            musica.sfx("stun", volume=0.9)
+                        except Exception:
+                            pass
+                        jugador.invencible = True
+                        jugador.invencible_timer = 0.45
+                        jugador.knockback_activo = True
+                        jugador.knockback_timer = 0.22
+                        if not hasattr(jugador, "knockback_speed_x") or jugador.knockback_speed_x == 0:
+                            jugador.knockback_speed_x = 650
 
             # Muerte por vida
             if jugador.vida_actual <= 0 and estado == ESTADO_JUEGO:
@@ -1633,8 +1835,6 @@ def main():
 
                 # saltar TODO lo demás de la lógica de juego este frame
 
-
-
         elif estado == ESTADO_VICTORIA:
             # Mantén al jugador animando en idle (sin freeze)
             jugador.set_dx(0)
@@ -1659,25 +1859,23 @@ def main():
                 continue_ui.reset()
 
         elif estado == ESTADO_CONTINUE:
-            continue_ui.update(dt)
-            if continue_ui.remaining <= 0:
-                pygame.mixer.music.set_volume(VOL_NORMAL)
-                musica.switch("menu")
-                estado = ESTADO_MENU
-                freeze_cam_offset = None
-                menu_leaving = False
-                menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+            # CAMBIO AQUÍ: Ya no hay temporizador automático, solo actualizamos botones
+            continue_ui.update(mouse_pos)
+            # El cambio de estado ahora se maneja completamente con los botones/teclado
 
         # -------------------- DRAW --------------------
         if estado == ESTADO_MENU:
             ventana.blit(fondo_menu, (0, 0))
-            titulo.draw(ventana); btn_play.draw(ventana); btn_opc.draw(ventana); btn_salir.draw(ventana)
+            titulo.draw(ventana);
+            btn_play.draw(ventana);
+            btn_opc.draw(ventana);
+            btn_salir.draw(ventana)
             menu_krab.draw(ventana)
 
         elif estado == ESTADO_OPC:
             ventana.blit(fondo_menu, (0, 0))
             sub = get_font(constantes.FONT_SUBTITLE).render("OPCIONES (ESC para volver)", True, (255, 255, 255))
-            ventana.blit(sub, (constantes.ANCHO_VENTANA//2 - sub.get_width()//2, 60))
+            ventana.blit(sub, (constantes.ANCHO_VENTANA // 2 - sub.get_width() // 2, 60))
 
         elif estado == ESTADO_SELECT_PERSONAJE:
             ventana.blit(fondo_menu, (0, 0))
@@ -1690,7 +1888,6 @@ def main():
         elif estado == ESTADO_DIFICULTAD:
             ventana.blit(fondo_menu, (0, 0))
             diff_ui.draw(ventana)
-
 
         elif estado in ("JUEGO", "PAUSA"):
             # Fondo/parallax y mapa
@@ -1713,8 +1910,9 @@ def main():
                 ventana.blit(flag_img, fr)
 
             # Enemigos e ítems
-            for enemigo in enemigos:
-                ventana.blit(enemigo.image, (enemigo.rect.x - ox, enemigo.rect.y - oy))
+            # --- DIBUJAR ENEMIGOS CON OFFSET VISUAL ---
+            for e in enemigos:
+                ventana.blit(e.image, (e.rect.x - ox, e.rect.y - oy + e.render_offset_y))
             for item in items:
                 ventana.blit(item.image, (item.rect.x - ox, item.rect.y - oy))
 
@@ -1728,8 +1926,7 @@ def main():
                 draw_hud(ventana, jugador, vida_lleno_img, vida_vacio_img)
                 draw_puntuacion(ventana, font_hud, puntuacion)
 
-
-        elif estado in ("MUERTE", "CONTINUE"):
+        elif estado == "MUERTE":
             if parallax is not None:
                 parallax.draw(ventana)
             if freeze_cam_offset is None:
@@ -1738,8 +1935,10 @@ def main():
             ox, oy = freeze_cam_offset
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
             draw_timer(ventana, font_hud, max(0, timer), pos=(20, 20))
-            if estado == "CONTINUE":
-                continue_ui.draw(ventana)
+
+        elif estado == "CONTINUE":
+            # SOLO el nuevo Game Over - sin fondo del juego
+            continue_ui.draw(ventana)
 
         elif estado == ESTADO_TUTORIAL:
             if parallax is not None:
@@ -1756,7 +1955,6 @@ def main():
             draw_puntuacion(ventana, font_hud, puntuacion)
             if tutorial_overlay:
                 tutorial_overlay.draw(ventana)
-
 
         elif estado == ESTADO_VICTORIA:
             if parallax is not None:
@@ -1794,7 +1992,6 @@ def main():
 
     pygame.quit()
 
+
 if __name__ == "__main__":
     main()
-
-

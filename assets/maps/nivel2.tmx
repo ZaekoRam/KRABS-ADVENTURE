@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="210" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="101">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="210" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="107">
  <tileset firstgid="1" source="Tiles - Beach.tsx"/>
  <layer id="1" name="Capa de patrones 1" width="210" height="30">
   <data encoding="csv">
@@ -85,7 +85,7 @@
   <object id="16" x="1035" y="736" width="138.5" height="31"/>
   <object id="17" x="1035.33" y="767.5" width="171.667" height="30"/>
   <object id="18" x="1035.18" y="798.5" width="202.318" height="32.5"/>
-  <object id="19" x="1037.28" y="831.333" width="594.061" height="128.667"/>
+  <object id="19" x="1037.28" y="831.333" width="584.394" height="128.667"/>
   <object id="38" x="1862.91" y="716.432" width="17.8182" height="114.659"/>
   <object id="39" x="1862.67" y="830" width="569.333" height="130"/>
   <object id="44" x="2729" y="832.5" width="395" height="119.5"/>
@@ -137,9 +137,14 @@
   <object id="98" x="576.667" y="640" width="24.6667" height="319.667"/>
   <object id="99" x="1032" y="640.667" width="46" height="320"/>
   <object id="100" x="915.333" y="835.333" width="5.33333" height="7.33333"/>
+  <object id="101" x="-105.333" y="576" width="108" height="384"/>
  </objectgroup>
  <objectgroup id="4" name="barrera_enemigos">
   <object id="51" x="2434" y="678" width="30" height="153.333"/>
+  <object id="102" x="601.333" y="512" width="45.3333" height="228"/>
+  <object id="103" x="1633" y="701.5" width="21.5" height="160.25"/>
+  <object id="105" x="2816.5" y="511.5" width="9.5" height="105"/>
+  <object id="106" x="2992" y="510" width="8.5" height="101.5"/>
  </objectgroup>
  <objectgroup id="5" name="Meta">
   <object id="59" x="6553.33" y="-2" width="64" height="832"/>

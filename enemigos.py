@@ -32,6 +32,7 @@ class Enemigo(pygame.sprite.Sprite):
         self.ANIM_SPEED = 0.1
         self.aterrizando = False  # <-- NUEVO: Bandera para controlar la animación de aterrizaje
 
+        self.render_offset_y = 1  # o el valor que se vea bien
         # --- CONFIGURACIÓN INICIAL DEL SPRITE ---
         # La imagen inicial es el primer fotograma de la animación
         self.image = self.frames_idle[self.frame_index]
@@ -182,3 +183,119 @@ class Enemigo(pygame.sprite.Sprite):
 
     def tocar_jugador(self, jugador):
         return self.rect.colliderect(jugador.forma)
+
+class Enemigo_walk(pygame.sprite.Sprite):
+    def __init__(self, x, y, velocidad=80, vida=3, dano=1):
+        super().__init__()
+        self.puntos = 200
+
+        # --- Rutas y helpers ---
+        base_dir = Path(__file__).resolve().parent
+        enemy1_dir = base_dir / "assets" / "images" / "enemigos" / "enemigo2"
+
+        def load(path: Path) -> pygame.Surface:
+            return pygame.image.load(str(path)).convert_alpha()
+
+        def scale(img: pygame.Surface) -> pygame.Surface:
+            return pygame.transform.scale(
+                img,
+                (
+                    int(img.get_width() * constantes.ANCHO_IMAGEN * 0.7),
+                    int(img.get_height() * constantes.ALTO_IMAGEN * 0.7),
+                ),
+            )
+
+        # --- Cargar 6 frames de caminar ---
+        frames = []
+        # patrón principal: enemy_walk1..6.png
+        for i in range(1, 7):
+            p = enemy1_dir / f"enemigo_walk{i}.png"
+            if p.exists():
+                frames.append(scale(load(p)))
+
+        self.frames_walk = frames
+        self.frame_index = 0
+        self.anim_timer = 0.0
+        self.ANIM_FRAME_TIME = 0.10  # ~10 fps
+        self.render_offset_y = 9  # <- prueba 4–10 px hasta que te guste
+
+        self.image = self.frames_walk[self.frame_index]
+        self.desfase_baba = 10  # píxeles hacia abajo, ajusta a gusto (5–15 según el sprite)
+        self.rect = self.image.get_rect(midbottom=(x, y ))
+
+
+
+        # --- Movimiento horizontal ---
+        self.velocidad_mov = velocidad  # px/seg
+        self.direccion = -1  # 1 derecha, -1 izquierda
+
+        # --- Físicas verticales (para pararse en plataformas) ---
+        self.vel_y = 0.0
+
+        # --- Vida / Daño (compatibles con tu bloque de dificultad) ---
+        self.vida_maxima = vida
+        self.vida = vida
+        self.dano = dano
+
+        # --- Golpe/flash rojo ---
+        self.hit_flash_timer = 0.0
+        self.HIT_FLASH_DURACION = 0.5
+
+    def hurt(self, damage):
+        if self.hit_flash_timer <= 0 and self.vida > 0:
+            self.vida -= damage
+            self.hit_flash_timer = self.HIT_FLASH_DURACION
+            print(f"Enemigo golpeado, vida restante: {self.vida}")
+            if self.vida <= 0:
+                self.kill()
+
+    def tocar_jugador(self, jugador):
+        return self.rect.colliderect(jugador.forma)
+
+    def update(self, dt, plataformas):
+        # --- Flash ---
+        if self.hit_flash_timer > 0:
+            self.hit_flash_timer -= dt
+
+        # --- Movimiento X ---
+        self.rect.x += self.velocidad_mov * self.direccion * dt
+
+        # Rebotar en paredes/plataformas
+        for rect in plataformas:
+            if self.rect.colliderect(rect):
+                if self.direccion > 0:
+                    self.rect.right = rect.left
+                else:
+                    self.rect.left = rect.right
+                self.direccion *= -1
+                break
+
+        # --- Gravedad + soporte ---
+        self.vel_y += constantes.GRAVEDAD * dt
+        self.rect.y += self.vel_y * dt
+
+        for rect in plataformas:
+            if self.rect.colliderect(rect):
+                if self.vel_y > 0:
+                    self.rect.bottom = rect.top
+                    self.vel_y = 0
+                elif self.vel_y < 0:
+                    self.rect.top = rect.bottom
+                    self.vel_y = 0
+
+        # --- Animación caminar (6 frames) ---
+        self.anim_timer += dt
+        if self.anim_timer >= self.ANIM_FRAME_TIME:
+            self.anim_timer = 0.0
+            self.frame_index = (self.frame_index + 1) % len(self.frames_walk)
+
+        self.image = self.frames_walk[self.frame_index]
+
+        # Destello rojo
+        if self.hit_flash_timer > 0:
+            self.image = self.image.copy()
+            self.image.fill((150, 0, 0), special_flags=pygame.BLEND_RGB_ADD)
+
+        # Volteo según dirección
+        if self.direccion == 1:
+            self.image = pygame.transform.flip(self.image, True, False)

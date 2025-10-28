@@ -12,6 +12,7 @@ LIB = {
     "menu":     AUDIO_DIR / "menu.ogg",
     "nivel1":   AUDIO_DIR / "nivel1.ogg",
     "nivel2":   AUDIO_DIR / "nivel2.ogg",
+    "nivel3":   AUDIO_DIR / "nivel3.ogg",
 }
 
 # Jingles (sin loop) -> se cargan como Sound para evitar bloqueos
