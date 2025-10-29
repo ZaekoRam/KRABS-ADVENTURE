@@ -1118,7 +1118,7 @@ def main():
     FLAG_POS_BY_LEVEL = {
         1: (5491, 683),  # NIVEL 1
         2: (6485, 845),  # NIVEL 2 (ejemplo)
-        3: (8673, 864),  # si algún día agregas nivel 3
+        3: (8673, 871),  # si algún día agregas nivel 3
     }
 
     # variable que usaremos al dibujar (se actualiza al cargar cada nivel)
@@ -1518,6 +1518,28 @@ def main():
                     Enemigo(x=5442, y=574, velocidad=35, escala=2.5),
                     Enemigo_walk(x=6084, y=448, velocidad=40),
 
+                )
+            elif nivel_actual == 3:
+                enemigos.add(
+                    Enemigo_walk(x=611, y=864, velocidad = 40),
+                    Enemigo(x=869, y=671, velocidad=35, escala=2.5),
+                    Enemigo_walk(x=1469, y=864, velocidad=40),
+                    Enemigo_walk(x=2414, y=864, velocidad=40),
+                    Enemigo_walk(x=2046, y=864, velocidad=40),
+                    Enemigo_walk(x=1744, y=864, velocidad=40),
+                    Enemigo(x=2132, y=702, velocidad=35, escala=2.5),
+                    Enemigo(x=2121, y=545, velocidad=35, escala=2.5),
+                    Enemigo_walk(x=2862, y=864, velocidad=40),
+                    Enemigo_walk(x=4801, y=864, velocidad=40),
+                    Enemigo(x=4445, y=864, velocidad=35, escala=2.5),
+                    Enemigo_walk(x=4083, y=864, velocidad=40),
+                    Enemigo_walk(x=5946, y=864, velocidad=40),
+                    Enemigo(x=5933, y=735, velocidad=35, escala=2.5),
+                    Enemigo_walk(x=7548, y=864, velocidad=40),
+                    Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
+                    Enemigo(x=7550, y=543, velocidad=35, escala=2.5),
+                    Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
+                    Enemigo(x=8319, y=448, velocidad=35, escala=2.5),
 
                 )
             items = pygame.sprite.Group()
@@ -1549,12 +1571,12 @@ def main():
                 for e in enemigos:
                     # + VIDA (duplica vida y, si existe, vida máxima)
                     if hasattr(e, "vida_maxima"):
-                        e.vida_maxima = int(e.vida_maxima * 1.7)
+                        e.vida_maxima = int(e.vida_maxima * 1.5)
                         if hasattr(e, "vida"):
                             # Aumenta la vida actual en proporción sin exceder el nuevo máximo
-                            e.vida = min(int(e.vida * 1.7), e.vida_maxima)
+                            e.vida = min(int(e.vida * 1.5), e.vida_maxima)
                     elif hasattr(e, "vida"):
-                        e.vida = int(e.vida * 1.7)
+                        e.vida = int(e.vida * 1.5)
 
                     # x2 DAÑO (intenta cubrir distintos nombres de atributo)
                     if hasattr(e, "attack_damage"):
