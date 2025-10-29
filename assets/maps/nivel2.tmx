@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="210" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="107">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="210" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="9" nextobjectid="113">
  <tileset firstgid="1" source="Tiles - Beach.tsx"/>
  <layer id="1" name="Capa de patrones 1" width="210" height="30">
   <data encoding="csv">
@@ -145,6 +145,12 @@
   <object id="103" x="1633" y="701.5" width="21.5" height="160.25"/>
   <object id="105" x="2816.5" y="511.5" width="9.5" height="105"/>
   <object id="106" x="2992" y="510" width="8.5" height="101.5"/>
+  <object id="107" x="4014.58" y="428.167" width="9.5" height="144.333"/>
+  <object id="108" x="3719.25" y="431.833" width="9.5" height="144.333"/>
+  <object id="109" x="4662.58" y="435.167" width="9.5" height="144.333"/>
+  <object id="110" x="4897.92" y="432.5" width="9.5" height="144.333"/>
+  <object id="111" x="5363.25" y="431.167" width="9.5" height="144.333"/>
+  <object id="112" x="5505.92" y="428.5" width="9.5" height="144.333"/>
  </objectgroup>
  <objectgroup id="5" name="Meta">
   <object id="59" x="6553.33" y="-2" width="64" height="832"/>

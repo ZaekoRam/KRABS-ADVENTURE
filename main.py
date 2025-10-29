@@ -1510,6 +1510,15 @@ def main():
                     Enemigo(x=2331, y=830, velocidad=35, escala=2.5),
                     Enemigo(x=2903, y=607, velocidad=35, escala=2.5),
                     Enemigo_walk(x=2922, y=832, velocidad=40),
+                    Enemigo_walk(x=3543, y=830, velocidad=40),
+                    Enemigo_walk(x=3885, y=830, velocidad=40),
+                    Enemigo(x=3878, y=576, velocidad=35, escala=2.5),
+                    Enemigo(x=4572, y=606, velocidad=35, escala=2.5),
+                    Enemigo_walk(x=5445, y=832, velocidad=40),
+                    Enemigo(x=5442, y=574, velocidad=35, escala=2.5),
+                    Enemigo_walk(x=6084, y=448, velocidad=40),
+
+
                 )
             items = pygame.sprite.Group()
             if nivel_actual == 1:
