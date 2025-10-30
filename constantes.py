@@ -11,6 +11,8 @@ JUMP_REPEAT_EVERY = 0.25  # segundos entre saltos mientras se mantiene
 FPS = 60
 VELOCIDAD = 300
 VEL_ENEM = 80
+ESTADO_LANG_SELECT = 100
+ESTADO_INTRO_VIDEO = 101
 # --- Muerte / vidas / tiempo ---
 VIDAS_INICIALES = 4              # cuántas vidas tiene el jugador
 TIEMPO_NIVEL1   = 240   # segundos (si no quieres timer, comenta esta línea)

@@ -1,4 +1,6 @@
 # main.py
+import os
+
 import pygame
 from pathlib import Path
 import time, math, json
@@ -22,6 +24,7 @@ class SecuenciaVictoria:
         self.bandera_rect = bandera_rect
         self.nivel = nivel
         self.on_finish = on_finish
+        self._prev_music_vol = None  # para restaurar al final
 
         self.activa = False
         self.etapa = 0
@@ -40,7 +43,7 @@ class SecuenciaVictoria:
         self._finish_lanzado = False
         # <<< NUEVO: música de victoria >>>
         musica.switch("victoria")  # jingle no-loop (o como lo manejes en musica.py)
-        pygame.mixer.music.set_volume(0.9)
+        musica.set_master_volume(settings["volume"])
         self.jugador.set_dx(0)
         self.jugador.en_piso = True
         self.jugador.facing_right = True
@@ -100,132 +103,82 @@ class SecuenciaVictoria:
 
 # === SPAWN FIX ===
 # Pequeña ventana de invencibilidad y 2 frames sin física al entrar al nivel.
-SPAWN_GRACE = 1.0  # segundos invencible al cargar/cerrar tutorial
+SPAWN_GRACE = 0.2 # segundos invencible al cargar/cerrar tutorial
 SPAWN_SKIP_FRAMES = 2  # frames sin física para estabilizar
 
 
 # -------------------- Intro video --------------------
-def play_intro(
-        screen,
-        video_path: Path,
-        audio_path: Path,
-        size=(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA),
-        skip_keys=(pygame.K_SPACE, pygame.K_RETURN, pygame.K_ESCAPE),
-        FPS_MIN=5.0,
-        FPS_MAX=60.0,
-        FPS_OVERRIDE=30,
-        AV_OFFSET=0.0,
-        audio_delay=0.0,
-):
-    if not video_path.exists():
-        return
-    clock = pygame.time.Clock()
-    reader = None
+# === CONFIGURACIÓN GLOBAL ===
+settings = {
+    "volume": 0.8,      # volumen inicial (0.0 - 1.0)
+    "language": None,   # idioma elegido (None al inicio, luego "es" o "en")
+}
 
-    AUDIO_START_EVENT = pygame.USEREVENT + 24
-    audio_started = False
-    music_loaded = False
-    try:
-        if audio_path.exists():
-            pygame.mixer.music.stop()
-            pygame.mixer.music.load(str(audio_path))
-            pygame.mixer.music.set_volume(1.0)
-            music_loaded = True
-            pygame.time.set_timer(AUDIO_START_EVENT, int(max(0.0, float(audio_delay)) * 1000), loops=1)
-        else:
-            pygame.mixer.music.stop()
-    except Exception as e:
-        print("Aviso audio intro:", e)
+# === TEXTOS (I18N) ===
+I18N = {
+    "es": {
+        "select_lang": "Selecciona tu idioma",
+        "spanish": "Español",
+        "english": "Inglés",
+        "skip": "Pulsa cualquier tecla para saltar",
+    },
+    "en": {
+        "select_lang": "Select your language",
+        "spanish": "Spanish",
+        "english": "English",
+        "skip": "Press any key to skip",
+    }
+}
 
-    try:
-        reader = imageio.get_reader(str(video_path))
-        meta = reader.get_meta_data()
-        meta_fps = meta.get("fps", 24.0)
-        nframes = meta.get("nframes", None)
-        duration = meta.get("duration", None)
+try:
+    from ffpyplayer.player import MediaPlayer
+    _HAS_FFPY = True
+except Exception:
+    _HAS_FFPY = False
+    MediaPlayer = None
 
-        if not (isinstance(nframes, (int, float)) and math.isfinite(nframes) and nframes > 0):
-            nframes = None
-        if not (isinstance(duration, (int, float)) and math.isfinite(duration) and duration > 0):
-            duration = None
+class FFVideo:
+    def __init__(self, path: str, out_size: tuple[int,int]):
+        if not _HAS_FFPY:
+            raise RuntimeError("ffpyplayer no está disponible")
+        self.player = MediaPlayer(path, ff_opts={'sync': 'video'})  # audio lo maneja ffpyplayer
+        self.surf = None
+        self.size = out_size
+        self.done = False
 
-        if FPS_OVERRIDE and FPS_OVERRIDE > 0:
-            fps = float(FPS_OVERRIDE)
-        elif nframes and duration:
-            fps = float(nframes) / float(duration)
-        else:
-            try:
-                fps = float(meta_fps)
-            except Exception:
-                fps = 24.0
+    def update(self):
+        if self.done:
+            return
+        frame, val = self.player.get_frame()
+        if val == 'eof':
+            self.done = True
+            return
+        if frame is not None:
+            img, pts = frame
+            w, h = img.get_size()
+            # buffer RGB -> Surface
+            data = img.to_bytearray()[0]
+            frame_surf = pygame.image.frombuffer(data, (w, h), 'RGB')
+            # escalar a ventana (mantén aspect si quieres)
+            self.surf = pygame.transform.smoothscale(frame_surf, self.size)
 
-        fps = max(FPS_MIN, min(FPS_MAX, fps))
-        t0 = time.perf_counter() + AV_OFFSET
-        last_drawn = -1
+    def draw(self, screen):
+        if self.surf:
+            screen.blit(self.surf, (0, 0))
 
-        while True:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.mixer.music.stop()
-                    if reader: reader.close()
-                    pygame.quit()
-                    raise SystemExit
-                if event.type == pygame.KEYDOWN and event.key in skip_keys:
-                    pygame.mixer.music.stop()
-                    if reader: reader.close()
-                    return
-                if event.type == AUDIO_START_EVENT and music_loaded and not audio_started:
-                    try:
-                        pygame.mixer.music.play(loops=0)
-                    except Exception as e:
-                        print("Aviso al reproducir audio intro:", e)
-                    audio_started = True
-
-            now = time.perf_counter()
-            elapsed = now - t0
-            if duration is not None and elapsed > (duration + 0.05):
-                break
-
-            expected_i = int(max(0.0, elapsed) * fps)
-            if nframes is not None and expected_i >= int(nframes):
-                break
-
-            if expected_i == last_drawn:
-                clock.tick(120)
-                continue
-
-            try:
-                frame = reader.get_data(expected_i)
-            except IndexError:
-                break
-
-            h, w = frame.shape[0], frame.shape[1]
-            surf = pygame.image.frombuffer(frame.tobytes(), (w, h), "RGB").convert()
-            if (w, h) != size:
-                surf = pygame.transform.smoothscale(surf, size)
-
-            screen.blit(surf, (0, 0))
-            pygame.display.flip()
-            last_drawn = expected_i
-
-            next_time = (last_drawn + 1) / fps
-            spare = next_time - (time.perf_counter() - t0)
-            if spare > 0:
-                time.sleep(min(spare, 0.02))
-            clock.tick(240)
-    finally:
+    def close(self):
         try:
-            if reader: reader.close()
+            self.player.close_player()
         except Exception:
             pass
-        pygame.mixer.music.stop()
 
 
 # -------------------- Paths/prefs --------------------
 BASE_DIR = Path(__file__).resolve().parent
 IMG_DIR = BASE_DIR / "assets" / "images"
 MAP_DIR = BASE_DIR / "assets" / "maps"
-VID_DIR = BASE_DIR / "assets" / "video"
+VIDEO_DIR_ES = "assets/video/intro_es.mp4"
+VIDEO_DIR_EN = "assets/video/intro_en.mp4"
 PREFS_PATH = BASE_DIR / "settings.json"
 
 
@@ -248,7 +201,86 @@ def _save_prefs(data: dict):
         print("[WARN] No se pudo guardar settings.json:", e)
 
 
-# -------------------- Helpers/HUD --------------------
+# -------------------- Helpers/HUD --------------------}
+
+# ===== Helpers UI para Game Over =====
+def draw_text_center(surface, text, font, color, x_center, y, shadow=True):
+    """Dibuja texto centrado; si shadow=True añade sombra suave."""
+    if shadow:
+        shadow_surf = font.render(text, True, (0, 0, 0))
+        shadow_rect = shadow_surf.get_rect(midtop=(x_center+2, y+2))
+        surface.blit(shadow_surf, shadow_rect)
+
+    text_surf = font.render(text, True, color)
+    text_rect = text_surf.get_rect(midtop=(x_center, y))
+    surface.blit(text_surf, text_rect)
+    return text_rect  # por si quieres saber el alto
+
+def draw_button_auto(surface, text, font, center, bg=(30,60,140), fg=(255,255,255),
+                     pad_x=24, pad_y=14, border=3, radius=12, hover=False):
+    """Botón cuyo tamaño se adapta al texto."""
+    text_surf = font.render(text, True, fg)
+    tw, th = text_surf.get_size()
+    w = tw + pad_x*2
+    h = th + pad_y*2
+    rect = pygame.Rect(0, 0, w, h)
+    rect.center = center
+
+    # hover color
+    bg_draw = bg
+    if hover:
+        bg_draw = (min(bg[0]+20,255), min(bg[1]+20,255), min(bg[2]+30,255))
+
+    pygame.draw.rect(surface, bg_draw, rect, border_radius=radius)
+    pygame.draw.rect(surface, (220, 230, 255), rect, width=border, border_radius=radius)
+
+    surface.blit(text_surf, text_surf.get_rect(center=rect.center))
+    return rect
+
+# === Settings ===
+settings = {
+    "volume": 0.8,    # 0.0 - 1.0
+    "language": "es", # "es" | "en"
+}
+
+# === I18N ===
+I18N = {
+    "es": {
+        "options_title": "OPCIONES (ESC para volver)",
+        "volume": "Volumen",
+        "language": "Idioma",
+        "lang_value": {"es": "Español", "en": "Inglés"},
+        "hint": "Arrastra la barra o usa ← →",
+        "toggle": "Cambiar idioma"
+    },
+    "en": {
+        "options_title": "OPTIONS (ESC to go back)",
+        "volume": "Volume",
+        "language": "Language",
+        "lang_value": {"es": "Spanish", "en": "English"},
+        "hint": "Drag the bar or use ← →",
+        "toggle": "Toggle language"
+    }
+}
+
+# === Slider ===
+SLIDER_W = 360
+SLIDER_H = 8
+HANDLE_R = 10
+slider_bar_rect = pygame.Rect(0, 0, SLIDER_W, SLIDER_H)
+slider_bar_rect.center = (constantes.ANCHO_VENTANA // 2, 220)
+
+def slider_handle_pos_x():
+    return int(slider_bar_rect.left + settings["volume"] * slider_bar_rect.width)
+
+slider_dragging = False
+
+# === Botón de idioma ===
+btn_lang_rect = pygame.Rect(0, 0, 260, 50)
+btn_lang_rect.center = (constantes.ANCHO_VENTANA // 2, 320)
+
+
+
 def esta_en_suelo(j, col_rects) -> bool:
     """Chequeo inmediato de suelo: mira 1px por debajo del jugador."""
     probe = j.forma.copy()
@@ -616,91 +648,139 @@ class PauseMenu:
 
 
 # -------------------- Game Over Screen --------------------
-# -------------------- Game Over Screen --------------------
 class GameOverScreen:
     def __init__(self, size):
         self.w, self.h = size
         self.font_title = get_font(constantes.FONT_UI_TITLE)
+        self.font_sub = get_font(constantes.FONT_UI_ITEM)
         self.font_item = get_font(constantes.FONT_UI_ITEM)
 
-        # Cargar imagen de Game Over - MÁS GRANDE
+        # Imagen opcional (puedes dejar fondo del juego)
         try:
-            game_over_img = pygame.image.load(IMG_DIR / "ui" / "game_over.png").convert_alpha()
-            # Escalar para que sea más grande - 85% del ancho de la pantalla
-            max_width = int(self.w * 1.2)  # <- CAMBIADO de 0.7 a 0.85
-            # Siempre escalar la imagen sin importar su tamaño original
-            ratio = max_width / game_over_img.get_width()
-            new_height = int(game_over_img.get_height() * ratio)
-            game_over_img = pygame.transform.scale(game_over_img, (max_width, new_height))
-            self.game_over_img = game_over_img
-        except Exception as e:
-            print(f"[WARN] No se pudo cargar game_over.png: {e}")
-            self.game_over_img = None
+            self.bg = pygame.image.load(IMG_DIR / "ui" / "game_over.png").convert()
+            self.bg = pygame.transform.scale(self.bg, (self.w, self.h))
+        except:
+            self.bg = None
 
-        # Panel semi-transparente un poco más grande también
-        self.panel = pygame.Surface((int(self.w * 0.6), int(self.h * 0.6)), pygame.SRCALPHA)
-        self.panel.fill((0, 0, 0, 180))
+        # --- PANEL Y BOTONES ---
+        BTN_W, BTN_H = 280, 70
+        spacing = 90  # distancia entre botones
 
-        # Botones (coordenadas relativas al centro)
-        self.btn_continuar = BotonSimple("Continuar", (self.w // 2, self.h // 2 + 50), 220,
-                                         50)  # <- Botones más grandes
-        self.btn_menu = BotonSimple("Menú Principal", (self.w // 2, self.h // 2 + 120), 220,
-                                    50)  # <- Botones más grandes
+        center_y = self.h // 2 + 35
+
+        self.btn_retry = BotonSimple("Continuar", (self.w // 2, center_y), BTN_W, BTN_H)
+        self.btn_menu = BotonSimple("Menú", (self.w // 2, center_y + spacing), BTN_W, BTN_H)
 
     def reset(self):
-        """Método para mantener compatibilidad con el código existente"""
         pass
 
     def update(self, mouse_pos):
-        """Actualizar estado de botones"""
-        self.btn_continuar.update(mouse_pos)
+        self.btn_retry.update(mouse_pos)
         self.btn_menu.update(mouse_pos)
 
     def handle_event(self, event):
-        """Manejar eventos - reemplaza la lógica del temporizador"""
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.btn_continuar.rect.collidepoint(event.pos):
+            if self.btn_retry.rect.collidepoint(event.pos):
                 return "continuar"
             elif self.btn_menu.rect.collidepoint(event.pos):
                 return "menu"
 
-        # Controles de teclado (manteniendo tu esquema actual)
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_c):
                 return "continuar"
             if event.key in (pygame.K_ESCAPE, pygame.K_m, pygame.K_BACKSPACE):
                 return "menu"
-
         return None
 
     def draw(self, surface):
-        """Dibujar la pantalla de Game Over"""
-        # Fondo oscuro semi-transparente
+        # Fondo
+        if self.bg:
+            surface.blit(self.bg, (0, 0))
+        else:
+            surface.fill((20, 0, 0))
+
+        # Capa oscura
         dim = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
-        dim.fill((0, 0, 0, 160))  # <- Un poco más oscuro
+        dim.fill((0, 0, 0, 120))
         surface.blit(dim, (0, 0))
 
-        # Panel principal
-        px = (self.w - self.panel.get_width()) // 2
-        py = (self.h - self.panel.get_height()) // 2
-        surface.blit(self.panel, (px, py))
+        # --- TÍTULO PRINCIPAL ---
+        title = self.font_title.render("PARTIDA TERMINADA", True, (255, 180, 50))
+        title_rect = title.get_rect(center=(self.w // 2, self.h // 2 - 140))
+        surface.blit(title, title_rect)
 
-        # Imagen de Game Over - POSICIÓN MÁS CENTRADA
-        if self.game_over_img:
-            img_rect = self.game_over_img.get_rect(center=(self.w // 2, py + 100))  # <- Bajada un poco
-            surface.blit(self.game_over_img, img_rect)
-        else:
-            # Fallback si no hay imagen - texto grande de GAME OVER
-            title = self.font_title.render("GAME OVER", True, (255, 50, 50))
-            surface.blit(title, (self.w // 2 - title.get_width() // 2, py + 80))
+        # --- SUBTEXTO ---
+        subt = self.font_sub.render("Sigue intentando, aún podemos lograrlo!", True, (255, 255, 255))
+        subt_rect = subt.get_rect(center=(self.w // 2, self.h // 2 - 80))
+        surface.blit(subt, subt_rect)
 
-        # Botones
-        self.btn_continuar.draw(surface)
+        # --- BOTONES ---
+        self.btn_retry.draw(surface)
         self.btn_menu.draw(surface)
 
-        # Instrucciones (similar a tu diseño actual)
-        hint = self.font_item.render("ENTER: Continuar   |   ESC: Menú", True, (230, 230, 230))
-        surface.blit(hint, (self.w // 2 - hint.get_width() // 2, self.h - 80))  # <- Bajada un poco
+        # --- INSTRUCCIONES ABAJO ---
+        hint = self.font_item.render("ENTER: Reintentar | ESC: Menú", True, (255, 255, 255))
+        hint_rect = hint.get_rect(center=(self.w // 2, self.h - 60))
+        surface.blit(hint, hint_rect)
+
+class VictoryScreen:
+    def __init__(self, size, image_name="victory_screen.png"):
+        self.w, self.h = size
+
+        # Fuentes (reusa tu get_font si lo tienes)
+        try:
+            from fuentes import get_font
+            import constantes
+            self.font_item = get_font(constantes.FONT_UI_ITEM)
+        except:
+            pygame.font.init()
+            self.font_item = pygame.font.SysFont("Arial", 26)
+
+        # Fondo: imagen de victoria a pantalla completa (manteniendo proporción)
+        self.bg = None
+        try:
+            img = pygame.image.load(IMG_DIR / "ui" / image_name).convert_alpha()
+        except:
+            img = None
+
+        if img:
+            # Escala manteniendo proporción y centrado
+            iw, ih = img.get_width(), img.get_height()
+            scale = min(self.w / iw, self.h / ih)
+            nw, nh = int(iw * scale), int(ih * scale)
+            self.bg = pygame.transform.smoothscale(img, (nw, nh))
+            self.bg_rect = self.bg.get_rect(center=(self.w // 2, self.h // 2))
+
+        # Dim capa oscura suave para contraste del botón
+        self.dim = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
+        self.dim.fill((0, 0, 0, 80))
+
+        # Botón MENÚ (usa tu BotonSimple para que quede igual al resto del juego)
+        BTN_W, BTN_H = 260, 64
+        self.btn_menu = BotonSimple("Menú", (self.w // 2, self.h // 2 + 180), BTN_W, BTN_H)
+
+    def update(self, mouse_pos):
+        self.btn_menu.update(mouse_pos)
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.btn_menu.rect.collidepoint(event.pos):
+                return "menu"
+        if event.type == pygame.KEYDOWN:
+            if event.key in (pygame.K_ESCAPE, pygame.K_m, pygame.K_RETURN, pygame.K_SPACE):
+                return "menu"
+        return None
+
+    def draw(self, surface):
+        surface.fill((0, 0, 0))
+        if self.bg:
+            surface.blit(self.bg, self.bg_rect)
+        surface.blit(self.dim, (0, 0))
+
+        self.btn_menu.draw(surface)
+
+        hint = self.font_item.render("ENTER/ESPACIO: Menú", True, (255, 255, 255))
+        surface.blit(hint, hint.get_rect(center=(self.w // 2, self.h - 60)))
 
 
 # -------------------- Character Select UI --------------------
@@ -1073,6 +1153,10 @@ ESTADO_TUTORIAL = "TUTORIAL"
 ESTADO_VICTORIA = "VICTORIA"
 ESTADO_SELECT_PERSONAJE = "SELECT_PERSONAJE"
 ESTADO_SELECT_NIVEL = "SELECT_NIVEL"
+ESTADO_LANG_SELECT = "LANG_SELECT"
+ESTADO_INTRO_VIDEO = "INTRO_VIDEO"
+ESTADO_VICTORY_SCREEN = "VICTORY_SCREEN"
+
 
 
 def main():
@@ -1085,6 +1169,19 @@ def main():
     pygame.display.set_caption("Krab's adventure")
     reloj = pygame.time.Clock()
     prefs = _load_prefs()
+
+    # === ESTADO INICIAL ===
+    estado = ESTADO_LANG_SELECT
+
+    # === BOTONES DE IDIOMA ===
+    BTN_W, BTN_H = 260, 60
+    btn_es = pygame.Rect(0, 0, BTN_W, BTN_H)
+    btn_en = pygame.Rect(0, 0, BTN_W, BTN_H)
+    btn_es.center = (constantes.ANCHO_VENTANA // 2, 300)
+    btn_en.center = (constantes.ANCHO_VENTANA // 2, 380)
+
+    # === VIDEO INTRO (variable temporal) ===
+    video_intro = None
 
     # Tutorial (si existe)
     try:
@@ -1125,11 +1222,6 @@ def main():
     flag_pos_world = FLAG_POS_BY_LEVEL.get(1, (0, 0))
 
     # Intro
-    video_path = VID_DIR / "intro.mp4"
-    audio_path = VID_DIR / "intro.wav"
-    pygame.mixer.music.set_volume(1.0)
-    play_intro(ventana, video_path, audio_path, FPS_OVERRIDE=25, AV_OFFSET=0.0, audio_delay=0.1)
-
     font_hud = get_font(constantes.FONT_HUD)
     tiempo_total = float(getattr(constantes, "TIEMPO_NIVEL1", 60))
     timer = tiempo_total
@@ -1239,6 +1331,7 @@ def main():
     pause_menu = PauseMenu((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     # CAMBIO AQUÍ: ContinueOverlay → GameOverScreen
     continue_ui = GameOverScreen((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
+    victory_ui = VictoryScreen((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     freeze_cam_offset = None
 
     # --------- Game Loop ---------
@@ -1252,6 +1345,55 @@ def main():
             if event.type == pygame.QUIT:
                 musica.stop(300);
                 run = False
+
+            elif estado == ESTADO_LANG_SELECT:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mx, my = event.pos
+                    if btn_es.collidepoint(mx, my):
+                        settings["language"] = "es"
+                        # lanzar video ES
+                        if _HAS_FFPY and os.path.exists(VIDEO_DIR_ES):
+                            video_intro = FFVideo(VIDEO_DIR_ES, ventana.get_size())
+                            estado = ESTADO_INTRO_VIDEO
+                        else:
+                            # Si no hay video, pasar directo al menú
+                            estado = ESTADO_MENU
+                    elif btn_en.collidepoint(mx, my):
+                        settings["language"] = "en"
+                        # lanzar video EN
+                        if _HAS_FFPY and os.path.exists(VIDEO_DIR_EN):
+                            video_intro = FFVideo(VIDEO_DIR_EN, ventana.get_size())
+                            estado = ESTADO_INTRO_VIDEO
+                        else:
+                            estado = ESTADO_MENU
+
+                elif event.type == pygame.KEYDOWN:
+                    # Atajos: E para español, I para inglés
+                    if event.key == pygame.K_e:
+                        settings["language"] = "es"
+                        if _HAS_FFPY and os.path.exists(VIDEO_DIR_ES):
+                            video_intro = FFVideo(VIDEO_DIR_ES, ventana.get_size())
+                            estado = ESTADO_INTRO_VIDEO
+                        else:
+                            estado = ESTADO_MENU
+                    elif event.key == pygame.K_i:
+                        settings["language"] = "en"
+                        if _HAS_FFPY and os.path.exists(VIDEO_DIR_EN):
+                            video_intro = FFVideo(VIDEO_DIR_EN, ventana.get_size())
+                            estado = ESTADO_INTRO_VIDEO
+                        else:
+                            estado = ESTADO_MENU
+
+                # --- REPRODUCCIÓN DE VIDEO INTRO ---
+            elif estado == ESTADO_INTRO_VIDEO:
+                # permitir saltar con cualquier tecla/click
+                if event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
+                    if video_intro:
+                        video_intro.close()
+                        video_intro = None
+                    estado = ESTADO_MENU
+                    # aquí puedes arrancar la música del menú en el idioma ya elegido
+                    # musica.switch("menu")
 
             if estado == ESTADO_MENU:
                 if not menu_leaving:
@@ -1291,7 +1433,7 @@ def main():
                             _clear_input_state()
                         except Exception:
                             pass
-                        pygame.mixer.music.set_volume(VOL_NORMAL)
+                        musica.set_master_volume(settings["volume"])
                         musica.switch("menu")
 
             elif estado == ESTADO_SELECT_NIVEL:
@@ -1330,9 +1472,53 @@ def main():
                     selected_difficulty = result
                     estado = ESTADO_CARGANDO
 
+
             elif estado == ESTADO_OPC:
-                if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
-                    estado = ESTADO_MENU
+                if event.type == pygame.KEYDOWN:
+                    # Volver al menú
+                    if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                        estado = ESTADO_MENU
+
+                    # Ajustar volumen con flechas
+                    elif event.key == pygame.K_LEFT:
+                        settings["volume"] = max(0.0, settings["volume"] - 0.05)
+                        musica.set_master_volume(settings["volume"])
+                    elif event.key == pygame.K_RIGHT:
+                        settings["volume"] = min(1.0, settings["volume"] + 0.05)
+                        musica.set_master_volume(settings["volume"])
+
+                    # Toggle de idioma con Enter/Espacio si el cursor está sobre el botón (opcional)
+                    elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                        mx, my = pygame.mouse.get_pos()
+                        if btn_lang_rect.collidepoint(mx, my):
+                            settings["language"] = "en" if settings["language"] == "es" else "es"
+
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mx, my = event.pos
+
+                    # Slider: iniciar drag si clickea sobre la barra/handle
+                    handle_x = slider_handle_pos_x()
+                    handle_hit = pygame.Rect(handle_x - HANDLE_R, slider_bar_rect.centery - HANDLE_R, HANDLE_R * 2,
+                                             HANDLE_R * 2)
+                    if handle_hit.collidepoint(mx, my) or slider_bar_rect.collidepoint(mx, my):
+                        slider_dragging = True
+                        rel = (mx - slider_bar_rect.left) / slider_bar_rect.width
+                        settings["volume"] = min(1.0, max(0.0, rel))
+                        musica.set_master_volume(settings["volume"])
+
+                    # Botón de idioma
+                    if btn_lang_rect.collidepoint(mx, my):
+                        settings["language"] = "en" if settings["language"] == "es" else "es"
+
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    slider_dragging = False
+
+                elif event.type == pygame.MOUSEMOTION and slider_dragging:
+                    mx, my = event.pos
+                    rel = (mx - slider_bar_rect.left) / slider_bar_rect.width
+                    settings["volume"] = min(1.0, max(0.0, rel))
+                    musica.set_master_volume(settings["volume"])
+
 
             elif estado == ESTADO_JUEGO:
                 if event.type == pygame.KEYDOWN:
@@ -1340,7 +1526,7 @@ def main():
                         jugador.start_attack()
                     if event.key == pygame.K_ESCAPE:
                         estado = ESTADO_PAUSA
-                        pygame.mixer.music.set_volume(VOL_PAUSA)
+                        musica.set_master_volume(settings["volume"] * 0.5)  # volumen reducido
                     if event.key in (pygame.K_a, pygame.K_LEFT):  mover_izquierda = True
                     if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha = True
                     if event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
@@ -1354,7 +1540,7 @@ def main():
                             jugador.saltar()
                     if event.key == pygame.K_F1 and tutorial_overlay:
                         estado = ESTADO_TUTORIAL
-                        pygame.mixer.music.set_volume(VOL_PAUSA)
+                        musica.set_master_volume(settings["volume"] * 0.5)  # volumen reducido
                 if event.type == pygame.KEYUP:
                     if event.key in (pygame.K_a, pygame.K_LEFT):  mover_izquierda = False
                     if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha = False
@@ -1366,7 +1552,7 @@ def main():
                 action = pause_menu.handle_event(event)
                 if action == "resume":
                     estado = ESTADO_JUEGO
-                    pygame.mixer.music.set_volume(VOL_NORMAL)
+                    musica.set_master_volume(settings["volume"])
                     # limpiar entradas pegadas
                     mover_izquierda = False
                     mover_derecha = False
@@ -1376,7 +1562,7 @@ def main():
                         pass
                 elif action == "menu":
                     estado = ESTADO_MENU
-                    pygame.mixer.music.set_volume(VOL_NORMAL)
+                    musica.set_master_volume(settings["volume"])
                     musica.switch("menu")
                     menu_leaving = False
                     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
@@ -1394,7 +1580,7 @@ def main():
                     estado = ESTADO_CARGANDO
                     freeze_cam_offset = None
                 elif action == "menu":
-                    pygame.mixer.music.set_volume(VOL_NORMAL)
+                    musica.set_master_volume(settings["volume"])
                     musica.switch("menu")
                     estado = ESTADO_MENU
                     freeze_cam_offset = None
@@ -1425,7 +1611,7 @@ def main():
                         jugador.en_piso = True
 
                         estado = ESTADO_JUEGO
-                        pygame.mixer.music.set_volume(VOL_NORMAL)
+                        musica.set_master_volume(settings["volume"])
 
             elif estado == ESTADO_VICTORIA:
                 if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE,
@@ -1435,11 +1621,20 @@ def main():
                     menu_leaving = False
                     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
 
+            elif estado == ESTADO_VICTORY_SCREEN:
+                victory_ui.update(mouse_pos)
+                action = victory_ui.handle_event(event)
+                if action == "menu":
+                    musica.switch("menu")
+                    estado = ESTADO_MENU
+                    menu_leaving = False
+                    menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+
         # -------------------- UPDATE --------------------
         if estado == ESTADO_MENU:
             menu_krab.update(dt)
             if menu_leaving and menu_krab.offscreen(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA):
-                pygame.mixer.music.set_volume(VOL_NORMAL)
+                musica.set_master_volume(settings["volume"])
                 select_ui = CharacterSelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), portrait_krabby,
                                               portrait_karol)
                 estado = ESTADO_SELECT_PERSONAJE
@@ -1461,7 +1656,7 @@ def main():
             print("[DEBUG] Estado de carga: Iniciando nivel", nivel_actual)
             try:
                 musica.switch(f"nivel{nivel_actual}")  # ← reproduce nivel1, nivel2, nivel3 según corresponda
-                pygame.mixer.music.set_volume(VOL_NORMAL)
+                musica.set_master_volume(settings["volume"])
             except Exception as e:
                 print("Aviso música de nivel:", e)
             puntuacion = 0
@@ -1481,7 +1676,10 @@ def main():
 
             def _ir_a_victoria():
                 nonlocal estado
-                estado = ESTADO_VICTORIA
+                if nivel_actual == 3:
+                    estado = "VICTORY_SCREEN"
+                else:
+                    estado = ESTADO_VICTORIA
 
             secuencia_victoria = SecuenciaVictoria(
                 jugador,
@@ -1602,7 +1800,7 @@ def main():
             ):
                 tutorial_context = "game"
                 estado = ESTADO_TUTORIAL
-                pygame.mixer.music.set_volume(VOL_PAUSA)
+                musica.set_master_volume(settings["volume"] * 0.5)  # volumen reducido
             else:
                 # === SPAWN FIX: al entrar directo al juego, activar gracia/frames ===
                 spawn_grace = SPAWN_GRACE
@@ -1669,7 +1867,7 @@ def main():
                 # Música de derrota (sin loop)
                 try:
                     musica.switch("derrota", crossfade_ms=200)
-                    pygame.mixer.music.set_volume(0.9)
+                    musica.set_master_volume(settings["volume"])
                 except Exception as e:
                     print("Aviso música derrota (timeout):", e)
 
@@ -1692,7 +1890,7 @@ def main():
 
                 try:
                     musica.switch("derrota", crossfade_ms=200)
-                    pygame.mixer.music.set_volume(0.9)
+                    musica.set_master_volume(settings["volume"])
                 except Exception as e:
                     print("Aviso música derrota (caída):", e)
 
@@ -1835,7 +2033,7 @@ def main():
 
                 try:
                     musica.switch("derrota", crossfade_ms=200)
-                    pygame.mixer.music.set_volume(0.9)
+                    musica.set_master_volume(settings["volume"])
                 except Exception as e:
                     print("Aviso música derrota (hp=0):", e)
 
@@ -1895,6 +2093,48 @@ def main():
             # El cambio de estado ahora se maneja completamente con los botones/teclado
 
         # -------------------- DRAW --------------------
+
+        # --- UPDATE ---
+        if estado == ESTADO_INTRO_VIDEO and video_intro:
+            video_intro.update()
+            if video_intro.done:
+                video_intro.close()
+                video_intro = None
+                estado = ESTADO_MENU
+                # musica.switch("menu")
+
+        # --- DRAW ---
+        if estado == ESTADO_LANG_SELECT:
+            ventana.fill((10, 10, 14))
+            # Título (usa un fallback si language aún es None)
+            lang_ui = "es"
+            t = I18N[lang_ui]
+            title = get_font(constantes.FONT_SUBTITLE).render(t["select_lang"], True, (255, 255, 255))
+            ventana.blit(title, (constantes.ANCHO_VENTANA // 2 - title.get_width() // 2, 120))
+
+            # Botón ES
+            pygame.draw.rect(ventana, (40, 40, 60), btn_es, border_radius=12)
+            pygame.draw.rect(ventana, (120, 120, 160), btn_es, 2, border_radius=12)
+            txt_es = get_font(constantes.FONT_TEXT).render(t["spanish"], True, (230, 230, 230))
+            ventana.blit(txt_es, (btn_es.centerx - txt_es.get_width() // 2, btn_es.centery - txt_es.get_height() // 2))
+
+            # Botón EN
+            pygame.draw.rect(ventana, (40, 40, 60), btn_en, border_radius=12)
+            pygame.draw.rect(ventana, (120, 120, 160), btn_en, 2, border_radius=12)
+            txt_en = get_font(constantes.FONT_TEXT).render(t["english"], True, (230, 230, 230))
+            ventana.blit(txt_en, (btn_en.centerx - txt_en.get_width() // 2, btn_en.centery - txt_en.get_height() // 2))
+
+        elif estado == ESTADO_INTRO_VIDEO:
+            ventana.fill((0, 0, 0))
+            if video_intro:
+                video_intro.draw(ventana)
+                # hint para saltar
+                lang = settings["language"] or "es"
+                t = I18N[lang]
+                hint = get_font(constantes.FONT_SMALL).render(t["skip"], True, (200, 200, 200))
+                ventana.blit(hint,
+                             (constantes.ANCHO_VENTANA // 2 - hint.get_width() // 2, constantes.ALTO_VENTANA - 40))
+
         if estado == ESTADO_MENU:
             ventana.blit(fondo_menu, (0, 0))
             titulo.draw(ventana);
@@ -1905,8 +2145,42 @@ def main():
 
         elif estado == ESTADO_OPC:
             ventana.blit(fondo_menu, (0, 0))
-            sub = get_font(constantes.FONT_SUBTITLE).render("OPCIONES (ESC para volver)", True, (255, 255, 255))
+
+            lang = settings["language"]
+            t = I18N[lang]
+
+            # Título
+            sub = get_font(constantes.FONT_SUBTITLE).render(t["options_title"], True, (255, 255, 255))
             ventana.blit(sub, (constantes.ANCHO_VENTANA // 2 - sub.get_width() // 2, 60))
+
+            # Etiqueta Volumen
+            vol_label = get_font(constantes.FONT_HUD).render(t["volume"], True, (220, 220, 220))
+            ventana.blit(vol_label, (slider_bar_rect.centerx - vol_label.get_width() // 2, slider_bar_rect.top - 40))
+
+            # Slider (bar + progress + handle)
+            pygame.draw.rect(ventana, (80, 80, 90), slider_bar_rect, border_radius=SLIDER_H // 2)
+            progress_rect = slider_bar_rect.copy()
+            progress_rect.width = int(settings["volume"] * slider_bar_rect.width)
+            pygame.draw.rect(ventana, (120, 180, 255), progress_rect, border_radius=SLIDER_H // 2)
+
+            hx = slider_handle_pos_x()
+            hy = slider_bar_rect.centery
+            pygame.draw.circle(ventana, (240, 240, 255), (hx, hy), HANDLE_R)
+
+            hint = get_font(constantes.FONT_HUD).render(t["hint"], True, (180, 180, 180))
+            ventana.blit(hint, (slider_bar_rect.centerx - hint.get_width() // 2, slider_bar_rect.bottom + 12))
+
+            # Botón de idioma
+            pygame.draw.rect(ventana, (40, 40, 50), btn_lang_rect, border_radius=12)
+            pygame.draw.rect(ventana, (120, 120, 140), btn_lang_rect, width=2, border_radius=12)
+
+            lang_label = get_font(constantes.FONT_HUD).render(t["language"], True, (230, 230, 230))
+            ventana.blit(lang_label, (btn_lang_rect.centerx - lang_label.get_width() // 2, btn_lang_rect.top + 6))
+
+            lang_value_str = t["lang_value"][settings["language"]]
+            lang_value = get_font(constantes.FONT_HUD).render(lang_value_str, True, (180, 210, 255))
+            ventana.blit(lang_value, (btn_lang_rect.centerx - lang_value.get_width() // 2, btn_lang_rect.top + 28))
+
 
         elif estado == ESTADO_SELECT_PERSONAJE:
             ventana.blit(fondo_menu, (0, 0))
@@ -1970,6 +2244,10 @@ def main():
         elif estado == "CONTINUE":
             # SOLO el nuevo Game Over - sin fondo del juego
             continue_ui.draw(ventana)
+
+        elif estado == ESTADO_VICTORY_SCREEN:
+            victory_ui.draw(ventana)
+
 
         elif estado == ESTADO_TUTORIAL:
             if parallax is not None:

@@ -7,7 +7,60 @@ AUDIO_DIR = BASE_DIR / "assets" / "audio"
 MUSIC_DIR = AUDIO_DIR / "musica"        # <— aquí viven victoria.ogg y derrota.ogg
 SFX_DIR   = AUDIO_DIR / "sfx"
 
+
 # ------------ Música ------------
+
+# ===== Volúmenes globales =====
+MASTER_VOLUME = 0.8  # control general (slider del menú)
+MUSIC_VOLUME  = 1.0  # balance música
+SFX_VOLUME    = 1.0  # balance efectos/sfx
+JINGLE_VOLUME = 1.0  # balance jingles
+
+# Volumen temporal para cuando el juego está en pausa
+VOL_PAUSA = 0.5   # porcentaje del volumen maestro
+_is_paused_volume = False
+
+def _clamp01(v: float) -> float:
+    try:
+        return max(0.0, min(1.0, float(v)))
+    except Exception:
+        return 0.0
+
+def _apply_volumes():
+    """Aplica volúmenes actuales a música y a lo que ya esté cacheado."""
+    _ensure_init()
+    # música de fondo
+    try:
+        pygame.mixer.music.set_volume(_clamp01(MASTER_VOLUME * MUSIC_VOLUME))
+    except Exception:
+        pass
+    # SFX ya cacheados
+    for snd in _SFX_CACHE.values():
+        snd.set_volume(_clamp01(MASTER_VOLUME * SFX_VOLUME))
+    # Jingles ya cacheados (volumen base, el específico se setea al reproducir)
+    for snd in _JINGLE_CACHE.values():
+        snd.set_volume(_clamp01(MASTER_VOLUME * JINGLE_VOLUME))
+
+def set_master_volume(v: float):
+    global MASTER_VOLUME
+    MASTER_VOLUME = _clamp01(v)
+    _apply_volumes()
+
+def set_music_volume(v: float):
+    global MUSIC_VOLUME
+    MUSIC_VOLUME = _clamp01(v)
+    _apply_volumes()
+
+def set_sfx_volume(v: float):
+    global SFX_VOLUME
+    SFX_VOLUME = _clamp01(v)
+    _apply_volumes()
+
+def set_jingle_volume(v: float):
+    global JINGLE_VOLUME
+    JINGLE_VOLUME = _clamp01(v)
+    _apply_volumes()
+
 LIB = {
     "menu":     AUDIO_DIR / "menu.ogg",
     "nivel1":   AUDIO_DIR / "nivel1.ogg",
@@ -17,12 +70,11 @@ LIB = {
 
 # Jingles (sin loop) -> se cargan como Sound para evitar bloqueos
 JINGLES = {
+    "victoria_lvl3": MUSIC_DIR / "victoria_lvl3.ogg",
     "victoria": MUSIC_DIR / "victoria.ogg",
     "derrota":  MUSIC_DIR / "derrota.ogg",
 }
 
-# caché SFX normal
-_SFX_CACHE = {}
 # caché de jingles como Sound
 _JINGLE_CACHE = {}
 # canal dedicado (opcional) para jingles
@@ -61,7 +113,7 @@ def _play_music(name: str, loop=True, volumen=0.7, fade_ms=0):
     else:
         pygame.mixer.music.stop()
     pygame.mixer.music.load(str(path))
-    pygame.mixer.music.set_volume(max(0.0, min(1.0, float(volumen))))
+    pygame.mixer.music.set_volume(_clamp01(MASTER_VOLUME * MUSIC_VOLUME * volumen))
     pygame.mixer.music.play(-1 if loop else 0)
     global _current
     _current = name
@@ -86,7 +138,7 @@ def jingle(name: str, volumen=0.9, fade_music_ms=200, stop_music=True):
         except Exception:
             pass
 
-    snd.set_volume(max(0.0, min(1.0, float(volumen))))
+    snd.set_volume(_clamp01(MASTER_VOLUME * JINGLE_VOLUME * volumen))
     # usa canal dedicado si está libre; si no, busca uno libre
     ch = pygame.mixer.Channel(_JINGLE_CHANNEL_IDX)
     if ch.get_busy():
@@ -145,7 +197,7 @@ def sfx(name: str, volume=1.0):
     if snd is None:
         snd = pygame.mixer.Sound(str(path))
         _SFX_CACHE[name] = snd
-    snd.set_volume(max(0.0, min(1.0, float(volume))))
+    snd.set_volume(_clamp01(MASTER_VOLUME * SFX_VOLUME * volume))
 
     ch = pygame.mixer.find_channel()
     if ch: ch.play(snd)
