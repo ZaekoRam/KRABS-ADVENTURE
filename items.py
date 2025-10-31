@@ -9,7 +9,7 @@ class Manzana(pygame.sprite.Sprite):
 
         # Carga la imagen específica de la manzana
         try:
-            ruta_imagen = Path(__file__).resolve().parent / "assets" / "images" / "items" / "manzana.png"
+            ruta_imagen = Path(__file__).resolve().parent / "assets" / "images" / "items" / "botella.png"
             self.image = pygame.image.load(str(ruta_imagen)).convert_alpha()
         except pygame.error as e:
             print(f"Error al cargar la imagen 'manzana.png': {e}")

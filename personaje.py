@@ -125,12 +125,27 @@ class Personaje(pygame.sprite.Sprite):
             self.anim_index = 0
 
     def get_attack_rect(self):
-        if self.facing_right:
-            x = self.forma.left + self.attack_offset_x
+        """
+        Rectángulo de ataque SOLO hacia el frente del jugador.
+        Usa self.forma (tu rect) y self.facing_right (dirección).
+        """
+        # Evita crashear si aún no está inicializado
+        if not hasattr(self, "forma") or self.forma is None:
+            return pygame.Rect(0, 0, 0, 0)
+
+        # Ajusta a tu gusto (alcance y grosor)
+        ATTACK_RANGE = max(24, int(self.image.get_width() * 0.9))  # px hacia adelante
+        ATTACK_THICK = max(16, int(self.image.get_height() * 0.55))  # altura del hitbox
+
+        # Altura: centrado en el torso. Si quieres "barrida" al suelo, ver opción abajo.
+        top = self.forma.centery - ATTACK_THICK // 2
+
+        if getattr(self, "facing_right", True):
+            left = self.forma.right  # hacia la derecha
         else:
-            x = self.forma.right - self.attack_offset_x - self.attack_w
-        y = self.forma.top + self.attack_offset_y
-        return pygame.Rect(x, y, self.attack_w, self.attack_h)
+            left = self.forma.left - ATTACK_RANGE  # hacia la izquierda
+
+        return pygame.Rect(left, top, ATTACK_RANGE, ATTACK_THICK)
 
     def colocar_en_midbottom(self, x, y):
         self.forma.midbottom = (int(x), int(y))
@@ -163,6 +178,7 @@ class Personaje(pygame.sprite.Sprite):
         self.vel_y += constantes.GRAVEDAD * dt
 
     def actualizar(self, dt):
+
         # ... tu gravedad/movimiento ...
         if self.attack_cooldown_timer > 0:
             self.attack_cooldown_timer -= dt

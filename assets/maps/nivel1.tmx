@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="180" height="25" tilewidth="32" tileheight="32" infinite="0" nextlayerid="11" nextobjectid="78">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="180" height="25" tilewidth="32" tileheight="32" infinite="0" nextlayerid="11" nextobjectid="80">
  <tileset firstgid="1" source="Tiles - Beach.tsx"/>
  <tileset firstgid="217" source="[32x32] Dungeon Bricks Plain.tsx"/>
  <layer id="5" name="Capa de patrones 3" width="180" height="25" visible="0">
@@ -92,10 +92,9 @@
 28,16,76,4,192,77,16,28,64,93,28,94,19,180,180,31,64,75,19,76,19,64,77,75,16,75,180,82,76,64,28,75,192,82,28,64,31,30,4,192,30,94,180,180,77,30,30,192,76,81,31,28,16,28,93,64,94,16,28,81,16,192,77,82,82,75,94,31,94,28,82,28,16,64,93,94,31,19,81,82,180,30,19,77,75,81,16,30,75,4,81,77,93,31,64,64,0,64,93,75,28,31,180,77,81,4,82,31,19,81,75,82,81,93,31,64,31,75,16,30,192,64,30,94,4,28,93,64,94,75,4,64,81,75,81,75,94,64,94,93,28,4,4,76,75,30,180,16,28,31,4,64,93,81,81,94,30,94,180,75,93,192,180,77,192,19,31,180,93,16,19,93,77,192,16,77,192,64,76,0
 </data>
  </layer>
- <objectgroup id="8" name="Meta" visible="0">
-  <object id="56" x="5538" y="2" width="214" height="678"/>
+ <objectgroup id="8" name="Meta">
+  <object id="56" x="5569.83" y="-81.5606" width="33.3333" height="751.333"/>
  </objectgroup>
- <objectgroup id="9" name="enemigos"/>
  <objectgroup id="6" name="collisions">
   <object id="5" name="collision" x="352" y="546" width="62.6667" height="20.6667" visible="0"/>
   <object id="8" x="298.167" y="544.167" width="108.833" height="18.1667"/>
@@ -114,7 +113,7 @@
   <object id="25" x="1535.33" y="608" width="21.6667" height="179"/>
   <object id="26" x="1567.67" y="639.333" width="21" height="143"/>
   <object id="27" x="1600.67" y="673" width="1418.67" height="127.545"/>
-  <object id="28" x="3116" y="674.667" width="2638.67" height="126.667"/>
+  <object id="28" x="3116" y="674.667" width="2932" height="126.667"/>
   <object id="29" x="2989.33" y="545.167" width="40.5" height="254.833"/>
   <object id="30" x="2952" y="577" width="34.6667" height="221.667"/>
   <object id="31" x="2920" y="609.667" width="25.3333" height="187.833"/>
@@ -147,19 +146,10 @@
   <object id="70" x="4420.67" y="512" width="344" height="16.6667"/>
  </objectgroup>
  <objectgroup id="10" name="barrera_enemigos">
-  <object id="58" x="655" y="351.666" width="25.3333" height="91.3333"/>
-  <object id="60" x="790.667" y="353.667" width="25.3333" height="91.3333"/>
+  <object id="58" x="631" y="351.666" width="25.3333" height="91.3333"/>
+  <object id="60" x="810.667" y="350.667" width="25.3333" height="91.3333"/>
   <object id="75" x="2684.5" y="260.5" width="36.5" height="181.5"/>
   <object id="76" x="2846" y="274" width="38" height="164"/>
   <object id="77" x="5182.67" y="5.33333" width="62.6667" height="660"/>
- </objectgroup>
- <objectgroup id="7" name="Spawns">
-  <object id="40" name="player" x="85" y="656">
-   <point/>
-  </object>
-  <object id="71" x="789" y="605" width="48" height="22"/>
-  <object id="72" x="398" y="614" width="26" height="22"/>
-  <object id="73" x="714" y="394" width="24" height="10"/>
-  <object id="74" x="5097.33" y="417" width="32" height="29.5"/>
  </objectgroup>
 </map>
