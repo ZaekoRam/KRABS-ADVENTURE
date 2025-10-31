@@ -11,6 +11,7 @@ from pytmx.util_pygame import load_pygame
 import imageio
 from enemigos import Enemigo
 from enemigos import Enemigo_walk
+from enemigos import EnemigoPezueso
 from items import Manzana, bolsa
 from fuentes import get_font
 from parallax import create_parallax_nivel1
@@ -722,43 +723,112 @@ class GameOverScreen:
         hint = self.font_item.render("ENTER: Reintentar | ESC: Menú", True, (255, 255, 255))
         hint_rect = hint.get_rect(center=(self.w // 2, self.h - 60))
         surface.blit(hint, hint_rect)
-
 class VictoryScreen:
     def __init__(self, size, image_name="victory_screen.png"):
         self.w, self.h = size
 
-        # Fuentes (reusa tu get_font si lo tienes)
+        # ==== Fuentes ====
         try:
             from fuentes import get_font
             import constantes
-            self.font_item = get_font(constantes.FONT_UI_ITEM)
+            self.font_title = get_font(constantes.FONT_UI_TITLE)
+            self.font_sub   = get_font(constantes.FONT_UI_ITEM)
+            self.font_hint  = get_font(constantes.FONT_UI_ITEM)
         except:
             pygame.font.init()
-            self.font_item = pygame.font.SysFont("Arial", 26)
+            self.font_title = pygame.font.SysFont("Arial", 60, bold=True)
+            self.font_sub   = pygame.font.SysFont("Arial", 30)
+            self.font_hint  = pygame.font.SysFont("Arial", 24)
 
-        # Fondo: imagen de victoria a pantalla completa (manteniendo proporción)
+        # ==== Fondo tipo "cover" ====
         self.bg = None
         try:
-            img = pygame.image.load(IMG_DIR / "ui" / image_name).convert_alpha()
-        except:
-            img = None
-
-        if img:
-            # Escala manteniendo proporción y centrado
+            img = pygame.image.load(IMG_DIR / "ui" / image_name).convert()
             iw, ih = img.get_width(), img.get_height()
-            scale = min(self.w / iw, self.h / ih)
-            nw, nh = int(iw * scale), int(ih * scale)
-            self.bg = pygame.transform.smoothscale(img, (nw, nh))
+            scale = max(self.w / iw, self.h / ih) * 1.1
+            self.bg = pygame.transform.smoothscale(img, (int(iw * scale), int(ih * scale)))
             self.bg_rect = self.bg.get_rect(center=(self.w // 2, self.h // 2))
+        except Exception as e:
+            print("[WARN] No se pudo cargar fondo de victoria:", e)
 
-        # Dim capa oscura suave para contraste del botón
+        # ==== Capa oscura ====
         self.dim = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
-        self.dim.fill((0, 0, 0, 80))
+        self.dim.fill((0, 0, 0, 120))
 
-        # Botón MENÚ (usa tu BotonSimple para que quede igual al resto del juego)
-        BTN_W, BTN_H = 260, 64
-        self.btn_menu = BotonSimple("Menú", (self.w // 2, self.h // 2 + 180), BTN_W, BTN_H)
+        # ==== Botón Menú (centrado) ====
+        BTN_W, BTN_H = 280, 70
+        self.btn_menu = BotonSimple("Menú", (self.w // 2, self.h // 2 + 100), BTN_W, BTN_H)
 
+        # ==== Textos ====
+        self.title_text = "¡MISIÓN CUMPLIDA!"
+        self.sub_text = (
+            "Has salvado el océano y demostrado que la perseverancia "
+            "y el valor pueden cambiarlo todo."
+        )
+
+        # ==== Animación de rebote del título ====
+        self._t0_ms = None
+        self._dur = 900
+        self._done = False
+
+    # --------------------------------------------------
+    # ==== Animación tipo "rebote" ====
+    def restart(self):
+        """Reinicia el rebote (llamar al entrar en la pantalla)."""
+        self._t0_ms = pygame.time.get_ticks()
+        self._done = False
+
+    def _ease_back_out(self, x, s=1.70158):
+        x -= 1.0
+        return (x * x * ((s + 1) * x + s) + 1.0)
+
+    def _title_scale(self):
+        if self._t0_ms is None:
+            self._t0_ms = pygame.time.get_ticks()
+        if self._done:
+            return 1.0
+        t = pygame.time.get_ticks() - self._t0_ms
+        if t >= self._dur:
+            self._done = True
+            return 1.0
+        u = max(0.0, min(1.0, t / self._dur))
+        return 0.6 + 0.4 * self._ease_back_out(u)
+
+    # --------------------------------------------------
+    # ==== Texto multilínea centrado ====
+    def _wrap_text(self, text, font, max_width):
+        """Rompe el texto en líneas según ancho."""
+        words = text.split()
+        lines, cur = [], ""
+        for w in words:
+            test = (cur + " " + w).strip()
+            if font.size(test)[0] <= max_width:
+                cur = test
+            else:
+                if cur:
+                    lines.append(cur)
+                cur = w
+        if cur:
+            lines.append(cur)
+        return lines
+
+    def _draw_wrapped_center(self, surface, font, text, y_start, max_width,
+                             color=(255, 255, 255), line_gap=8, shadow=True):
+        """Dibuja texto multilínea centrado y devuelve el y final (bottom)."""
+        lines = self._wrap_text(text, font, max_width)
+        y = y_start
+        cx = self.w // 2
+        for line in lines:
+            surf = font.render(line, True, color)
+            rect = surf.get_rect(center=(cx, y))
+            if shadow:
+                sh = font.render(line, True, (0, 0, 0))
+                surface.blit(sh, sh.get_rect(center=(cx + 2, y + 2)))
+            surface.blit(surf, rect)
+            y = rect.bottom + line_gap
+        return y
+
+    # --------------------------------------------------
     def update(self, mouse_pos):
         self.btn_menu.update(mouse_pos)
 
@@ -771,16 +841,44 @@ class VictoryScreen:
                 return "menu"
         return None
 
+    # --------------------------------------------------
     def draw(self, surface):
-        surface.fill((0, 0, 0))
+        # ==== Fondo ====
         if self.bg:
             surface.blit(self.bg, self.bg_rect)
+        else:
+            surface.fill((10, 10, 40))
         surface.blit(self.dim, (0, 0))
 
+        # ==== Título con rebote ====
+        title_surf = self.font_title.render(self.title_text, True, (255, 210, 60))
+        s = self._title_scale()
+        tw, th = title_surf.get_size()
+        scaled = pygame.transform.smoothscale(title_surf, (max(1, int(tw * s)), max(1, int(th * s))))
+        rect = scaled.get_rect(center=(self.w // 2, self.h // 2 - 140))
+        surface.blit(scaled, rect)
+
+        # ==== Texto multilínea centrado debajo ====
+        max_w = int(self.w * 0.78)
+        bottom = self._draw_wrapped_center(
+            surface,
+            self.font_sub,
+            self.sub_text,
+            y_start=rect.bottom + 36,
+            max_width=max_w,
+            color=(255, 255, 255),
+            line_gap=6,
+            shadow=True
+        )
+
+        # ==== Botón centrado debajo del texto ====
+        self.btn_menu.rect.center = (self.w // 2, bottom + 70)
         self.btn_menu.draw(surface)
 
-        hint = self.font_item.render("ENTER/ESPACIO: Menú", True, (255, 255, 255))
-        surface.blit(hint, hint.get_rect(center=(self.w // 2, self.h - 60)))
+        # ==== Hint inferior ====
+        hint = self.font_hint.render("ENTER/ESPACIO: Menú", True, (255, 255, 255))
+        surface.blit(hint, hint.get_rect(center=(self.w // 2, self.h - 50)))
+
 
 
 # -------------------- Character Select UI --------------------
@@ -1326,6 +1424,13 @@ def main():
         print("Aviso música:", e)
 
     mover_izquierda = mover_derecha = False
+    # --- Fly/Debug ---
+    fly_mode = False
+    fly_up = False
+    fly_down = False
+    FLY_SPEED = 480.0
+    FLY_TOGGLE_COOLDOWN_MS = 250  # 1/4 de segundo de protección
+
     estado, run = ESTADO_MENU, True
     VOL_NORMAL, VOL_PAUSA = 0.8, 0.3
     pause_menu = PauseMenu((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
@@ -1333,6 +1438,8 @@ def main():
     continue_ui = GameOverScreen((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     victory_ui = VictoryScreen((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     freeze_cam_offset = None
+
+
 
     # --------- Game Loop ---------
     while run:
@@ -1521,16 +1628,37 @@ def main():
 
 
             elif estado == ESTADO_JUEGO:
+                # ---------------- KEYDOWN ----------------
                 if event.type == pygame.KEYDOWN:
+                    # atacar
                     if event.key == pygame.K_f:
                         jugador.start_attack()
-                    if event.key == pygame.K_ESCAPE:
-                        estado = ESTADO_PAUSA
-                        musica.set_master_volume(settings["volume"] * 0.5)  # volumen reducido
-                    if event.key in (pygame.K_a, pygame.K_LEFT):  mover_izquierda = True
-                    if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha = True
-                    if event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
-                        # Solo permite saltar si REALMENTE hay suelo ahora mismo
+
+                    # toggle fly con F10 (FUERA de K_f)
+                    if event.key == pygame.K_F10:
+                        fly_mode = not fly_mode
+                        if fly_mode:
+                            jugador.invencible = True
+                            jugador.invencible_timer = 9999
+                            jugador.knockback_activo = False
+                            jugador.knockback_timer = 0.0
+                            jugador.vel_y = 0
+                            jugador.en_piso = False
+                            print("[DEBUG] Fly mode ON")
+                        else:
+                            jugador.invencible = False
+                            jugador.invencible_timer = 0.0
+                            jugador.vel_y = 0
+                            print("[DEBUG] Fly mode OFF")
+
+                    # movimiento horizontal
+                    if event.key in (pygame.K_a, pygame.K_LEFT):
+                        mover_izquierda = True
+                    if event.key in (pygame.K_d, pygame.K_RIGHT):
+                        mover_derecha = True
+
+                    # salto solo si NO volamos
+                    if not fly_mode and event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
                         if esta_en_suelo(jugador, nivel.collision_rects):
                             try:
                                 if getattr(jugador, "en_piso", False):
@@ -1538,14 +1666,33 @@ def main():
                             except Exception:
                                 pass
                             jugador.saltar()
-                    if event.key == pygame.K_F1 and tutorial_overlay:
-                        estado = ESTADO_TUTORIAL
-                        musica.set_master_volume(settings["volume"] * 0.5)  # volumen reducido
-                if event.type == pygame.KEYUP:
-                    if event.key in (pygame.K_a, pygame.K_LEFT):  mover_izquierda = False
-                    if event.key in (pygame.K_d, pygame.K_RIGHT): mover_derecha = False
+
+                    # control vertical de vuelo
+                    if fly_mode:
+                        if event.key in (pygame.K_w, pygame.K_UP):
+                            fly_up = True
+                        if event.key in (pygame.K_s, pygame.K_DOWN):
+                            fly_down = True
+
+                    # pausa
+                    if event.key == pygame.K_ESCAPE:
+                        estado = ESTADO_PAUSA
+                        musica.set_master_volume(settings["volume"] * 0.5)
+
+                # ---------------- KEYUP ----------------
+                elif event.type == pygame.KEYUP:
+                    if event.key in (pygame.K_a, pygame.K_LEFT):
+                        mover_izquierda = False
+                    if event.key in (pygame.K_d, pygame.K_RIGHT):
+                        mover_derecha = False
+                    if fly_mode:
+                        if event.key in (pygame.K_w, pygame.K_UP):
+                            fly_up = False
+                        if event.key in (pygame.K_s, pygame.K_DOWN):
+                            fly_down = False
                     if event.key == pygame.K_F9:
                         print("Jugador midbottom:", jugador.forma.midbottom)
+
 
             # === BLOQUE NUEVO: MANEJO DE PAUSA ===
             elif estado == ESTADO_PAUSA:
@@ -1677,6 +1824,7 @@ def main():
             def _ir_a_victoria():
                 nonlocal estado
                 if nivel_actual == 3:
+                    musica.switch("victoria_lvl3")
                     estado = "VICTORY_SCREEN"
                 else:
                     estado = ESTADO_VICTORIA
@@ -1738,6 +1886,17 @@ def main():
                     Enemigo(x=7550, y=543, velocidad=35, escala=2.5),
                     Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
                     Enemigo(x=8319, y=448, velocidad=35, escala=2.5),
+                    EnemigoPezueso(
+                        x=611, y=890,
+                        jugador=jugador,
+                        velocidad_patulla=120,
+                        velocidad_furia=260,
+                        radio_det=220,
+                        duracion_furia_ms=1800,
+                        dir_inicial=1,
+                        mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
+                        escala_extra=1.0
+                    ),
 
                 )
             items = pygame.sprite.Group()
@@ -1817,6 +1976,37 @@ def main():
             pass  # la interacción se maneja en eventos
 
         elif estado == ESTADO_JUEGO:
+
+            if fly_mode:
+                vx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
+                vy = 0.0
+                if fly_up:   vy -= FLY_SPEED
+                if fly_down: vy += FLY_SPEED
+
+                jugador.forma.x += int(vx * dt)
+                jugador.forma.y += int(vy * dt)
+
+                jugador.set_dx(vx)
+                jugador.state = "run" if (vx or vy) else "idle"
+                jugador.animar(dt)
+
+                cam.follow(jugador.forma, lerp=1.0)
+                if parallax is not None:
+                    new_ox = cam.offset()[0]
+                    camera_dx = new_ox - prev_cam_offset_x
+                    prev_cam_offset_x = new_ox
+                    parallax.update_by_camera(camera_dx)
+
+                # Activa meta si toca el goal
+                for goal in nivel.goal_rects:
+                    if jugador.forma.colliderect(goal):
+                        if not getattr(secuencia_victoria, "activa", False):
+                            secuencia_victoria.iniciar()
+                        break
+
+                # opcional: limitar al mundo
+                # jugador.forma.clamp_ip(pygame.Rect(0, 0, nivel.width_px, nivel.height_px))
+                continue  # saltar el resto del update normal
             # === SPAWN FIX: protección de los primeros frames y gracia ===
             if spawn_skip_frames > 0:
                 spawn_skip_frames -= 1
@@ -2045,6 +2235,7 @@ def main():
             if "secuencia_victoria" in locals() and secuencia_victoria.activa:
                 mover_izquierda = False
                 mover_derecha = False
+                reproducido = False
 
                 # congela al jugador
                 jugador.state = "idle"
