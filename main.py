@@ -1,6 +1,7 @@
 # main.py
 import os
-
+import math
+import random
 import pygame
 from pathlib import Path
 import time, math, json
@@ -723,7 +724,76 @@ class GameOverScreen:
         hint = self.font_item.render("ENTER: Reintentar | ESC: Menú", True, (255, 255, 255))
         hint_rect = hint.get_rect(center=(self.w // 2, self.h - 60))
         surface.blit(hint, hint_rect)
+# ---------------- helpers: PECES Y BURBUJAS ----------------
+class Fish:
+    """Pez simple dibujado con círculos (sin sprites)."""
+    def __init__(self, w, h):
+        self.w, self.h = w, h
+        self.reset(full=True)
+
+    def reset(self, full=False):
+        self.y = random.randint(self.h // 2, self.h - 180)
+        self.x = random.randint(-200, self.w + 50) if full else -random.randint(20, 160)
+        self.color = random.choice([(255,120,80), (255,210,60), (90,200,255)])
+        self.speed = random.uniform(22, 46)     # px/seg
+        self.r = random.randint(6, 9)           # radio
+        self.wiggle_t = random.uniform(0, 6.28) # fase para “aleteo”
+        self.wiggle_amp = random.uniform(1, 3)  # amplitud vertical
+
+    def update(self, dt):
+        self.x += self.speed * dt
+        self.wiggle_t += dt * 6.0
+        self.y += math.sin(self.wiggle_t) * (self.wiggle_amp * dt * 6)
+        if self.x - self.r > self.w + 10:
+            self.reset(full=False)
+
+    def draw(self, surface, alpha=120):
+        c = (*self.color, alpha)
+        # cuerpo
+        pygame.draw.circle(surface, c, (int(self.x), int(self.y)), self.r)
+        # colita (triangulito sencillo)
+        tail = pygame.Surface((self.r*2, self.r*2), pygame.SRCALPHA)
+        pygame.draw.polygon(tail, c, [(0,self.r), (self.r,self.r-2), (self.r,self.r+2)])
+        surface.blit(tail, (int(self.x - self.r*2), int(self.y - self.r)))
+
+class Bubble:
+    """Partícula de burbuja ascendente."""
+    def __init__(self, w, h):
+        self.w, self.h = w, h
+        self.reset(full=True)
+
+    def reset(self, full=False):
+        self.x = random.randint(0, self.w)
+        self.y = random.randint(self.h-80, self.h) if full else self.h + random.randint(0, 60)
+        self.r = random.randint(3, 6)
+        self.speed = random.uniform(28, 55)   # px/seg
+        self.alpha = random.randint(90, 160)
+        self.sway_t = random.uniform(0, 6.28)
+        self.sway_amp = random.uniform(2, 5)
+
+    def update(self, dt):
+        self.y -= self.speed * dt
+        self.sway_t += dt * 2.5
+        self.x += math.sin(self.sway_t) * (self.sway_amp * dt * 10)
+        self.alpha = max(0, self.alpha - dt*28)
+        if self.y + self.r < -10 or self.alpha <= 0:
+            self.reset(full=False)
+
+    def draw(self, surface):
+        col = (255, 255, 255, int(self.alpha))
+        pygame.draw.circle(surface, col, (int(self.x), int(self.y)), self.r)
+
+# -------------------- VICTORY SCREEN COMPLETA --------------------
 class VictoryScreen:
+    # ---------- KNOBS (ajustes rápidos) ----------
+    MAX_W_RATIO = 0.70   # ancho máx del párrafo
+    TITLE_Y_OFF = -150   # offset vertical del título
+    SUB_GAP     = 42     # espacio título -> párrafo
+    LINE_GAP    = 10     # interlineado del párrafo
+    BTN_GAP     = 64     # párrafo -> botón
+    FISH_COUNT  = 10     # # de peces
+    BUBBLE_COUNT= 35     # # de burbujas
+
     def __init__(self, size, image_name="victory_screen.png"):
         self.w, self.h = size
 
@@ -740,14 +810,14 @@ class VictoryScreen:
             self.font_sub   = pygame.font.SysFont("Arial", 30)
             self.font_hint  = pygame.font.SysFont("Arial", 24)
 
-        # ==== Fondo tipo "cover" ====
+        # ==== Fondo "cover" ====
         self.bg = None
         try:
             img = pygame.image.load(IMG_DIR / "ui" / image_name).convert()
             iw, ih = img.get_width(), img.get_height()
-            scale = max(self.w / iw, self.h / ih) * 1.1
-            self.bg = pygame.transform.smoothscale(img, (int(iw * scale), int(ih * scale)))
-            self.bg_rect = self.bg.get_rect(center=(self.w // 2, self.h // 2))
+            scale = max(self.w/iw, self.h/ih) * 1.1
+            self.bg = pygame.transform.smoothscale(img, (int(iw*scale), int(ih*scale)))
+            self.bg_rect = self.bg.get_rect(center=(self.w//2, self.h//2))
         except Exception as e:
             print("[WARN] No se pudo cargar fondo de victoria:", e)
 
@@ -755,9 +825,9 @@ class VictoryScreen:
         self.dim = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
         self.dim.fill((0, 0, 0, 120))
 
-        # ==== Botón Menú (centrado) ====
+        # ==== Botón Menú ====
         BTN_W, BTN_H = 280, 70
-        self.btn_menu = BotonSimple("Menú", (self.w // 2, self.h // 2 + 100), BTN_W, BTN_H)
+        self.btn_menu = BotonSimple("Menú", (self.w//2, self.h//2+100), BTN_W, BTN_H)
 
         # ==== Textos ====
         self.title_text = "¡MISIÓN CUMPLIDA!"
@@ -766,27 +836,32 @@ class VictoryScreen:
             "y el valor pueden cambiarlo todo."
         )
 
-        # ==== Animación de rebote del título ====
+        # ==== Animación rebote del título ====
         self._t0_ms = None
-        self._dur = 900
-        self._done = False
+        self._dur   = 900
+        self._done  = False
 
-    # --------------------------------------------------
-    # ==== Animación tipo "rebote" ====
+        # ==== Peces y burbujas ====
+        self.fishes  = [Fish(self.w, self.h) for _ in range(self.FISH_COUNT)]
+        self.bubbles = [Bubble(self.w, self.h) for _ in range(self.BUBBLE_COUNT)]
+        self._last_time_ms = pygame.time.get_ticks()
+
+    # ---------- ANIMACIONES ----------
     def restart(self):
-        """Reinicia el rebote (llamar al entrar en la pantalla)."""
         self._t0_ms = pygame.time.get_ticks()
-        self._done = False
+        self._done  = False
+        self._last_time_ms = self._t0_ms
+        for f in self.fishes: f.reset(full=True)
+        for b in self.bubbles: b.reset(full=True)
 
+    # rebote
     def _ease_back_out(self, x, s=1.70158):
         x -= 1.0
-        return (x * x * ((s + 1) * x + s) + 1.0)
+        return (x*x*((s+1)*x + s) + 1.0)
 
     def _title_scale(self):
-        if self._t0_ms is None:
-            self._t0_ms = pygame.time.get_ticks()
-        if self._done:
-            return 1.0
+        if self._t0_ms is None: self._t0_ms = pygame.time.get_ticks()
+        if self._done: return 1.0
         t = pygame.time.get_ticks() - self._t0_ms
         if t >= self._dur:
             self._done = True
@@ -794,10 +869,16 @@ class VictoryScreen:
         u = max(0.0, min(1.0, t / self._dur))
         return 0.6 + 0.4 * self._ease_back_out(u)
 
-    # --------------------------------------------------
-    # ==== Texto multilínea centrado ====
+    # brillo de color (shimmer) del título
+    def _title_color(self):
+        t = pygame.time.get_ticks() * 0.003
+        r = int(210 + 45 * math.sin(t))
+        g = int(190 + 45 * math.sin(t + 2.1))
+        b = int(70  + 35 * math.sin(t + 4.2))
+        return (r, g, b)
+
+    # ---------- UTILIDADES TEXTO ----------
     def _wrap_text(self, text, font, max_width):
-        """Rompe el texto en líneas según ancho."""
         words = text.split()
         lines, cur = [], ""
         for w in words:
@@ -805,16 +886,13 @@ class VictoryScreen:
             if font.size(test)[0] <= max_width:
                 cur = test
             else:
-                if cur:
-                    lines.append(cur)
+                if cur: lines.append(cur)
                 cur = w
-        if cur:
-            lines.append(cur)
+        if cur: lines.append(cur)
         return lines
 
     def _draw_wrapped_center(self, surface, font, text, y_start, max_width,
-                             color=(255, 255, 255), line_gap=8, shadow=True):
-        """Dibuja texto multilínea centrado y devuelve el y final (bottom)."""
+                             color=(255,255,255), line_gap=8, shadow=True):
         lines = self._wrap_text(text, font, max_width)
         y = y_start
         cx = self.w // 2
@@ -822,13 +900,22 @@ class VictoryScreen:
             surf = font.render(line, True, color)
             rect = surf.get_rect(center=(cx, y))
             if shadow:
-                sh = font.render(line, True, (0, 0, 0))
-                surface.blit(sh, sh.get_rect(center=(cx + 2, y + 2)))
+                sh = font.render(line, True, (0,0,0))
+                surface.blit(sh, sh.get_rect(center=(cx+2, y+2)))
             surface.blit(surf, rect)
             y = rect.bottom + line_gap
         return y
 
-    # --------------------------------------------------
+    def _draw_text_outline(self, surface, font, text, center,
+                           fill=(255,210,60), outline=(10,30,50), r=2):
+        base = font.render(text, True, fill)
+        ox   = font.render(text, True, outline)
+        cx, cy = center
+        for dx, dy in ((-r,0),(r,0),(0,-r),(0,r),(-r,-r),(-r,r),(r,-r),(r,r)):
+            surface.blit(ox, ox.get_rect(center=(cx+dx, cy+dy)))
+        surface.blit(base, base.get_rect(center=center))
+
+    # ---------- LOOP ----------
     def update(self, mouse_pos):
         self.btn_menu.update(mouse_pos)
 
@@ -841,43 +928,54 @@ class VictoryScreen:
                 return "menu"
         return None
 
-    # --------------------------------------------------
     def draw(self, surface):
-        # ==== Fondo ====
-        if self.bg:
-            surface.blit(self.bg, self.bg_rect)
-        else:
-            surface.fill((10, 10, 40))
+        # Fondo
+        if self.bg: surface.blit(self.bg, self.bg_rect)
+        else: surface.fill((10,10,40))
+
+        # dt para animaciones
+        now = pygame.time.get_ticks()
+        dt = (now - self._last_time_ms) / 1000.0
+        self._last_time_ms = now
+
+        # Capa peces + burbujas (detrás del texto)
+        fx_layer = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
+        for f in self.fishes:
+            f.update(dt); f.draw(fx_layer, alpha=120)
+        for b in self.bubbles:
+            b.update(dt); b.draw(fx_layer)
+        surface.blit(fx_layer, (0, 0))
+
+        # Dim general encima
         surface.blit(self.dim, (0, 0))
 
-        # ==== Título con rebote ====
-        title_surf = self.font_title.render(self.title_text, True, (255, 210, 60))
+        # ---- Título con rebote + brillo ----
+        # usamos color shimmer
+        shiny = self._title_color()
+        title_surface = self.font_title.render(self.title_text, True, shiny)
         s = self._title_scale()
-        tw, th = title_surf.get_size()
-        scaled = pygame.transform.smoothscale(title_surf, (max(1, int(tw * s)), max(1, int(th * s))))
-        rect = scaled.get_rect(center=(self.w // 2, self.h // 2 - 140))
-        surface.blit(scaled, rect)
+        tw, th = title_surface.get_size()
+        scaled = pygame.transform.smoothscale(title_surface, (max(1,int(tw*s)), max(1,int(th*s))))
+        title_rect = scaled.get_rect(center=(self.w//2, self.h//2 + self.TITLE_Y_OFF))
+        # contorno
+        self._draw_text_outline(surface, self.font_title, self.title_text,
+                                center=title_rect.center, fill=shiny, outline=(10,30,50), r=2)
 
-        # ==== Texto multilínea centrado debajo ====
-        max_w = int(self.w * 0.78)
-        bottom = self._draw_wrapped_center(
-            surface,
-            self.font_sub,
-            self.sub_text,
-            y_start=rect.bottom + 36,
-            max_width=max_w,
-            color=(255, 255, 255),
-            line_gap=6,
-            shadow=True
-        )
+        # ---- Párrafo centrado con sombra ----
+        max_w = int(self.w * self.MAX_W_RATIO)
+        sub_top = title_rect.bottom + self.SUB_GAP
+        bottom = self._draw_wrapped_center(surface, self.font_sub, self.sub_text,
+                                           y_start=sub_top, max_width=max_w,
+                                           color=(255,255,255), line_gap=self.LINE_GAP, shadow=True)
 
-        # ==== Botón centrado debajo del texto ====
-        self.btn_menu.rect.center = (self.w // 2, bottom + 70)
+        # ---- Botón ----
+        self.btn_menu.rect.center = (self.w // 2, bottom + self.BTN_GAP)
         self.btn_menu.draw(surface)
 
-        # ==== Hint inferior ====
-        hint = self.font_hint.render("ENTER/ESPACIO: Menú", True, (255, 255, 255))
-        surface.blit(hint, hint.get_rect(center=(self.w // 2, self.h - 50)))
+        # ---- Hint ----
+        hint = self.font_hint.render("ENTER/ESPACIO: Menú", True, (255,255,255))
+        surface.blit(hint, hint.get_rect(center=(self.w//2, self.h - 50)))
+
 
 
 

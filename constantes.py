@@ -1,5 +1,9 @@
+# constantes.py
 ANCHO_VENTANA = 800
 ALTO_VENTANA = 600
+FPS = 60
+
+
 GRAVEDAD = 1400.0      # px/s^2
 SALTO_VEL = -750.0     # px/s   (negativo = arriba)
 ALTO_PERSONAJE = .5
@@ -11,8 +15,6 @@ JUMP_REPEAT_EVERY = 0.25  # segundos entre saltos mientras se mantiene
 FPS = 60
 VELOCIDAD = 300
 VEL_ENEM = 80
-ESTADO_LANG_SELECT = 100
-ESTADO_INTRO_VIDEO = 101
 # --- Muerte / vidas / tiempo ---
 VIDAS_INICIALES = 4              # cuántas vidas tiene el jugador
 TIEMPO_NIVEL1   = 240   # segundos (si no quieres timer, comenta esta línea)

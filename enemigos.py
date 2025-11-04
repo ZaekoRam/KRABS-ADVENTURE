@@ -1,6 +1,7 @@
 import pygame
 import constantes
 from pathlib import Path
+import random
 
 class Enemigo(pygame.sprite.Sprite):
     def __init__(self, x, y, velocidad=2, escala=2):  # <-- Añade el parámetro escala
@@ -242,9 +243,13 @@ class Enemigo_walk(pygame.sprite.Sprite):
         self.HIT_FLASH_DURACION = 0.5
 
     def hurt(self, damage):
+        # Solo puede recibir daño si no está ya dañado y su vida es > 0
         if self.hit_flash_timer <= 0 and self.vida > 0:
             self.vida -= damage
+            # Al recibir daño, se activa el temporizador. Mientras sea > 0,
+            # la condición de arriba no se cumplirá y el enemigo será invencible.
             self.hit_flash_timer = self.HIT_FLASH_DURACION
+
             print(f"Enemigo golpeado, vida restante: {self.vida}")
             if self.vida <= 0:
                 self.kill()
@@ -301,92 +306,108 @@ class Enemigo_walk(pygame.sprite.Sprite):
             self.image = pygame.transform.flip(self.image, True, False)
 
 
+# --- CLASE DEL PEZ HUESO ---
+# Pega esto al FINAL de tu archivo enemigos.py
 
-class EnemigoPezueso(pygame.sprite.Sprite):
+# --- CLASE DEL PEZ HUESO (AHORA "ENEMIGOPEZUCSO") ---
+# REEMPLAZA la clase EnemigoPezueso vieja con esta
+
+# --- CLASE DEL PEZ HUESO (AHORA "ENEMIGOPEZUCSO") ---
+# PEGA ESTE CÓDIGO COMPLETO EN ENEMIGOS.PY
+
+# --- CLASE DEL PEZ HUESO (AHORA "ENEMIGOPEZUCSO") ---
+# PEGA ESTE CÓDIGO COMPLETO EN ENEMIGOS.PY
+
+# --- CLASE DEL PEZ HUESO (AHORA "ENEMIGOPEZUCSO") ---
+# PEGA ESTE CÓDIGO COMPLETO EN ENEMIGOS.PY
+
+class EnemigoPezueso(Enemigo):
     """
-    Pez acuático tipo 'Fishbone':
-    - Nada hacia la izquierda constantemente.
-    - Cuando detecta al jugador, tiembla 1 segundo (advertencia).
-    - Luego entra en modo furioso y lo persigue con leve imprecisión.
+    Enemigo estilo "Fishbone".
+    Usa los assets de 'enemigo3' (nadar/furioso).
+    Patrulla, detecta al jugador, tiembla (anim furioso) y se lanza (anim furioso).
+
+    Versión con corrección de:
+    - Dirección inicial (respeta 'dir_inicial').
+    - "Teleport" (añade gracia de 0.5s en colisión de ataque).
     """
+
     def __init__(self, x, y, jugador,
-                 velocidad_patulla=120, velocidad_furia=260,
-                 radio_det=220, duracion_furia_ms=2000,
-                 dir_inicial=-1, mundo_bounds=None, escala_extra=1.0):
-        super().__init__()
-        self.puntos = 250
-        self.jugador = jugador
-        self.render_offset_y = 0  # compatibilidad con tu sistema de render
+                 velocidad_patrulla=2,
+                 velocidad_furia=7,
+                 radio_det=250,
+                 punto_b_x=None,
+                 dir_inicial=1,  # <-- AHORA SÍ LO USAMOS
+                 **kwargs):
 
-        # --- Rutas y helpers ---
+        pygame.sprite.Sprite.__init__(self)
+
+        # --- Directorio de Sprites (enemigo3) ---
         base_dir = Path(__file__).resolve().parent
-        enemy_dir = base_dir / "assets" / "images" / "enemigos" / "enemigo3"  # asegúrate de que coincida con tu carpeta
+        sprite_dir = base_dir / "assets" / "images" / "enemigos" / "enemigo3"
 
-        def load(path: Path) -> pygame.Surface:
-            return pygame.image.load(str(path)).convert_alpha()
+        # --- Referencias e Imágenes ---
+        self.jugador = jugador
+        self.frames_patrulla = []  # Animación "nadar"
+        self.frames_ataque = []  # Animación "furioso"
 
-        def scale(img: pygame.Surface) -> pygame.Surface:
-            w = int(img.get_width() * constantes.ANCHO_IMAGEN * escala_extra)
-            h = int(img.get_height() * constantes.ALTO_IMAGEN * escala_extra)
-            return pygame.transform.scale(img, (w, h))
+        try:
+            # NOTA: Estas imágenes DEBEN estar mirando hacia la DERECHA por defecto
+            for i in range(1, 4):
+                ruta = sprite_dir / f"nadar{i}.png"
+                self.frames_patrulla.append(pygame.image.load(str(ruta)).convert_alpha())
+            for i in range(1, 3):
+                ruta = sprite_dir / f"furioso{i}.png"
+                self.frames_ataque.append(pygame.image.load(str(ruta)).convert_alpha())
 
-        import re, os
-        def sort_key(fn: str) -> int:
-            m = re.search(r'(\d+)(?=\.[a-zA-Z]{3,4}$)', fn)
-            return int(m.group(1)) if m else 0
+        except FileNotFoundError as e:
+            print(f"--- ERROR URGENTE ---")
+            print(f"No se encontraron las imágenes en: {sprite_dir}")
+            print(f"Asegúrate que 'nadar1.png', 'furioso1.png', etc., existan allí.")
+            print(f"Error original: {e}")
+            print(f"---------------------")
+            # Fallback
+            self.frames_patrulla = [pygame.Surface((30, 30), pygame.SRCALPHA)]
+            self.frames_patrulla[0].fill((0, 255, 0))  # Verde
+            self.frames_ataque = [pygame.Surface((30, 30), pygame.SRCALPHA)]
+            self.frames_ataque[0].fill((255, 0, 0))  # Rojo
 
-        if not enemy_dir.exists():
-            raise FileNotFoundError(f"No existe {enemy_dir}")
-
-        exts = {".png", ".jpg", ".jpeg"}
-        archivos = [f for f in os.listdir(enemy_dir) if Path(f).suffix.lower() in exts]
-        nadar_files   = sorted([f for f in archivos if f.lower().startswith("nadar")],   key=sort_key)
-        furioso_files = sorted([f for f in archivos if f.lower().startswith("furioso")], key=sort_key)
-        if not nadar_files:
-            raise RuntimeError("No encontré frames 'nadar*.png' en enemigo3")
-        if not furioso_files:
-            raise RuntimeError("No encontré frames 'furioso*.png' en enemigo3")
-
-        self.frames_idle  = [scale(load(enemy_dir / f)) for f in nadar_files]
-        self.frames_angry = [scale(load(enemy_dir / f)) for f in furioso_files]
-
-        # --- Estado / animación ---
-        self.estado = "patrulla"  # patrulla | detecta | furioso
-        self.frame_index = 0
-        self.ANIM_DT_IDLE  = 1 / 8
-        self.ANIM_DT_ANGRY = 1 / 10
-        self._anim_accum = 0.0
-        self._anim_step = self.ANIM_DT_IDLE
-
-        # --- Sprite base ---
-        self.image = self.frames_idle[self.frame_index]
-        self.rect = self.image.get_rect(center=(int(x), int(y)))
-
-        # --- Movimiento ---
-        self.dir = -1  # siempre inicia nadando hacia la izquierda
-        self.v_pat = float(velocidad_patulla)
-        self.v_fur = float(velocidad_furia)
-        self.radio_det = float(radio_det)
-        self.furia_ms = int(duracion_furia_ms)
-        self._furia_desde = 0
-        self._flip_h = False
-        self.mundo_bounds = mundo_bounds
-
-        # --- Nuevos atributos para temblor ---
-        self.deteccion_duracion = 1000  # ms (1 segundo)
-        self.deteccion_inicio = 0
-        self.temblor_intensidad = 3  # px
-
-        # --- Vida / daño ---
-        self.vida = 3
+        # --- Variables de Animación ---
+        self.anim_index = 0.0
+        self.anim_velocidad = 0.2
+        self.image = self.frames_patrulla[0]
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
         self.hit_flash_timer = 0.0
+        self.vida = 2
         self.HIT_FLASH_DURACION = 0.5
 
-    # -------------------------
-    # Métodos auxiliares
-    # -------------------------
-    def _player_rect(self):
-        return getattr(self.jugador, "forma", getattr(self.jugador, "rect", None))
+        # --- Atributos de Patrulla ---
+        self.punto_a_x = x
+        self.punto_b_x = punto_b_x if punto_b_x is not None else x + 200
+        self.pos_y_original = y
+        self.velocidad_patrulla = velocidad_patrulla
+
+        # --- Máquina de Estados ---
+        self.estado = "PATRULLANDO"
+        self.timer_estado = 0
+        self.direccion_visual = dir_inicial  # <-- CORRECCIÓN DE DIRECCIÓN
+        self.pos_tiemble_original = self.rect.topleft
+        self.dt_actual = 0.0
+
+        # --- Constantes de Comportamiento ---
+        self.RANGO_VISION = radio_det
+        self.TIEMPO_TEMBLOR = 60  # 1 segundo a 60 FPS
+        self.velocidad_ataque = velocidad_furia
+
+        # --- Vectores de Ataque ---
+        self.direccion_ataque_vec = pygame.math.Vector2(0, 0)
+
+        # --- Inicializar estado ---
+        self.velocidad_x = self.velocidad_patrulla * self.direccion_visual  # <-- CORRECCIÓN DE DIRECCIÓN
+        self.velocidad_y = 0
+        self.puntos = 100
+        self.render_offset_y = 0
 
     def hurt(self, damage):
         if self.hit_flash_timer <= 0 and self.vida > 0:
@@ -396,100 +417,131 @@ class EnemigoPezueso(pygame.sprite.Sprite):
             if self.vida <= 0:
                 self.kill()
 
-    def tocar_jugador(self, jugador):
-        pj = getattr(jugador, "forma", getattr(jugador, "rect", None))
-        if pj is None:
-            return False
-        bite = self.rect.inflate(-self.rect.w * 0.3, -self.rect.h * 0.3)
-        return bite.colliderect(pj)
+    def update(self, dt, plataformas):
+        self.dt_actual = dt
 
-    # -------------------------
-    # Comportamiento principal
-    # -------------------------
-    def update(self, dt, _plataformas_no_usadas):
-        # --- Flash rojo ---
-        if self.hit_flash_timer > 0:
-            self.hit_flash_timer -= dt
+        if self.estado == "PATRULLANDO":
+            self.patrullar()
+            self.buscar_jugador()
+            self.animar(self.frames_patrulla)
 
-        pj = self._player_rect()
-        if pj is not None:
-            dx = pj.centerx - self.rect.centerx
-            dy = pj.centery - self.rect.centery
-            dist = (dx * dx + dy * dy) ** 0.5
-        else:
-            dx = dy = 0
-            dist = 99999
+        elif self.estado == "DETECTANDO":
+            self.temblar()
+            self.animar(self.frames_ataque)
 
-        now = pygame.time.get_ticks()
-
-        # --- FSM (estados) ---
-        if self.estado == "patrulla":
-            if dist <= self.radio_det:
-                self.estado = "detecta"
-                self.deteccion_inicio = now
-                self._anim_step = self.ANIM_DT_IDLE
-        elif self.estado == "detecta":
-            if now - self.deteccion_inicio > self.deteccion_duracion:
-                self.estado = "furioso"
-                self._furia_desde = now
-                self._anim_step = self.ANIM_DT_ANGRY
-        elif self.estado == "furioso":
-            lejos = dist > self.radio_det * 1.8
-            expiro = (now - self._furia_desde) > self.furia_ms
-            if lejos or expiro:
-                self.estado = "patrulla"
-                self._anim_step = self.ANIM_DT_IDLE
-
-        # --- Movimiento según estado ---
-        if self.estado == "patrulla":
-            # nada siempre hacia la izquierda
-            self.rect.x -= int(self.v_pat * dt)
-
-        elif self.estado == "detecta":
-            # tiembla ligeramente
-            import random
-            shake_x = random.randint(-self.temblor_intensidad, self.temblor_intensidad)
-            shake_y = random.randint(-self.temblor_intensidad, self.temblor_intensidad)
-            self.rect.x += shake_x
-            self.rect.y += shake_y
-
-        elif self.estado == "furioso":
-            # persecución con error
-            import math, random
-            ang = math.atan2(dy, dx)
-            error = random.uniform(-0.17, 0.17)  # ±10° de error
-            ang += error
-            self.rect.x += int(math.cos(ang) * self.v_fur * dt)
-            self.rect.y += int(math.sin(ang) * self.v_fur * dt)
-
-        # --- Límites del mundo ---
-        if self.mundo_bounds:
-            L, T, R, B = self.mundo_bounds
-            if self.rect.right < L:
-                self.rect.left = R
-            if self.rect.top < T:
-                self.rect.top = T
-            elif self.rect.bottom > B:
-                self.rect.bottom = B
-
-        # --- Animación ---
-        self._anim_accum += dt
-        frames = self.frames_angry if self.estado == "furioso" else self.frames_idle
-        while self._anim_accum >= self._anim_step:
-            self._anim_accum -= self._anim_step
-            self.frame_index = (self.frame_index + 1) % len(frames)
-            self.image = frames[self.frame_index]
-
-        # --- Flip (siempre mirando a la izquierda) ---
-        flip = True
-        if flip != self._flip_h:
-            self.image = pygame.transform.flip(self.image, True, False)
-            self._flip_h = flip
-
+        elif self.estado == "ATACANDO":
+            self.atacar(plataformas)
+            self.animar(self.frames_ataque)
         # --- Flash rojo (daño) ---
         if self.hit_flash_timer > 0:
-            self.image = self.image.copy()
-            self.image.fill((150, 0, 0), special_flags=pygame.BLEND_RGB_ADD)
+            self.hit_flash_timer -= dt
+            if self.hit_flash_timer < 0:
+                self.hit_flash_timer = 0
+
+            if self.hit_flash_timer > 0:
+                self.image = self.image.copy()
+                self.image.fill((150, 0, 0), special_flags=pygame.BLEND_RGB_ADD)
+
+    def animar(self, frames_lista):
+        """ Maneja el ciclo de animación """
+        # La animación la basamos en 'dt' para que sea fluida
+        self.anim_index += self.anim_velocidad * (self.dt_actual * 60)  # Asumiendo 60fps base
+        if self.anim_index >= len(frames_lista):
+            self.anim_index = 0.0
+
+        self.image = frames_lista[int(self.anim_index)]
+
+        # --- ¡CORRECCIÓN DE LÓGICA DE FLIP! ---
+        # Si la dirección es 1 (DERECHA), volteamos la imagen (que mira a la IZQUIERDA)
+        if self.direccion_visual == 1:  # <-- ESTE ES EL CAMBIO (1 en lugar de -1)
+            self.image = pygame.transform.flip(self.image, True, False)
+        # Si la dirección es -1 (IZQUIERDA), no hacemos nada (la imagen ya mira a la izquierda)
+
+    def cambiar_estado(self, nuevo_estado):
+        self.estado = nuevo_estado
+        self.timer_estado = 0
+        self.anim_index = 0.0
+
+        if nuevo_estado == "PATRULLANDO":
+            self.rect.x = self.punto_a_x
+            self.rect.y = self.pos_y_original
+            self.velocidad_x = self.velocidad_patrulla
+            self.velocidad_y = 0
+            # Al volver a patrullar, asegurarse que mira a la derecha
+            if self.direccion_visual == -1:
+                self.flip_sprite()
+            self.velocidad_x = self.velocidad_patrulla * self.direccion_visual
 
 
+        elif nuevo_estado == "DETECTANDO":
+            self.velocidad_x = 0
+            self.velocidad_y = 0
+            self.pos_tiemble_original = self.rect.topleft
 
+            try:
+                dir_vec = pygame.math.Vector2(self.jugador.forma.center) - pygame.math.Vector2(self.rect.center)
+                self.direccion_ataque_vec = dir_vec.normalize()
+            except ValueError:
+                self.direccion_ataque_vec = pygame.math.Vector2(1, 0)
+
+            # Lógica para voltear
+            if self.direccion_ataque_vec.x < 0 and self.direccion_visual == 1:
+                self.flip_sprite()  # Si ataca a la izq. y miro a la der. -> voltear
+            elif self.direccion_ataque_vec.x > 0 and self.direccion_visual == -1:
+                self.flip_sprite()  # Si ataca a la der. y miro a la izq. -> voltear
+
+        elif nuevo_estado == "ATACANDO":
+            self.rect.topleft = self.pos_tiemble_original
+            self.velocidad_x = self.direccion_ataque_vec.x * self.velocidad_ataque
+            self.velocidad_y = self.direccion_ataque_vec.y * self.velocidad_ataque
+
+    def patrullar(self):
+        self.rect.x += self.velocidad_x * self.dt_actual
+
+        if self.rect.right >= self.punto_b_x and self.velocidad_x > 0:
+            self.rect.right = self.punto_b_x
+            self.velocidad_x *= -1
+            self.flip_sprite()
+        elif self.rect.left <= self.punto_a_x and self.velocidad_x < 0:
+            self.rect.left = self.punto_a_x
+            self.velocidad_x *= -1
+            self.flip_sprite()
+
+    def buscar_jugador(self):
+        dist = pygame.math.Vector2(self.jugador.forma.center).distance_to(self.rect.center)
+        if dist < self.RANGO_VISION:
+            self.cambiar_estado("DETECTANDO")
+
+    def temblar(self):
+        self.timer_estado += (self.dt_actual * 60)
+
+        self.rect.x = self.pos_tiemble_original[0] + random.randint(-1, 1)
+        self.rect.y = self.pos_tiemble_original[1] + random.randint(-1, 1)
+
+        if self.timer_estado >= self.TIEMPO_TEMBLOR:
+            self.cambiar_estado("ATACANDO")
+
+    def atacar(self, plataformas):
+        # Moverse
+        self.rect.x += self.velocidad_x * self.dt_actual
+        self.rect.y += self.velocidad_y * self.dt_actual
+
+        # Aumentar el timer (contador de frames)
+        self.timer_estado += (self.dt_actual * 60)
+
+        # --- ¡¡AQUÍ ESTÁ LA CORRECCIÓN DEL TELEPORT!! ---
+        # No comprobar colisiones durante los primeros 30 frames (0.5 seg)
+        # Esto le da tiempo al pez de "salir" de la plataforma en la que está.
+        if self.timer_estado > 30:
+            indice_colision = self.rect.collidelist(plataformas)
+            if indice_colision != -1:
+                self.cambiar_estado("PATRULLANDO")
+
+        # Si vuela por demasiado tiempo (5 seg) sin chocar, también se reinicia
+        if self.timer_estado > (constantes.FPS * 5):
+            self.cambiar_estado("PATRULLANDO")
+            # --- FIN DE LA CORRECCIÓN ---
+
+    def flip_sprite(self):
+        """Invierte la dirección visual."""
+        self.direccion_visual *= -1
