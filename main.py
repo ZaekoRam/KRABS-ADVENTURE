@@ -132,6 +132,101 @@ I18N = {
         "skip": "Press any key to skip",
     }
 }
+# === TEXTOS GLOBALES (UI multi-idioma) ===
+TXT = {
+    "es": {
+        # HUD
+        "time": "Tiempo",
+        "points": "Puntos",
+
+        # Menús genéricos
+        "menu": "Menú",
+        "continue": "Continuar",
+
+        # Pausa
+        "pause_title": "PAUSA",
+        "pause_resume": "Continuar",
+        "pause_to_menu": "Salir al menú",
+
+        # Game Over
+        "go_title": "PARTIDA TERMINADA",
+        "go_sub": "Sigue intentando, aún podemos lograrlo!",
+        "go_hint": "ENTER: Reintentar | ESC: Menú",
+
+        # Victoria simple (bandera)
+        "victory": "¡VICTORIA!",
+        "victory_hint": "Pulsa ENTER para volver al menú",
+
+        # Victory Screen completa (pantalla bonita)
+        "v2_title": "¡MISIÓN CUMPLIDA!",
+        "v2_sub": "Has salvado el océano y demostrado que la perseverancia y el valor pueden cambiarlo todo.",
+        "v2_hint": "ENTER/ESPACIO: Menú",
+
+        # Selectores
+        "sel_char_title": "SELECCIÓN DE PERSONAJE",
+        "sel_level_title": "SELECCIÓN DE NIVEL",
+        "level_1": "NIVEL 1",
+        "level_2": "NIVEL 2",
+        "level_3": "NIVEL 3",
+        "level_hint": "Dale clic o 1/2/3 • ESC para volver",
+
+        "diff_title": "DIFICULTAD",
+        "diff_easy": "PRINCIPIANTE",
+        "diff_hard": "DESAFIANTE",
+        "diff_hint": "Clic o ←/→ para jugar • ESC para volver",
+
+        # Tutorial
+        "tutorial_hint": "Enter para continuar • F1 para volver a ver",
+    },
+    "en": {
+        # HUD
+        "time": "Time",
+        "points": "Points",
+
+        # Menús genéricos
+        "menu": "Menu",
+        "continue": "Continue",
+
+        # Pausa
+        "pause_title": "PAUSE",
+        "pause_resume": "Resume",
+        "pause_to_menu": "Exit to Menu",
+
+        # Game Over
+        "go_title": "GAME OVER",
+        "go_sub": "Keep trying — we can still make it!",
+        "go_hint": "ENTER: Retry | ESC: Menu",
+
+        # Victoria simple (bandera)
+        "victory": "VICTORY!",
+        "victory_hint": "Press ENTER to return to menu",
+
+        # Victory Screen completa (pantalla bonita)
+        "v2_title": "MISSION ACCOMPLISHED!",
+        "v2_sub": "You saved the ocean and proved that perseverance and courage can change everything.",
+        "v2_hint": "ENTER/SPACE: Menu",
+
+        # Selectores
+        "sel_char_title": "CHARACTER SELECT",
+        "sel_level_title": "LEVEL SELECT",
+        "level_1": "LEVEL 1",
+        "level_2": "LEVEL 2",
+        "level_3": "LEVEL 3",
+        "level_hint": "Click or press 1/2/3 • ESC to go back",
+
+        "diff_title": "DIFFICULTY",
+        "diff_easy": "BEGINNER",
+        "diff_hard": "CHALLENGING",
+        "diff_hint": "Click or ←/→ to play • ESC to go back",
+
+        # Tutorial
+        "tutorial_hint": "Press Enter to continue • F1 to view again",
+    }
+}
+
+def tr(key: str) -> str:
+    lang = settings.get("language") or "es"
+    return TXT.get(lang, TXT["es"]).get(key, key)
 
 try:
     from ffpyplayer.player import MediaPlayer
@@ -205,6 +300,27 @@ def _save_prefs(data: dict):
 
 
 # -------------------- Helpers/HUD --------------------}
+
+def _load_menu_img_variant(base_folder: str, lang: str, scale_w: int) -> pygame.Surface:
+    """
+    Busca la primera imagen válida probando varias rutas según el idioma.
+    Devuelve escalada al ancho dado (mantiene proporción).
+    """
+    # prioriza carpeta por idioma; luego sufijo por idioma; luego fallback ES
+    candidates = [
+        f"menu/{lang}/{base_folder}",     # assets/images/menu/en/botonplay/...
+        f"{base_folder}_{lang}",          # assets/images/botonplay_en/...
+        f"{lang}/{base_folder}",          # assets/images/en/botonplay/...
+        f"{base_folder}",                 # fallback: assets/images/botonplay/...
+    ]
+    for folder in candidates:
+        try:
+            surf = cargar_primera_imagen(folder, usa_alpha=True)
+            return scale_to_width(surf, scale_w)
+        except Exception:
+            continue
+    raise FileNotFoundError(f"No pude cargar ninguna variante para {base_folder} ({lang}).")
+
 
 # ===== Helpers UI para Game Over =====
 def draw_text_center(surface, text, font, color, x_center, y, shadow=True):
@@ -318,7 +434,7 @@ def draw_timer(surface, font, seconds, pos=(20, 20)):
     s = max(0, int(seconds))
     color = (255, 80, 80) if s <= 10 else (255, 255, 255)
     sombra = (0, 0, 0)
-    txt = f"Tiempo: {s:02d}"
+    txt = f"{tr('time')}: {s:02d}"
     surf = font.render(txt, True, color)
     shad = font.render(txt, True, sombra)
     x, y = pos
@@ -338,7 +454,7 @@ def draw_hud(surface, jugador, img_lleno, img_vacio):
 
 
 def draw_puntuacion(surface, font, puntuacion, pos=(20, 80)):
-    texto = font.render(f"Puntos: {puntuacion}", True, (255, 255, 255))
+    texto = font.render(f"{tr('points')}: {puntuacion}", True, (255, 255, 255))
     surface.blit(texto, pos)
 
 
@@ -600,7 +716,7 @@ class PauseMenu:
         self.w, self.h = size
         self.font_title = get_font(constantes.FONT_UI_TITLE)
         self.font_item = get_font(constantes.FONT_UI_ITEM)
-        self.options = ["Continuar", "Salir al menú"]
+        self.options = [tr("pause_resume"), tr("pause_to_menu")]
         self.selected = 0
         self.panel = pygame.Surface((int(self.w * 0.6), int(self.h * 0.5)), pygame.SRCALPHA)
         self.panel.fill((0, 0, 0, 140))
@@ -641,7 +757,7 @@ class PauseMenu:
         px = (self.w - self.panel.get_width()) // 2
         py = (self.h - self.panel.get_height()) // 2
         surface.blit(self.panel, (px, py))
-        title = self.font_title.render("PAUSA", True, (255, 255, 255))
+        title = self.font_title.render(tr("pause_title"), True, (255, 255, 255))
         surface.blit(title, (self.w // 2 - title.get_width() // 2, py + 40))
         for i, text in enumerate(self.options):
             color = (255, 230, 120) if i == self.selected else (230, 230, 230)
@@ -671,8 +787,8 @@ class GameOverScreen:
 
         center_y = self.h // 2 + 35
 
-        self.btn_retry = BotonSimple("Continuar", (self.w // 2, center_y), BTN_W, BTN_H)
-        self.btn_menu = BotonSimple("Menú", (self.w // 2, center_y + spacing), BTN_W, BTN_H)
+        self.btn_retry = BotonSimple(tr("continue"), (self.w // 2, center_y), BTN_W, BTN_H)
+        self.btn_menu  = BotonSimple(tr("menu"), (self.w // 2, center_y + spacing), BTN_W, BTN_H)
 
     def reset(self):
         pass
@@ -708,21 +824,24 @@ class GameOverScreen:
         surface.blit(dim, (0, 0))
 
         # --- TÍTULO PRINCIPAL ---
-        title = self.font_title.render("PARTIDA TERMINADA", True, (255, 180, 50))
+        title = self.font_title.render(tr("go_title"), True, (255, 180, 50))
         title_rect = title.get_rect(center=(self.w // 2, self.h // 2 - 140))
         surface.blit(title, title_rect)
 
         # --- SUBTEXTO ---
-        subt = self.font_sub.render("Sigue intentando, aún podemos lograrlo!", True, (255, 255, 255))
+        subt = self.font_sub.render(tr("go_sub"), True, (255, 255, 255))
         subt_rect = subt.get_rect(center=(self.w // 2, self.h // 2 - 80))
         surface.blit(subt, subt_rect)
+
+        self.btn_retry.texto = tr("continue")
+        self.btn_menu.texto = tr("menu")
 
         # --- BOTONES ---
         self.btn_retry.draw(surface)
         self.btn_menu.draw(surface)
 
         # --- INSTRUCCIONES ABAJO ---
-        hint = self.font_item.render("ENTER: Reintentar | ESC: Menú", True, (255, 255, 255))
+        hint  = self.font_item.render(tr("go_hint"), True, (255, 255, 255))
         hint_rect = hint.get_rect(center=(self.w // 2, self.h - 60))
         surface.blit(hint, hint_rect)
 # ---------------- helpers: PECES Y BURBUJAS ----------------
@@ -828,14 +947,11 @@ class VictoryScreen:
 
         # ==== Botón Menú ====
         BTN_W, BTN_H = 280, 70
-        self.btn_menu = BotonSimple("Menú", (self.w//2, self.h//2+100), BTN_W, BTN_H)
+        self.btn_menu  = BotonSimple(tr("menu"),(self.w//2, self.h//2+100), BTN_W, BTN_H)
 
         # ==== Textos ====
-        self.title_text = "¡MISIÓN CUMPLIDA!"
-        self.sub_text = (
-            "Has salvado el océano y demostrado que la perseverancia "
-            "y el valor pueden cambiarlo todo."
-        )
+        self.title_text = tr("v2_title")
+        self.sub_text = tr("v2_sub")
 
         # ==== Animación rebote del título ====
         self._t0_ms = None
@@ -930,6 +1046,10 @@ class VictoryScreen:
         return None
 
     def draw(self, surface):
+        self.title_text = tr("v2_title")
+        self.sub_text = tr("v2_sub")
+        self.btn_menu.texto = tr("menu")
+
         # Fondo
         if self.bg: surface.blit(self.bg, self.bg_rect)
         else: surface.fill((10,10,40))
@@ -974,7 +1094,7 @@ class VictoryScreen:
         self.btn_menu.draw(surface)
 
         # ---- Hint ----
-        hint = self.font_hint.render("ENTER/ESPACIO: Menú", True, (255,255,255))
+        hint = self.font_hint.render(tr("v2_hint"), True, (255, 255, 255))
         surface.blit(hint, hint.get_rect(center=(self.w//2, self.h - 50)))
 
 
@@ -1027,7 +1147,7 @@ class CharacterSelectUI:
         surface.blit(name_surf, nr)
 
     def draw(self, surface):
-        title = self.font_title.render("SELECCIÓN DE PERSONAJE", True, (15, 40, 80))
+        title = self.font_title.render(tr("sel_char_title"), True, (15, 40, 80))
         band = pygame.Surface((title.get_width() + 40, title.get_height() + 18), pygame.SRCALPHA)
         pygame.draw.rect(band, (180, 210, 255, 230), band.get_rect(), border_radius=8)
         band.blit(title, (20, 9))
@@ -1059,9 +1179,9 @@ class LevelSelectUI:
             self.rects.append(r)
         self.thumbs = thumbs or {}
         self.labels = [
-            self.font_item.render("NIVEL 1", True, (20, 30, 60)),
-            self.font_item.render("NIVEL 2", True, (20, 30, 60)),
-            self.font_item.render("NIVEL 3", True, (20, 30, 60)),
+            self.font_item.render(tr("level_1"), True, (20, 30, 60)),
+            self.font_item.render(tr("level_2"), True, (20, 30, 60)),
+            self.font_item.render(tr("level_3"), True, (20, 30, 60)),
         ]
         self.hover = None
         self.selected = None
@@ -1111,7 +1231,7 @@ class LevelSelectUI:
             surface.blit(tic, trect)
 
     def draw(self, surface):
-        title = self.font_title.render("SELECCIÓN DE NIVEL", True, (15, 40, 80))
+        title = self.font_title.render(tr("sel_level_title"), True, (15, 40, 80))
         band = pygame.Surface((title.get_width() + 40, title.get_height() + 18), pygame.SRCALPHA)
         pygame.draw.rect(band, (180, 210, 255, 230), band.get_rect(), border_radius=8)
         band.blit(title, (20, 9))
@@ -1120,7 +1240,7 @@ class LevelSelectUI:
         for i, r in enumerate(self.rects):
             self._draw_card(surface, r, i + 1, self.labels[i], hover=(self.hover == i),
                             selected=(self.selected == i + 1))
-        hint_txt = "Dale clic o 1/2/3 • ESC para volver"
+        hint_txt = tr("level_hint")
         hint = self.font_item.render(hint_txt, True, (20, 20, 20))  # negro para legibilidad
         surface.blit(hint, hint.get_rect(center=(self.w // 2, self.h - 40)))
 
@@ -1146,8 +1266,8 @@ class DifficultySelectUI:
         self.rect_hard = pygame.Rect(0, 0, self.card_w, self.card_h);
         self.rect_hard.center = (cx + self.gap, cy)
 
-        self.lbl_easy = self.font_item.render("PRINCIPIANTE", True, (20, 30, 60))
-        self.lbl_hard = self.font_item.render("DESAFIANTE", True, (20, 30, 60))
+        self.lbl_easy = self.font_item.render(tr("diff_easy"), True, (20, 30, 60))
+        self.lbl_hard = self.font_item.render(tr("diff_hard"), True, (20, 30, 60))
 
         # íconos (opcional)
         def _fit_icon(surf: pygame.Surface | None) -> pygame.Surface | None:
@@ -1227,7 +1347,7 @@ class DifficultySelectUI:
 
     def draw(self, surface):
         # título
-        title = self.font_title.render("DIFICULTAD", True, (15, 40, 80))
+        title = self.font_title.render(tr("diff_title"), True, (15, 40, 80))
         band = pygame.Surface((title.get_width() + 40, title.get_height() + 18), pygame.SRCALPHA)
         pygame.draw.rect(band, (180, 210, 255, 230), band.get_rect(), border_radius=8)
         band.blit(title, (20, 9))
@@ -1249,7 +1369,7 @@ class DifficultySelectUI:
                         selected=(self.selected == "DIFICIL"), hover=(self.hover == 'hard'))
 
         # hint
-        hint_txt = "Clic o ←/→ para jugar • ESC para volver"
+        hint_txt = tr("diff_hint")
         hint = self.font_item.render(hint_txt, True, (20, 20, 20))
         surface.blit(hint, hint.get_rect(center=(self.w // 2, self.h - 40)))
 
@@ -1281,7 +1401,7 @@ class TutorialOverlay:
         r = self.img.get_rect(center=(self.w // 2, self.h // 2))
         surface.blit(self.img, r)
         hint_font = get_font(constantes.FONT_UI_ITEM)
-        hint = hint_font.render("Enter para continuar • F1 para volver a ver", True, (230, 230, 230))
+        hint = hint_font.render(tr("tutorial_hint"), True, (230, 230, 230))
         surface.blit(hint,
                      (self.w // 2 - hint.get_width() // 2, r.bottom + 12 if r.bottom + 28 < self.h else self.h - 28))
 
@@ -1426,9 +1546,11 @@ def main():
     # Recursos menú
     fondo_menu = escalar_a_ventana(cargar_primera_imagen("menufondo", False))
     titulo_img = scale_to_width(cargar_primera_imagen("menu_titulo", True), 360)
-    img_play = scale_to_width(cargar_primera_imagen("botonplay", True), 360)
-    img_opciones = scale_to_width(cargar_primera_imagen("botonopciones", True), 340)
-    img_salir = scale_to_width(cargar_primera_imagen("botonsalir", True), 345)
+    # 🔸 Declarar variables vacías de botones del menú
+    btn_play = None
+    btn_opc = None
+    btn_salir = None
+
     # -------------- Miniaturas de los niveles --------------
     thumbs = {}
     try:
@@ -1475,9 +1597,6 @@ def main():
     COL_play = int(constantes.ANCHO_VENTANA * 0.27)
     Y0, GAP1, GAP = int(constantes.ALTO_VENTANA * 0.35), 60, 64
     titulo = ImageButton(titulo_img, midleft=(COL_TITLE, Y1))
-    btn_play = ImageButton(img_play, midleft=(COL_play, Y0))
-    btn_opc = ImageButton(img_opciones, midleft=(COL_X, btn_play.rect.bottom + GAP1))
-    btn_salir = ImageButton(img_salir, midleft=(COL_X, btn_opc.rect.bottom + GAP))
 
     # Krabby en el menú
     KRAB_MENU_POS = (int(constantes.ANCHO_VENTANA * 0.85), int(constantes.ALTO_VENTANA * 0.83))
@@ -1542,7 +1661,19 @@ def main():
 
     # --------- Game Loop ---------
     while run:
+        def _rebuild_menu_buttons(lang: str):
+            nonlocal btn_play, btn_opc, btn_salir  # ahora existen arriba
+
+            img_play = _load_menu_img_variant("botonplay", lang, 360)
+            img_opciones = _load_menu_img_variant("botonopciones", lang, 340)
+            img_salir = _load_menu_img_variant("botonsalir", lang, 345)
+
+            btn_play = ImageButton(img_play, midleft=(COL_play, Y0))
+            btn_opc = ImageButton(img_opciones, midleft=(COL_X, btn_play.rect.bottom + GAP1))
+            btn_salir = ImageButton(img_salir, midleft=(COL_X, btn_opc.rect.bottom + GAP))
         dt = reloj.tick(constantes.FPS) / 1000.0
+        current_lang = settings["language"] or "es"
+        _rebuild_menu_buttons(current_lang)
         mouse_pos = pygame.mouse.get_pos();
         mouse_down = pygame.mouse.get_pressed()[0]
 
@@ -1563,6 +1694,7 @@ def main():
                             estado = ESTADO_INTRO_VIDEO
                         else:
                             # Si no hay video, pasar directo al menú
+                            print("no hay video")
                             estado = ESTADO_MENU
                     elif btn_en.collidepoint(mx, my):
                         settings["language"] = "en"
@@ -1571,6 +1703,7 @@ def main():
                             video_intro = FFVideo(VIDEO_DIR_EN, ventana.get_size())
                             estado = ESTADO_INTRO_VIDEO
                         else:
+                            print("no hay video")
                             estado = ESTADO_MENU
 
                 elif event.type == pygame.KEYDOWN:
@@ -1600,7 +1733,9 @@ def main():
                     estado = ESTADO_MENU
                     # aquí puedes arrancar la música del menú en el idioma ya elegido
                     # musica.switch("menu")
-
+            if settings["language"] != current_lang:
+                current_lang = settings["language"]
+                _rebuild_menu_buttons(current_lang)
             if estado == ESTADO_MENU:
                 if not menu_leaving:
                     btn_play.update(mouse_pos, mouse_down)
@@ -1986,7 +2121,7 @@ def main():
                     Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
                     Enemigo(x=8319, y=448, velocidad=35, escala=2.5),
                     EnemigoPezueso(
-                        x=862, y=900,
+                        x=860, y=470,
                         jugador=jugador,
                         velocidad_patulla=120,
                         velocidad_furia=260,
@@ -2575,13 +2710,13 @@ def main():
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
 
             # Mensaje
-            msg = get_font(constantes.FONT_UI_TITLE).render("¡VICTORIA!", True, (255, 255, 0))
+            msg = get_font(constantes.FONT_UI_TITLE).render(tr("victory"), True, (255, 255, 0))
             ventana.blit(
                 msg,
                 (constantes.ANCHO_VENTANA // 2 - msg.get_width() // 2,
                  constantes.ALTO_VENTANA // 2 - msg.get_height() // 2)
             )
-            hint = get_font(constantes.FONT_UI_ITEM).render("Pulsa ENTER para volver al menú", True, (255, 255, 255))
+            hint = get_font(constantes.FONT_UI_ITEM).render(tr("victory_hint"), True, (255, 255, 255))
             ventana.blit(
                 hint,
                 (constantes.ANCHO_VENTANA // 2 - hint.get_width() // 2,
