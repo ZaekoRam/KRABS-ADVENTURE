@@ -1986,7 +1986,7 @@ def main():
                     Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
                     Enemigo(x=8319, y=448, velocidad=35, escala=2.5),
                     EnemigoPezueso(
-                        x=862, y=501,
+                        x=862, y=900,
                         jugador=jugador,
                         velocidad_patulla=120,
                         velocidad_furia=260,
