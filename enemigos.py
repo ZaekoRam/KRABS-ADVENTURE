@@ -333,7 +333,7 @@ class EnemigoPezueso(Enemigo):
     """
 
     def __init__(self, x, y, jugador,
-                 velocidad_patrulla=2,
+                 velocidad_patrulla=45,
                  velocidad_furia=7,
                  radio_det=250,
                  punto_b_x=None,

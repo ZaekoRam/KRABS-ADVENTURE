@@ -15,6 +15,7 @@ from enemigos import Enemigo_walk
 from enemigos import EnemigoPezueso
 from items import Manzana, bolsa
 from fuentes import get_font
+()
 from parallax import create_parallax_nivel1
 import sys
 
@@ -1985,7 +1986,7 @@ def main():
                     Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
                     Enemigo(x=8319, y=448, velocidad=35, escala=2.5),
                     EnemigoPezueso(
-                        x=611, y=890,
+                        x=862, y=501,
                         jugador=jugador,
                         velocidad_patulla=120,
                         velocidad_furia=260,
