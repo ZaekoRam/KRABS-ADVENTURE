@@ -1783,7 +1783,7 @@ def main():
                 if settings["language"] != current_lang:
                     current_lang = settings["language"]
                     _rebuild_menu_buttons(current_lang)
-            if estado == ESTADO_MENU:
+            elif estado == ESTADO_MENU:
                 if not menu_leaving:
                     btn_play.update(mouse_pos, mouse_down)
                     btn_opc.update(mouse_pos, mouse_down)
@@ -2641,7 +2641,7 @@ def main():
                 y = constantes.ALTO_VENTANA - 550
                 ventana.blit(hint_surf, (x, y))
 
-        if estado == ESTADO_MENU:
+        elif estado == ESTADO_MENU:
             ventana.blit(fondo_menu, (0, 0))
             titulo.draw(ventana);
             btn_play.draw(ventana);
