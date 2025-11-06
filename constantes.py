@@ -1,5 +1,5 @@
 # constantes.py
-ANCHO_VENTANA = 800
+ANCHO_VENTANA = 1100
 ALTO_VENTANA = 600
 FPS = 60
 

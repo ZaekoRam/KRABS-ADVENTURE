@@ -263,7 +263,15 @@ class FFVideo:
 
     def draw(self, screen):
         if self.surf:
-            screen.blit(self.surf, (0, 0))
+            sw, sh = screen.get_size()
+            vw, vh = self.size  # p.ej. (800, 600)
+            x = (sw - vw) // 2
+            y = (sh - vh) // 2
+            # fondo negro para “letterbox”
+            black = pygame.Surface((sw, sh))
+            black.fill((0, 0, 0))
+            screen.blit(black, (0, 0))
+            screen.blit(self.surf, (x, y))
 
     def close(self):
         try:
@@ -366,6 +374,10 @@ settings = {
 # === I18N ===
 I18N = {
     "es": {
+        "select_lang": "Selecciona tu idioma",
+        "spanish": "Español",
+        "english": "Inglés",
+        "skip": "Pulsa cualquier tecla para saltar",
         "options_title": "OPCIONES (ESC para volver)",
         "volume": "Volumen",
         "language": "Idioma",
@@ -374,6 +386,10 @@ I18N = {
         "toggle": "Cambiar idioma"
     },
     "en": {
+         "select_lang": "Select your language",
+        "spanish": "Spanish",
+        "english": "English",
+        "skip": "Press any key to skip",
         "options_title": "OPTIONS (ESC to go back)",
         "volume": "Volume",
         "language": "Language",
@@ -933,9 +949,9 @@ class VictoryScreen:
     # ---------- KNOBS (ajustes rápidos) ----------
     MAX_W_RATIO = 0.70   # ancho máx del párrafo
     TITLE_Y_OFF = -150   # offset vertical del título
-    SUB_GAP     = 42     # espacio título -> párrafo
+    SUB_GAP     = 90     # espacio título -> párrafo
     LINE_GAP    = 10     # interlineado del párrafo
-    BTN_GAP     = 64     # párrafo -> botón
+    BTN_GAP     = 120     # párrafo -> botón
     FISH_COUNT  = 10     # # de peces
     BUBBLE_COUNT= 35     # # de burbujas
 
@@ -972,7 +988,7 @@ class VictoryScreen:
 
         # ==== Botón Menú ====
         BTN_W, BTN_H = 280, 70
-        self.btn_menu  = BotonSimple(tr("menu"),(self.w//2, self.h//2+100), BTN_W, BTN_H)
+        self.btn_menu  = BotonSimple(tr("menu"),(self.w//2, self.h//10000), BTN_W, BTN_H)
 
         # ==== Textos ====
         self.title_text = tr("v2_title")
@@ -1616,10 +1632,10 @@ def main():
         icon_easy = icon_hard = None
 
     # Botones del menú
-    COL_X = int(constantes.ANCHO_VENTANA * 0.28)
+    COL_X = int(constantes.ANCHO_VENTANA * 0.35)
     Y1 = int(constantes.ALTO_VENTANA * 0.15)
-    COL_TITLE = int(constantes.ANCHO_VENTANA * 0.28)
-    COL_play = int(constantes.ANCHO_VENTANA * 0.27)
+    COL_TITLE = int(constantes.ANCHO_VENTANA * 0.35)
+    COL_play = int(constantes.ANCHO_VENTANA * 0.34)
     Y0, GAP1, GAP = int(constantes.ALTO_VENTANA * 0.35), 60, 64
     titulo = ImageButton(titulo_img, midleft=(COL_TITLE, Y1))
 
@@ -1661,10 +1677,7 @@ def main():
     spawn_skip_frames = 0
 
     # Música menú
-    try:
-        musica.play("menu", volumen=0.8)
-    except Exception as e:
-        print("Aviso música:", e)
+
 
     mover_izquierda = mover_derecha = False
     # --- Fly/Debug ---
@@ -1674,7 +1687,8 @@ def main():
     FLY_SPEED = 480.0
     FLY_TOGGLE_COOLDOWN_MS = 250  # 1/4 de segundo de protección
 
-    estado, run = ESTADO_MENU, True
+    estado = ESTADO_LANG_SELECT
+    run = True
     VOL_NORMAL, VOL_PAUSA = 0.8, 0.3
     pause_menu = PauseMenu((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     # CAMBIO AQUÍ: ContinueOverlay → GameOverScreen
@@ -1701,7 +1715,8 @@ def main():
         if settings["language"] != current_lang:
             current_lang = settings["language"]
             _rebuild_menu_buttons(current_lang)
-        dt = reloj.tick(constantes.FPS) / 1000.0
+        target_fps = 30 if estado == ESTADO_INTRO_VIDEO else constantes.FPS
+        dt = reloj.tick(target_fps) / 1000.0
         mouse_pos = pygame.mouse.get_pos();
         mouse_down = pygame.mouse.get_pressed()[0]
 
@@ -1718,7 +1733,7 @@ def main():
                         settings["language"] = "es"
                         # lanzar video ES
                         if _HAS_FFPY and os.path.exists(VIDEO_DIR_ES):
-                            video_intro = FFVideo(VIDEO_DIR_ES, ventana.get_size())
+                            video_intro = FFVideo(VIDEO_DIR_ES, (1155, 828))
                             estado = ESTADO_INTRO_VIDEO
                         else:
                             # Si no hay video, pasar directo al menú
@@ -1728,7 +1743,7 @@ def main():
                         settings["language"] = "en"
                         # lanzar video EN
                         if _HAS_FFPY and os.path.exists(VIDEO_DIR_EN):
-                            video_intro = FFVideo(VIDEO_DIR_EN, ventana.get_size())
+                            video_intro = FFVideo(VIDEO_DIR_EN, (1050, 760))
                             estado = ESTADO_INTRO_VIDEO
                         else:
                             print("no hay video")
@@ -1739,14 +1754,14 @@ def main():
                     if event.key == pygame.K_e:
                         settings["language"] = "es"
                         if _HAS_FFPY and os.path.exists(VIDEO_DIR_ES):
-                            video_intro = FFVideo(VIDEO_DIR_ES, ventana.get_size())
+                            video_intro = FFVideo(VIDEO_DIR_ES, (1000, 850))
                             estado = ESTADO_INTRO_VIDEO
                         else:
                             estado = ESTADO_MENU
                     elif event.key == pygame.K_i:
                         settings["language"] = "en"
                         if _HAS_FFPY and os.path.exists(VIDEO_DIR_EN):
-                            video_intro = FFVideo(VIDEO_DIR_EN, ventana.get_size())
+                            video_intro = FFVideo(VIDEO_DIR_EN, (1000, 850))
                             estado = ESTADO_INTRO_VIDEO
                         else:
                             estado = ESTADO_MENU
@@ -1758,6 +1773,10 @@ def main():
                     if video_intro:
                         video_intro.close()
                         video_intro = None
+                    try:
+                        musica.play("menu", volumen=0.8)
+                    except Exception as e:
+                        print("Aviso música:", e)
                     estado = ESTADO_MENU
                     # aquí puedes arrancar la música del menú en el idioma ya elegido
                     # musica.switch("menu")
@@ -2166,7 +2185,7 @@ def main():
                     Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
                     Enemigo(x=8319, y=448, velocidad=35, escala=2.5),
                     EnemigoPezueso(
-                        x=860, y=470,
+                        x=300, y=500,
                         jugador=jugador,
                         velocidad_patrulla=100,
                         velocidad_furia=260,
@@ -2571,7 +2590,7 @@ def main():
                 video_intro.close()
                 video_intro = None
                 estado = ESTADO_MENU
-                # musica.switch("menu")
+                musica.switch("menu")
 
         # --- DRAW ---
         if estado == ESTADO_LANG_SELECT:
@@ -2585,25 +2604,42 @@ def main():
             # Botón ES
             pygame.draw.rect(ventana, (40, 40, 60), btn_es, border_radius=12)
             pygame.draw.rect(ventana, (120, 120, 160), btn_es, 2, border_radius=12)
-            txt_es = get_font(constantes.FONT_TEXT).render(t["spanish"], True, (230, 230, 230))
+            txt_es = get_font(constantes.FONT_HUD).render(t["spanish"], True, (230, 230, 230))
             ventana.blit(txt_es, (btn_es.centerx - txt_es.get_width() // 2, btn_es.centery - txt_es.get_height() // 2))
 
             # Botón EN
             pygame.draw.rect(ventana, (40, 40, 60), btn_en, border_radius=12)
             pygame.draw.rect(ventana, (120, 120, 160), btn_en, 2, border_radius=12)
-            txt_en = get_font(constantes.FONT_TEXT).render(t["english"], True, (230, 230, 230))
+            txt_en = get_font(constantes.FONT_HUD).render(t["english"], True, (230, 230, 230))
             ventana.blit(txt_en, (btn_en.centerx - txt_en.get_width() // 2, btn_en.centery - txt_en.get_height() // 2))
 
         elif estado == ESTADO_INTRO_VIDEO:
             ventana.fill((0, 0, 0))
             if video_intro:
                 video_intro.draw(ventana)
-                # hint para saltar
+
+                # hint para saltar (fade in/out suave)
                 lang = settings["language"] or "es"
                 t = I18N[lang]
-                hint = get_font(constantes.FONT_SMALL).render(t["skip"], True, (200, 200, 200))
-                ventana.blit(hint,
-                             (constantes.ANCHO_VENTANA // 2 - hint.get_width() // 2, constantes.ALTO_VENTANA - 40))
+
+                # --- Parámetros del fade ---
+                period_ms = 3000  # ciclo total: 3s (1.5s aparecer, 1.5s desaparecer)
+                max_alpha = 255  # opacidad máxima
+
+                # tiempo normalizado [0,1) dentro del periodo
+                tiempo_ms = pygame.time.get_ticks()
+                phase = (tiempo_ms % period_ms) / period_ms
+
+                # Onda senoidal 0→1→0 (suave): alpha = sin^2(pi * phase)
+                # - Empieza visible, se desvanece, desaparece, y vuelve a aparecer
+                alpha = int((math.sin(math.pi * phase) ** 2) * max_alpha)
+
+                hint_surf = get_font(constantes.FONT_HUD).render(t["skip"], True, (200, 200, 200)).convert_alpha()
+                hint_surf.set_alpha(alpha)
+
+                x = constantes.ANCHO_VENTANA // 2 - hint_surf.get_width() // 2
+                y = constantes.ALTO_VENTANA - 550
+                ventana.blit(hint_surf, (x, y))
 
         if estado == ESTADO_MENU:
             ventana.blit(fondo_menu, (0, 0))

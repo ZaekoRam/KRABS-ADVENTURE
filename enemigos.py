@@ -350,6 +350,16 @@ class EnemigoPezueso(Enemigo):
         self.jugador = jugador
         self.frames_patrulla = []  # Animación "nadar"
         self.frames_ataque = []  # Animación "furioso"
+        self.frames_morir = []
+
+        for i in range(1, 5):  # 4 frames: morir1..morir4
+            ruta = sprite_dir / f"romper{i}.png"
+            if ruta.exists():
+                self.frames_morir.append(pygame.image.load(str(ruta)).convert_alpha())
+
+        # Velocidad de la animación de muerte (frames por segundo)
+        self.death_fps = 15  # 10 fps → ~0.4 s para 4 frames (ajusta a gusto)
+        self.death_index = 0.0
 
         try:
             # NOTA: Estas imágenes DEBEN estar mirando hacia la DERECHA por defecto
@@ -409,13 +419,38 @@ class EnemigoPezueso(Enemigo):
         self.puntos = 100
         self.render_offset_y = 0
 
+    def start_death(self):
+        if self.estado == "MURIENDO":
+            return
+        self.estado = "MURIENDO"
+        self.timer_estado = 0
+        self.death_index = 0.0
+        self.velocidad_x = 0
+        self.velocidad_y = 0
+
     def hurt(self, damage):
         if self.hit_flash_timer <= 0 and self.vida > 0:
             self.vida -= damage
             self.hit_flash_timer = self.HIT_FLASH_DURACION
             print(f"Pezueso golpeado, vida restante: {self.vida}")
             if self.vida <= 0:
-                self.kill()
+                self.start_death()
+
+    def animar_muerte(self):
+        # Avanza por tiempo real (dt)
+        self.death_index += self.death_fps * self.dt_actual
+        idx = int(self.death_index)
+
+        if idx >= len(self.frames_morir):
+            self.kill()
+            return
+
+        frame = self.frames_morir[idx]
+        # Respeta dirección visual (tus sprites base miran a la izquierda)
+        self.image = pygame.transform.flip(frame, True, False) if self.direccion_visual == 1 else frame
+        # Mantén el centro al cambiar de tamaño del frame
+        cx, cy = self.rect.center
+        self.rect = self.image.get_rect(center=(cx, cy))
 
     def update(self, dt, plataformas):
         self.dt_actual = dt
@@ -432,6 +467,8 @@ class EnemigoPezueso(Enemigo):
         elif self.estado == "ATACANDO":
             self.atacar(plataformas)
             self.animar(self.frames_ataque)
+        elif self.estado == "MURIENDO":
+            self.animar_muerte()
         # --- Flash rojo (daño) ---
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= dt
@@ -461,6 +498,8 @@ class EnemigoPezueso(Enemigo):
         self.estado = nuevo_estado
         self.timer_estado = 0
         self.anim_index = 0.0
+        if self.estado == "MURIENDO":
+            return
 
         if nuevo_estado == "PATRULLANDO":
             self.rect.x = self.punto_a_x
@@ -535,12 +574,15 @@ class EnemigoPezueso(Enemigo):
         if self.timer_estado > 30:
             indice_colision = self.rect.collidelist(plataformas)
             if indice_colision != -1:
-                self.cambiar_estado("PATRULLANDO")
+                self.start_death()
+                return
 
         # Si vuela por demasiado tiempo (5 seg) sin chocar, también se reinicia
         if self.timer_estado > (constantes.FPS * 5):
             self.cambiar_estado("PATRULLANDO")
             # --- FIN DE LA CORRECCIÓN ---
+
+
 
     def flip_sprite(self):
         """Invierte la dirección visual."""
