@@ -534,44 +534,51 @@ def _clear_input_state():
 
 # -------------------- UI Button --------------------
 class ImageButton:
-    def __init__(self, surf: pygame.Surface, center=None, midleft=None, scale=1.0, hover_scale=1.02):
-        self.base = surf
-        self.scale = scale
-        self.hover_scale = hover_scale
-        self.image = self._scaled(self.base, self.scale)
-        if center:
-            self.rect = self.image.get_rect(center=center);
-            self._anchor = ("center", self.rect.center)
-        elif midleft:
-            self.rect = self.image.get_rect(midleft=midleft);
-            self._anchor = ("midleft", self.rect.midleft)
-        else:
-            self.rect = self.image.get_rect();
-            self._anchor = ("topleft", self.rect.topleft)
-        self._last_size = self.image.get_size()
+    def __init__(self, surface, *, midleft=None, center=None, hover_scale=1.08):
+        self.base_surf = surface.convert_alpha()
+        w, h = self.base_surf.get_size()
+        self.hover_surf = pygame.transform.smoothscale(
+            self.base_surf, (int(w * hover_scale), int(h * hover_scale))
+        )
 
-    def _scaled(self, surf, factor):
-        w = int(surf.get_width() * factor);
-        h = int(surf.get_height() * factor)
-        return pygame.transform.scale(surf, (w, h))
+        # Estado inicial
+        self.current_surf = self.base_surf
+        self.rect = self.current_surf.get_rect()
+
+        # Anclaje original (recordamos cómo lo posicionaste)
+        if midleft is not None:
+            self.rect.midleft = midleft
+            self._anchor = ("midleft", midleft)
+        elif center is not None:
+            self.rect.center = center
+            self._anchor = ("center", center)
+        else:
+            self._anchor = ("topleft", self.rect.topleft)
+
+        self._hovered = False
+        self.texto = None
 
     def update(self, mouse_pos, mouse_down):
-        hovering = self.rect.collidepoint(mouse_pos)
-        target = self.hover_scale if (hovering and not mouse_down) else self.scale
-        size = (int(self.base.get_width() * target), int(self.base.get_height() * target))
-        if size != self._last_size:
-            self.image = self._scaled(self.base, target)
-            self.rect = self.image.get_rect()
-            setattr(self.rect, self._anchor[0], self._anchor[1])
-            self._last_size = size
+        hovered = self.rect.collidepoint(mouse_pos)
 
-    def draw(self, screen):
-        screen.blit(self.image, self.rect)
+        if hovered != self._hovered:
+            self._hovered = hovered
+
+            # guardamos el centro (para escalar de forma simétrica)
+            center = self.rect.center
+            self.current_surf = self.hover_surf if hovered else self.base_surf
+            self.rect = self.current_surf.get_rect()
+            self.rect.center = center  # <-- el truco: centramos el nuevo tamaño
+
+    def draw(self, surface):
+        surface.blit(self.current_surf, self.rect)
 
     def clicked(self, event):
-        return (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
-                and self.rect.collidepoint(event.pos))
-
+        return (
+            event.type == pygame.MOUSEBUTTONDOWN
+            and event.button == 1
+            and self.rect.collidepoint(event.pos)
+        )
 
 # -------------------- Simple Button --------------------
 class BotonSimple:
@@ -1657,23 +1664,26 @@ def main():
     victory_ui = VictoryScreen((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     freeze_cam_offset = None
 
+    def _rebuild_menu_buttons(lang: str):
+        nonlocal btn_play, btn_opc, btn_salir  # ahora existen arriba
 
+        img_play = _load_menu_img_variant("botonplay", lang, 360)
+        img_opciones = _load_menu_img_variant("botonopciones", lang, 340)
+        img_salir = _load_menu_img_variant("botonsalir", lang, 345)
+
+        btn_play = ImageButton(img_play, midleft=(COL_play, Y0))
+        btn_opc = ImageButton(img_opciones, midleft=(COL_X, btn_play.rect.bottom + GAP1))
+        btn_salir = ImageButton(img_salir, midleft=(COL_X, btn_opc.rect.bottom + GAP))
+
+    current_lang = settings["language"] or "es"
+    _rebuild_menu_buttons(current_lang)
 
     # --------- Game Loop ---------
     while run:
-        def _rebuild_menu_buttons(lang: str):
-            nonlocal btn_play, btn_opc, btn_salir  # ahora existen arriba
-
-            img_play = _load_menu_img_variant("botonplay", lang, 360)
-            img_opciones = _load_menu_img_variant("botonopciones", lang, 340)
-            img_salir = _load_menu_img_variant("botonsalir", lang, 345)
-
-            btn_play = ImageButton(img_play, midleft=(COL_play, Y0))
-            btn_opc = ImageButton(img_opciones, midleft=(COL_X, btn_play.rect.bottom + GAP1))
-            btn_salir = ImageButton(img_salir, midleft=(COL_X, btn_opc.rect.bottom + GAP))
+        if settings["language"] != current_lang:
+            current_lang = settings["language"]
+            _rebuild_menu_buttons(current_lang)
         dt = reloj.tick(constantes.FPS) / 1000.0
-        current_lang = settings["language"] or "es"
-        _rebuild_menu_buttons(current_lang)
         mouse_pos = pygame.mouse.get_pos();
         mouse_down = pygame.mouse.get_pressed()[0]
 
@@ -1733,21 +1743,22 @@ def main():
                     estado = ESTADO_MENU
                     # aquí puedes arrancar la música del menú en el idioma ya elegido
                     # musica.switch("menu")
-            if settings["language"] != current_lang:
-                current_lang = settings["language"]
-                _rebuild_menu_buttons(current_lang)
+                if settings["language"] != current_lang:
+                    current_lang = settings["language"]
+                    _rebuild_menu_buttons(current_lang)
             if estado == ESTADO_MENU:
                 if not menu_leaving:
                     btn_play.update(mouse_pos, mouse_down)
                     btn_opc.update(mouse_pos, mouse_down)
                     btn_salir.update(mouse_pos, mouse_down)
+
                     if btn_play.clicked(event):
                         menu_leaving = True
                         menu_krab.jump_and_leave()
                     elif btn_opc.clicked(event):
                         estado = ESTADO_OPC
                     elif btn_salir.clicked(event):
-                        musica.stop(300);
+                        musica.stop(300)
                         run = False
 
             elif estado == ESTADO_SELECT_PERSONAJE:
