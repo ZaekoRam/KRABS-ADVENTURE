@@ -724,54 +724,71 @@ class PauseMenu:
         self.w, self.h = size
         self.font_title = get_font(constantes.FONT_UI_TITLE)
         self.font_item = get_font(constantes.FONT_UI_ITEM)
-        self.options = [tr("pause_resume"), tr("pause_to_menu")]
+
+        # Guarda llaves en vez de textos fijos
+        self.option_keys = ["pause_resume", "pause_to_menu"]
         self.selected = 0
+
         self.panel = pygame.Surface((int(self.w * 0.6), int(self.h * 0.5)), pygame.SRCALPHA)
         self.panel.fill((0, 0, 0, 140))
 
-    def handle_event(self, event):
-        if event.type == pygame.KEYDOWN:
-            if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
-                return "resume" if self.selected == 0 else "menu"
-            if event.key in (pygame.K_UP, pygame.K_w):
-                self.selected = (self.selected - 1) % len(self.options)
-            if event.key in (pygame.K_DOWN, pygame.K_s):
-                self.selected = (self.selected + 1) % len(self.options)
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            mx, my = event.pos
-            x = (self.w - self.panel.get_width()) // 2
-            y = (self.h - self.panel.get_height()) // 2
-            items = self._item_rects(x, y)
-            for i, r in enumerate(items):
-                if r.collidepoint(mx, my):
-                    self.selected = i
-                    return "resume" if i == 0 else "menu"
-        return None
-
-    def _item_rects(self, px, py):
+    def _item_rects(self, px, py, n_items):
         rects = []
         start_y = py + 120
-        for i, _ in enumerate(self.options):
+        for i in range(n_items):
             r = pygame.Rect(0, 0, 300, 48)
             r.centerx = px + self.panel.get_width() // 2
             r.y = start_y + i * 60
             rects.append(r)
         return rects
 
+    def handle_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
+                # usa índice seleccionado
+                return "resume" if self.selected == 0 else "menu"
+            if event.key in (pygame.K_UP, pygame.K_w):
+                self.selected = (self.selected - 1) % len(self.option_keys)
+            if event.key in (pygame.K_DOWN, pygame.K_s):
+                self.selected = (self.selected + 1) % len(self.option_keys)
+
+        # Hover / click con mouse
+        if event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN):
+            mx, my = (event.pos if hasattr(event, "pos") else pygame.mouse.get_pos())
+            x = (self.w - self.panel.get_width()) // 2
+            y = (self.h - self.panel.get_height()) // 2
+            items = self._item_rects(x, y, len(self.option_keys))
+            for i, r in enumerate(items):
+                if r.collidepoint(mx, my):
+                    self.selected = i
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        return "resume" if i == 0 else "menu"
+
+        return None
+
     def draw(self, surface):
+        # capa oscura
         dim = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
-        dim.fill((0, 0, 0, 100));
+        dim.fill((0, 0, 0, 100))
         surface.blit(dim, (0, 0))
+
+        # panel
         px = (self.w - self.panel.get_width()) // 2
         py = (self.h - self.panel.get_height()) // 2
         surface.blit(self.panel, (px, py))
+
+        # título (se traduce siempre)
         title = self.font_title.render(tr("pause_title"), True, (255, 255, 255))
         surface.blit(title, (self.w // 2 - title.get_width() // 2, py + 40))
-        for i, text in enumerate(self.options):
+
+        # opciones: traduce al vuelo según idioma actual
+        for i, key in enumerate(self.option_keys):
+            text = tr(key)
             color = (255, 230, 120) if i == self.selected else (230, 230, 230)
             surf = self.font_item.render(text, True, color)
             r = surf.get_rect(center=(self.w // 2, py + 120 + i * 60))
             surface.blit(surf, r)
+
 
 
 # -------------------- Game Over Screen --------------------
