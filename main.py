@@ -16,7 +16,8 @@ from enemigos import EnemigoPezueso
 from items import Manzana, bolsa
 from fuentes import get_font
 ()
-from parallax import create_parallax_nivel1
+from parallax import create_parallax_nivel1, create_parallax_nivel2, create_parallax_nivel3
+
 import sys
 
 
@@ -2053,13 +2054,29 @@ def main():
                 print("Aviso música de nivel:", e)
             puntuacion = 0
             timer = tiempo_total
-            parallax = create_parallax_nivel1()
+            if nivel_actual == 1:
+                parallax = create_parallax_nivel1()
+            elif nivel_actual == 2:
+                parallax = create_parallax_nivel2()
+            elif nivel_actual == 3:
+                parallax = create_parallax_nivel3()
+            else:
+                parallax = create_parallax_nivel1()  # fallback
+
             prev_cam_offset_x = cam.offset()[0]
 
             reiniciar_nivel(nivel, jugador)
             cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
             cam.follow(jugador.forma, lerp=1.0)
-            parallax = create_parallax_nivel1()
+            if nivel_actual == 1:
+                parallax = create_parallax_nivel1()
+            elif nivel_actual == 2:
+                parallax = create_parallax_nivel2()
+            elif nivel_actual == 3:
+                parallax = create_parallax_nivel3()
+            else:
+                parallax = create_parallax_nivel1()  # fallback
+
             prev_cam_offset_x = cam.offset()[0]
             mover_derecha = False
             mover_izquierda = False
@@ -2134,7 +2151,7 @@ def main():
                     EnemigoPezueso(
                         x=860, y=470,
                         jugador=jugador,
-                        velocidad_patulla=120,
+                        velocidad_patrulla=100,
                         velocidad_furia=260,
                         radio_det=220,
                         duracion_furia_ms=1800,
