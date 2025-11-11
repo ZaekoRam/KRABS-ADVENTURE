@@ -240,7 +240,14 @@ class FFVideo:
     def __init__(self, path: str, out_size: tuple[int,int]):
         if not _HAS_FFPY:
             raise RuntimeError("ffpyplayer no está disponible")
-        self.player = MediaPlayer(path, ff_opts={'sync': 'video'})  # audio lo maneja ffpyplayer
+        self.player = MediaPlayer(path, ff_opts={
+            'sync': 'audio',  # Sincronizar con audio (MUCHO MEJOR)
+            'ar': 44100,  # Forzar frecuencia de muestreo 44.1kHz
+            'ac': 2,  # Forzar 2 canales (estéreo)
+            'sample_fmt': 's16'  # Forzar formato 16-bit
+        })
+        # --- FIN DE MODIFICACIÓN ---
+
         self.surf = None
         self.size = out_size
         self.done = False
@@ -329,6 +336,34 @@ def _load_menu_img_variant(base_folder: str, lang: str, scale_w: int) -> pygame.
         except Exception:
             continue
     raise FileNotFoundError(f"No pude cargar ninguna variante para {base_folder} ({lang}).")
+
+
+def _load_tutorial_img(base_folder: str, lang: str, scale_w: int) -> pygame.Surface:
+    """
+    Carga una imagen de tutorial, buscando por idioma.
+    Ruta: assets/images/tutorial/<lang>/<base_folder>.png
+    """
+    candidates = [
+        f"tutorial/{lang}/{base_folder}.png",  # assets/images/tutorial/en/key_move.png
+        f"tutorial/es/{base_folder}.png",  # Fallback a español
+    ]
+    for folder in candidates:
+        try:
+            # Reutiliza la lógica de cargar_primera_imagen (que busca en IMG_DIR)
+            # NOTA: cargar_primera_imagen espera una *carpeta*, no un archivo.
+            # Vamos a simplificarlo para este caso específico.
+
+            img_path = IMG_DIR / folder
+            if img_path.exists():
+                surf = pygame.image.load(str(img_path)).convert_alpha()
+                return scale_to_width(surf, scale_w)
+
+        except Exception:
+            continue
+    # Si no encuentra nada, crea un "placeholder"
+    surf = pygame.Surface((scale_w, scale_w))
+    surf.fill((255, 0, 255))  # Color magenta brillante si falta la imagen
+    return surf
 
 
 # ===== Helpers UI para Game Over =====
@@ -441,6 +476,36 @@ def cargar_primera_imagen(carpeta_rel: str, usa_alpha: bool) -> pygame.Surface:
             surf = pygame.image.load(str(files[0]))
             return surf.convert_alpha() if usa_alpha else surf.convert()
     raise FileNotFoundError(f"No encontré imágenes en {carpeta}")
+
+
+def cargar_imagenes_desde_carpeta(carpeta_path):
+    """
+    Carga todas las imágenes .png de una carpeta específica.
+    La clave del diccionario será el nombre del archivo (sin .png).
+    Ej: 'tecla_w.png' -> {'tecla_w': <imagen_pygame>}
+    """
+    imagenes_cargadas = {}
+    carpeta = Path(carpeta_path)
+
+    if not carpeta.is_dir():
+        print(f"Error: La carpeta de imágenes {carpeta} no existe.")
+        return imagenes_cargadas
+
+    # Buscar todos los archivos .png en la carpeta
+    for archivo_path in carpeta.glob('*.png'):
+        try:
+            # 'archivo.stem' es el nombre sin extensión (ej: 'tecla_w')
+            key_imagen = archivo_path.stem
+            img = pygame.image.load(archivo_path).convert_alpha()
+
+            # Guardar en el diccionario
+            imagenes_cargadas[key_imagen] = img
+            # print(f"Cargada: {key_imagen}") # (Descomenta para depurar)
+
+        except Exception as e:
+            print(f"Error al cargar la imagen {archivo_path.name}: {e}")
+
+    return imagenes_cargadas
 
 
 def escalar_a_ventana(surf: pygame.Surface) -> pygame.Surface:
@@ -1198,92 +1263,143 @@ class CharacterSelectUI:
         self._draw_card(surface, self.rect_f, self.pic_f, self.txt_f, enabled=True, hover=(self.hover == 'f'))
 
 
-# -------------------- Level Select UI --------------------
+# -------------------------------
+# level_select_ui.py (o similar)
+# -------------------------------
 class LevelSelectUI:
-    """Selector visual de nivel 1, 2, 3 (front)."""
+    """Selector de nivel 1, 2, 3 + botón Tutorial (nivel 0)."""
 
     def __init__(self, size, thumbs=None):
         self.w, self.h = size
         self.font_title = get_font(constantes.FONT_UI_TITLE)
-        self.font_item = get_font(constantes.FONT_UI_ITEM)
+        self.font_item  = get_font(constantes.FONT_UI_ITEM)
+
+        # --- Tarjetas 1-3 ---
         self.card_w, self.card_h = 220, 240
         gap = 60
         cx = self.w // 2
         cy = self.h // 2 + 10
+
         self.rects = []
-        x0 = cx - self.card_w - gap
-        x1 = cx
-        x2 = cx + self.card_w + gap
-        for x in (x0, x1, x2):
+        for x in (cx - self.card_w - gap, cx, cx + self.card_w + gap):
             r = pygame.Rect(0, 0, self.card_w, self.card_h)
             r.center = (x, cy)
             self.rects.append(r)
+
         self.thumbs = thumbs or {}
         self.labels = [
             self.font_item.render(tr("level_1"), True, (20, 30, 60)),
             self.font_item.render(tr("level_2"), True, (20, 30, 60)),
             self.font_item.render(tr("level_3"), True, (20, 30, 60)),
         ]
+
+        # --- Botón "Tutorial" (nivel 0) ---
+        btn_w, btn_h = 260, 60
+        self.tutorial_rect = pygame.Rect(0, 0, btn_w, btn_h)
+        bottom_cards = max(r.bottom for r in self.rects)
+        self.tutorial_rect.center = (cx, bottom_cards + 80)
+        # Hitbox un poco más grande para facilitar el click
+        self.tutorial_hit = self.tutorial_rect.inflate(12, 12)
+        self._tutorial_hover = False
+
         self.hover = None
         self.selected = None
 
+    # ------------------------------------------------------------------ #
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
             self.hover = None
+            self._tutorial_hover = self.tutorial_hit.collidepoint(event.pos)
             for i, r in enumerate(self.rects):
                 if r.collidepoint(event.pos):
                     self.hover = i
                     break
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # 1) Tutorial primero (por si hay solapamientos)
+            if self.tutorial_hit.collidepoint(event.pos):
+                self.selected = 0
+                return 0
+            # 2) Tarjetas 1-3
             for i, r in enumerate(self.rects):
                 if r.collidepoint(event.pos):
                     self.selected = i + 1
                     return self.selected
+
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_1, pygame.K_KP1): self.selected = 1; return 1
             if event.key in (pygame.K_2, pygame.K_KP2): self.selected = 2; return 2
             if event.key in (pygame.K_3, pygame.K_KP3): self.selected = 3; return 3
+            if event.key == pygame.K_t:                self.selected = 0; return 0  # Tutorial
             if event.key in (pygame.K_RETURN, pygame.K_SPACE): self.selected = 2; return 2
+
         return None
 
+    # ------------------------------------------------------------------ #
     def _draw_card(self, surface, rect, n_level, label, hover=False, selected=False):
         pygame.draw.rect(surface, (15, 70, 130), rect, border_radius=8, width=5)
         inner = rect.inflate(-12, -12)
-        base_color = (200, 230, 255)
-        if selected: base_color = (180, 220, 255)
+        base_color = (180, 220, 255) if selected else (200, 230, 255)
         pygame.draw.rect(surface, base_color, inner, border_radius=6)
-        if hover: pygame.draw.rect(surface, (80, 180, 255), inner, width=4, border_radius=6)
+        if hover:
+            pygame.draw.rect(surface, (80, 180, 255), inner, width=4, border_radius=6)
+
         thumb = self.thumbs.get(n_level)
         if thumb:
-            tr = thumb.get_rect(center=(inner.centerx, inner.top + 80))
-            surface.blit(thumb, tr)
+            surface.blit(thumb, thumb.get_rect(center=(inner.centerx, inner.top + 80)))
         else:
-            ph = pygame.Surface((120, 80));
-            ph.fill((170, 210, 255))
-            pr = ph.get_rect(center=(inner.centerx, inner.top + 80))
-            surface.blit(ph, pr)
+            ph = pygame.Surface((120, 80)); ph.fill((170, 210, 255))
+            surface.blit(ph, ph.get_rect(center=(inner.centerx, inner.top + 80)))
+
         bar = pygame.Rect(inner.left + 8, inner.bottom - 56, inner.width - 16, 40)
         pygame.draw.rect(surface, (170, 210, 255), bar, border_radius=6)
-        lr = label.get_rect(center=bar.center)
-        surface.blit(label, lr)
+        surface.blit(label, label.get_rect(center=bar.center))
+
         if selected:
             tic = self.font_item.render("✓", True, (15, 40, 80))
-            trect = tic.get_rect(center=(inner.right - 28, inner.top + 26))
-            surface.blit(tic, trect)
+            surface.blit(tic, tic.get_rect(center=(inner.right - 28, inner.top + 26)))
 
+    # ------------------------------------------------------------------ #
+    def _draw_tutorial_button(self, surface):
+        # Marco y relleno
+        pygame.draw.rect(surface, (15, 70, 130), self.tutorial_rect, border_radius=10, width=4)
+        inner = self.tutorial_rect.inflate(-10, -10)
+        pygame.draw.rect(surface, (200, 230, 255), inner, border_radius=8)
+        if self._tutorial_hover:
+            pygame.draw.rect(surface, (80, 180, 255), inner, width=3, border_radius=8)
+
+        # Texto del botón (cámbialo por tr("tutorial") si usas i18n)
+        texto = tr("tutorial") if "tr" in globals() else "TUTORIAL"
+        txt = self.font_item.render(texto, True, (20, 30, 60))
+        surface.blit(txt, txt.get_rect(center=inner.center))
+
+        # Si quieres un icono en lugar de texto, descomenta:
+        # icon = self.thumbs.get(0)
+        # if icon:
+        #     surface.blit(icon, icon.get_rect(center=inner.center))
+
+    # ------------------------------------------------------------------ #
     def draw(self, surface):
+        # Título
         title = self.font_title.render(tr("sel_level_title"), True, (15, 40, 80))
         band = pygame.Surface((title.get_width() + 40, title.get_height() + 18), pygame.SRCALPHA)
         pygame.draw.rect(band, (180, 210, 255, 230), band.get_rect(), border_radius=8)
         band.blit(title, (20, 9))
-        band_rect = band.get_rect(center=(self.w // 2, 90))
-        surface.blit(band, band_rect)
+        surface.blit(band, band.get_rect(center=(self.w // 2, 90)))
+
+        # Tarjetas
         for i, r in enumerate(self.rects):
-            self._draw_card(surface, r, i + 1, self.labels[i], hover=(self.hover == i),
-                            selected=(self.selected == i + 1))
+            self._draw_card(surface, r, i + 1, self.labels[i],
+                            hover=(self.hover == i), selected=(self.selected == i + 1))
+
+        # Botón Tutorial
+        self._draw_tutorial_button(surface)
+
+        # Hint general (si te estorba, comenta estas 2 líneas)
         hint_txt = tr("level_hint")
-        hint = self.font_item.render(hint_txt, True, (20, 20, 20))  # negro para legibilidad
-        surface.blit(hint, hint.get_rect(center=(self.w // 2, self.h - 40)))
+        hint = self.font_item.render(hint_txt, True, (20, 20, 20))
+        surface.blit(hint, hint.get_rect(center=(self.w // 2, self.h - 28)))
+
 
 
 # -------------------- Difficulty Select UI --------------------
@@ -1527,6 +1643,7 @@ def main():
     pygame.display.set_caption("Krab's adventure")
     reloj = pygame.time.Clock()
     prefs = _load_prefs()
+    slider_dragging = False
 
     # === ESTADO INICIAL ===
     estado = ESTADO_LANG_SELECT
@@ -1571,6 +1688,7 @@ def main():
     # Posición por nivel (mundo, en píxeles) de la base de la bandera (bottom-left)
     # Ajusta estos valores a tu mapa:
     FLAG_POS_BY_LEVEL = {
+        0: (4640, 870),
         1: (5491, 683),  # NIVEL 1
         2: (6485, 845),  # NIVEL 2 (ejemplo)
         3: (8673, 871),  # si algún día agregas nivel 3
@@ -1678,6 +1796,58 @@ def main():
 
     # Música menú
 
+    imagenes_tutorial = {}
+    NIVEL0_PROMPTS_DATA = [
+        {
+            "id": "move",
+            "img_name": "key_move",
+            "img_w": 700,
+            "img_y_offset": -50,
+            "world_x": 400,  # <-- La clave que faltaba
+            "world_y": 680,
+            "range_pre": 500,  # <-- La clave que faltaba
+            "range_post": 500,  # <-- La clave que faltaba
+        },
+        {
+            "id": "jump",
+            "img_name": "key_jump",
+            "img_w": 700,
+            "img_y_offset": -50,
+            "world_x": 1390,  # <-- La clave que faltaba
+            "world_y": 680,
+            "range_pre": 500,  # <-- La clave que faltaba
+            "range_post": 500,  # <-- La clave que faltaba
+        },
+        {
+            "id": "attack",
+            "img_name": "key_clean",
+            "img_w": 700,
+            "img_y_offset": -50,
+            "world_x": 3400,  # <-- La clave que faltaba
+            "world_y": 680,
+            "range_pre": 500,  # <-- La clave que faltaba
+            "range_post": 500,  # <-- La clave que faltaba
+        },
+        {
+            "id": "trash",
+            "img_name": "key_collect",
+            "img_w": 700,
+            "img_y_offset": -50,
+            "world_x": 2200,  # <-- La clave que faltaba
+            "world_y": 680,
+            "range_pre": 500,  # <-- La clave que faltaba
+            "range_post": 500,  # <-- La clave que faltaba
+        }
+    ]
+
+    # --- CACHÉ GLOBAL DE PROMPTS ---
+    #
+    # <<< --- ¡LA SOLUCIÓN ESTÁ AQUÍ! --- >>>
+    #
+    # Define los diccionarios y listas vacíos PRIMERO.
+    g_tutorial_cache = {}
+    g_active_prompt_ids = []
+
 
     mover_izquierda = mover_derecha = False
     # --- Fly/Debug ---
@@ -1696,6 +1866,45 @@ def main():
     victory_ui = VictoryScreen((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     freeze_cam_offset = None
 
+    def _rebuild_tutorial_cache(lang: str):
+        nonlocal g_tutorial_cache  # <-- Esto ahora funciona
+        g_tutorial_cache.clear()
+
+        font = get_font(constantes.FONT_HUD)
+
+        for data in NIVEL0_PROMPTS_DATA:
+            prompt_id = data["id"]
+            key_text = data.get("key_text")
+            img_name = data.get("img_name")
+
+            text_surface = None
+            img_surface = None
+
+            # 1. Renderizar Texto (si existe)
+            if key_text:
+                text = tr(key_text)  # Traduce usando tu función tr()
+                color = (255, 255, 0)  # Amarillo
+
+                # Añadir sombra
+                text_surface = font.render(text, True, color)
+                shadow_surf = font.render(text, True, (0, 0, 0))
+                w, h = text_surface.get_size()
+                temp_surf = pygame.Surface((w + 4, h + 4), pygame.SRCALPHA)
+                temp_surf.blit(shadow_surf, (2, 2))
+                temp_surf.blit(text_surface, (0, 0))
+                text_surface = temp_surf
+
+            # 2. Cargar Imagen (si existe)
+            if img_name:
+                img_surface = _load_tutorial_img(
+                    img_name, lang, data.get("img_w", 64)
+                )
+
+            # Guardar en el caché
+            g_tutorial_cache[prompt_id] = {
+                "text_surf": text_surface,
+                "img_surf": img_surface,
+            }
     def _rebuild_menu_buttons(lang: str):
         nonlocal btn_play, btn_opc, btn_salir  # ahora existen arriba
 
@@ -1709,12 +1918,14 @@ def main():
 
     current_lang = settings["language"] or "es"
     _rebuild_menu_buttons(current_lang)
+    _rebuild_tutorial_cache(current_lang)  # <<< --- AÑADE ESTA LÍNEA (carga inicial)
 
     # --------- Game Loop ---------
     while run:
         if settings["language"] != current_lang:
             current_lang = settings["language"]
             _rebuild_menu_buttons(current_lang)
+            _rebuild_tutorial_cache(current_lang)  # <<< --- AÑADE ESTA LÍNEA (recarga)
         target_fps = 30 if estado == ESTADO_INTRO_VIDEO else constantes.FPS
         dt = reloj.tick(target_fps) / 1000.0
         mouse_pos = pygame.mouse.get_pos();
@@ -1729,21 +1940,21 @@ def main():
             elif estado == ESTADO_LANG_SELECT:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     mx, my = event.pos
-                    if btn_es.collidepoint(mx, my):
+                    if btn_es.collidepoint(mx,my):
                         settings["language"] = "es"
                         # lanzar video ES
                         if _HAS_FFPY and os.path.exists(VIDEO_DIR_ES):
-                            video_intro = FFVideo(VIDEO_DIR_ES, (1155, 828))
+                            video_intro = FFVideo(VIDEO_DIR_ES, (1000, 850))
                             estado = ESTADO_INTRO_VIDEO
                         else:
-                            # Si no hay video, pasar directo al menú
                             print("no hay video")
                             estado = ESTADO_MENU
+                    # ...
                     elif btn_en.collidepoint(mx, my):
                         settings["language"] = "en"
                         # lanzar video EN
                         if _HAS_FFPY and os.path.exists(VIDEO_DIR_EN):
-                            video_intro = FFVideo(VIDEO_DIR_EN, (1050, 760))
+                            video_intro = FFVideo(VIDEO_DIR_EN, (1050, 760))  #
                             estado = ESTADO_INTRO_VIDEO
                         else:
                             print("no hay video")
@@ -1827,6 +2038,9 @@ def main():
 
             elif estado == ESTADO_SELECT_NIVEL:
                 choice = level_select_ui.handle_event(event)
+                if choice == 0:
+                    nivel_actual = 0
+                    estado = ESTADO_CARGANDO
                 if choice == 1:
                     nivel_actual = 1
                     # Ir a dificultad
@@ -2072,6 +2286,11 @@ def main():
 
         elif estado == ESTADO_CARGANDO:
             # Carga el TMX según nivel_actual
+            ruta_carpeta_tutorial = BASE_DIR / "assets" / "tutorial" / lang
+
+            # 3. Llama a la nueva función para cargar las imágenes
+            #    Esto llena tu diccionario 'imagenes_tutorial'
+            imagenes_tutorial = cargar_imagenes_desde_carpeta(ruta_carpeta_tutorial)
             nivel = NivelTiled(MAP_DIR / f"nivel{nivel_actual}.tmx")
             cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
             flag_pos_world = FLAG_POS_BY_LEVEL.get(nivel_actual, FLAG_POS_BY_LEVEL.get(1, (0, 0)))
@@ -2133,7 +2352,12 @@ def main():
                 nivel,
                 on_finish=_ir_a_victoria
             )
+            if nivel_actual == 0:
+                enemigos.add(
+                    Enemigo(x=3550, y=675, velocidad=0, escala=2.5),
+                    Enemigo(x=3240, y=675, velocidad=0, escala=2.5),
 
+                )
             if nivel_actual == 1:
                 enemigos.add(
                     Enemigo(x=450, y=675, velocidad=34, escala=2.5),
@@ -2308,6 +2532,19 @@ def main():
             # === SPAWN FIX: protección de los primeros frames y gracia ===
             if spawn_skip_frames > 0:
                 spawn_skip_frames -= 1
+            g_active_prompt_ids.clear()  # Limpia los prompts activos cada frame
+
+            if nivel_actual == 0:  # <-- SOLO en el nivel tutorial
+                player_x = jugador.forma.centerx
+
+                for data in NIVEL0_PROMPTS_DATA:
+                    world_x = data["world_x"]
+                    range_pre = data["range_pre"]
+                    range_post = data["range_post"]
+
+                    # Comprueba si el jugador está en el rango
+                    if (world_x - range_pre) <= player_x <= (world_x + range_post):
+                        g_active_prompt_ids.append(data["id"])
 
             if spawn_grace > 0.0:
                 spawn_grace = max(0.0, spawn_grace - dt)
@@ -2708,6 +2945,45 @@ def main():
 
             # Offset de cámara (úsalo para TODO lo que dibujas)
             ox, oy = cam.offset()
+            if nivel_actual == 0:
+                ox, oy = cam.offset()  # Obtiene el offset de la cámara
+
+                for prompt_id in g_active_prompt_ids:
+                    # 1. Obtener los datos y los assets cacheados
+                    try:
+                        data = next(p for p in NIVEL0_PROMPTS_DATA if p["id"] == prompt_id)
+                        cache = g_tutorial_cache[prompt_id]
+                    except (StopIteration, KeyError):
+                        continue  # Seguridad por si algo falla
+
+                    text_surf = cache["text_surf"]
+                    img_surf = cache["img_surf"]
+
+                    # 2. Calcular Posición en Pantalla
+                    screen_x = data["world_x"] - ox
+                    screen_y_anchor = data["world_y"] - oy  # Ancla (bottom del texto)
+
+                    # 3. Dibujar Texto (si existe)
+                    if text_surf:
+                        t = time.time() * 3
+                        bob = int(math.sin(t) * 4)  # Animación de flote
+                        text_rect = text_surf.get_rect(
+                            centerx=screen_x,
+                            bottom=screen_y_anchor + bob
+                        )
+                        ventana.blit(text_surf, text_rect)
+
+                    # 4. Dibujar Imagen (si existe)
+                    if img_surf:
+                        img_y_offset = data.get("img_y_offset", -50)
+                        t_img = (time.time() * 3) + 0.5  # Flote desfasado
+                        bob = int(math.sin(t_img) * 4)
+
+                        img_rect = img_surf.get_rect(
+                            centerx=screen_x,
+                            bottom=screen_y_anchor + img_y_offset + bob
+                        )
+                        ventana.blit(img_surf, img_rect)
 
             # --- DIBUJAR BANDERA / BASURA ---
             if flag_img:

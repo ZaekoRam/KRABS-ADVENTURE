@@ -2,31 +2,34 @@
 import pygame
 from pathlib import Path
 
+
 def play_intro_or_skip(lang: str, screen, clock):
-    """
-    Reproduce el video de introducción en 800x600 a 30 FPS.
-    - lang: "es" o "en"
-    - Se puede saltar con cualquier tecla o clic.
-    """
+    # ...
     try:
         from ffpyplayer.player import MediaPlayer
     except Exception:
         return  # ffpyplayer no instalado
 
+    # -----------------------
+
     # --- Rutas del video ---
     video_path = Path(__file__).resolve().parent / "assets" / "video" / (
         "intro_es.mp4" if lang == "es" else "intro_en.mp4"
     )
-    if not video_path.exists():
-        return
+    # ...
 
     # --- Configuración del reproductor ---
+    # (Añado también la Solución 2 que te di, es buena idea forzar el formato)
     player = MediaPlayer(
         str(video_path),
         ff_opts={
-            "sync": "audio",       # mantiene sincronía entre audio y video
-            "out_fmt": "yuv420p",  # formato eficiente para rendimiento
-            "paused": False
+        "sync": "audio",
+            "out_fmt": "yuv420p",
+            "paused": False,
+            # --- Fuerza un formato de audio estándar ---
+            "ar": 44100,  # 44.1kHz
+            "ac": 2,  # 2 canales (estéreo)
+            "sample_fmt": "s16"  # 16-bit
         }
     )
 
@@ -70,7 +73,7 @@ def play_intro_or_skip(lang: str, screen, clock):
             pygame.display.flip()
 
         # --- Control de FPS (30) ---
-        clock.tick(32)
+        clock.tick(30)
 
     # --- Cierre seguro ---
     try:
