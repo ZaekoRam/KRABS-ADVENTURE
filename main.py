@@ -484,6 +484,7 @@ def draw_puntuacion(surface, font, puntuacion, pos=(20, 80)):
 
 def reiniciar_nivel(nivel, jugador):
     x, y_spawn = 100, 670
+
     if nivel.spawn:
         x, y_spawn = int(nivel.spawn[0]), int(nivel.spawn[1])
     if hasattr(jugador, "colocar_en_midbottom"):
@@ -1579,9 +1580,10 @@ def main():
     # Posición por nivel (mundo, en píxeles) de la base de la bandera (bottom-left)
     # Ajusta estos valores a tu mapa:
     FLAG_POS_BY_LEVEL = {
-        1: (5491, 683),  # NIVEL 1
+        1: (5490, 685),  # NIVEL 1
         2: (6485, 845),  # NIVEL 2 (ejemplo)
-        3: (8673, 871),  # si algún día agregas nivel 3
+        3: (8675, 870),  # si algún día agregas nivel 3
+        0: (4670, 870)
     }
 
     # variable que usaremos al dibujar (se actualiza al cargar cada nivel)
@@ -1836,7 +1838,7 @@ def main():
             elif estado == ESTADO_SELECT_NIVEL:
                 choice = level_select_ui.handle_event(event)
                 if choice == 1:
-                    nivel_actual = 1
+                    nivel_actual = 0
                     # Ir a dificultad
                     diff_ui = DifficultySelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), icon_easy,
                                                  icon_hard)
@@ -2108,7 +2110,6 @@ def main():
                 parallax = create_parallax_nivel1()  # fallback
 
             prev_cam_offset_x = cam.offset()[0]
-
             reiniciar_nivel(nivel, jugador)
             cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
             cam.follow(jugador.forma, lerp=1.0)
@@ -2141,6 +2142,12 @@ def main():
                 nivel,
                 on_finish=_ir_a_victoria
             )
+
+            if nivel_actual == 0:
+                enemigos.add(
+                    Enemigo(x=4000, y=860, velocidad=0, escala=2.5),
+                    Enemigo(x=4500, y=860, velocidad=0, escala=2.5),
+                )
 
             if nivel_actual == 1:
                 enemigos.add(
@@ -2206,6 +2213,11 @@ def main():
 
                 )
             items = pygame.sprite.Group()
+            if nivel_actual == 0:
+                items.add(
+                    Manzana(x=1900, y=650),
+                    bolsa(x=3210, y=830)
+                )
             if nivel_actual == 1:
                 items.add(
                     Manzana(x=338, y=479),
