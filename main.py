@@ -1658,15 +1658,8 @@ def main():
     # === VIDEO INTRO (variable temporal) ===
     video_intro = None
 
-    # Tutorial (si existe)
-    try:
-        tutorial_img = pygame.image.load(IMG_DIR / "ui" / "tutorial.png").convert_alpha()
-    except Exception:
-        tutorial_img = None
-    tutorial_overlay = TutorialOverlay(
-        (constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA),
-        tutorial_img if tutorial_img else pygame.Surface((800, 450), pygame.SRCALPHA)
-    ) if tutorial_img else None
+    # No cargues el tutorial aquí; el idioma aún no está elegido.
+    tutorial_overlay = None
 
     # HUD imágenes
     try:
@@ -2346,19 +2339,26 @@ def main():
                 else:
                     estado = ESTADO_VICTORIA
 
+            # --- crea grupos SOLO una vez ---
+            enemigos = pygame.sprite.Group()
+            items = pygame.sprite.Group()
+
+            # Secuencia de victoria
             secuencia_victoria = SecuenciaVictoria(
                 jugador,
                 pygame.Rect(flag_pos_world[0], flag_pos_world[1] - 200, 32, 200),
                 nivel,
                 on_finish=_ir_a_victoria
             )
+
+            # --- agrega enemigos por nivel ---
             if nivel_actual == 0:
                 enemigos.add(
                     Enemigo(x=3550, y=675, velocidad=0, escala=2.5),
                     Enemigo(x=3240, y=675, velocidad=0, escala=2.5),
-
                 )
-            if nivel_actual == 1:
+
+            elif nivel_actual == 1:
                 enemigos.add(
                     Enemigo(x=450, y=675, velocidad=34, escala=2.5),
                     Enemigo(x=800, y=675, velocidad=35, escala=2.5),
@@ -2370,9 +2370,10 @@ def main():
                     Enemigo(x=2830, y=643, velocidad=35, escala=2.5),
                     Enemigo(x=3725, y=320, escala=2.5)
                 )
+
             elif nivel_actual == 2:
                 enemigos.add(
-                    Enemigo_walk(x=299, y=833, velocidad = 40),
+                    Enemigo_walk(x=299, y=833, velocidad=40),
                     Enemigo(x=450, y=675, velocidad=35, escala=2.5),
                     Enemigo_walk(x=1578, y=831, velocidad=40),
                     Enemigo(x=2331, y=830, velocidad=35, escala=2.5),
@@ -2385,11 +2386,11 @@ def main():
                     Enemigo_walk(x=5445, y=832, velocidad=40),
                     Enemigo(x=5442, y=574, velocidad=35, escala=2.5),
                     Enemigo_walk(x=6084, y=448, velocidad=40),
-
                 )
+
             elif nivel_actual == 3:
                 enemigos.add(
-                    Enemigo_walk(x=611, y=864, velocidad = 40),
+                    Enemigo_walk(x=611, y=864, velocidad=40),
                     Enemigo(x=869, y=671, velocidad=35, escala=2.5),
                     Enemigo_walk(x=1469, y=864, velocidad=40),
                     Enemigo_walk(x=2414, y=864, velocidad=40),
@@ -2403,26 +2404,29 @@ def main():
                     Enemigo_walk(x=4083, y=864, velocidad=40),
                     Enemigo_walk(x=5946, y=864, velocidad=40),
                     Enemigo(x=5933, y=735, velocidad=35, escala=2.5),
-                    Enemigo_walk(x=7548, y=864, velocidad=40),
+                    Enemigo(x=7548, y=864, velocidad=40),
                     Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
                     Enemigo(x=7550, y=543, velocidad=35, escala=2.5),
                     Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
                     Enemigo(x=8319, y=448, velocidad=35, escala=2.5),
                     EnemigoPezueso(
-                        x=300, y=500,
-                        jugador=jugador,
-                        velocidad_patrulla=100,
-                        velocidad_furia=260,
-                        radio_det=220,
-                        duracion_furia_ms=1800,
-                        dir_inicial=1,
-                        mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
+                        x=300, y=500, jugador=jugador,
+                        velocidad_patrulla=100, velocidad_furia=260,
+                        radio_det=220, duracion_furia_ms=1800,
+                        dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
                         escala_extra=1.0
                     ),
-
                 )
-            items = pygame.sprite.Group()
-            if nivel_actual == 1:
+
+            # --- agrega items por nivel (SIN volver a hacer items = Group()) ---
+            if nivel_actual == 0:
+                items.add(
+                    Manzana(x=2298, y=591),
+                    Manzana(x=2590, y=463),
+                    bolsa(x=2740, y=375)
+                )
+
+            elif nivel_actual == 1:
                 items.add(
                     Manzana(x=338, y=479),
                     Manzana(x=724, y=374),
@@ -2434,10 +2438,8 @@ def main():
                     Manzana(x=2216, y=526),
                     Manzana(x=4481, y=425),
                     Manzana(x=4585, y=425),
-                    Manzana(x=4585, y=425),
                     Manzana(x=4681, y=425),
                     Manzana(x=3403, y=379),
-                    Manzana(x=3981, y=384),
                     Manzana(x=3981, y=384),
                     bolsa(x=2508, y=150),
                     bolsa(x=5342, y=254),
@@ -2477,11 +2479,39 @@ def main():
                     nivel_actual == 1
                     and selected_difficulty == "FACIL"
                     and not tutorial_shown_level1
-                    and tutorial_overlay
             ):
-                tutorial_context = "game"
-                estado = ESTADO_TUTORIAL
-                musica.set_master_volume(settings["volume"] * 0.5)  # volumen reducido
+                # Construir el overlay en este momento según el idioma
+                try:
+                    lang = settings.get("language") or "es"
+                    ui_dir = IMG_DIR / "ui"
+                    path = ui_dir / ("tutorial_en.png" if lang == "en" else "tutorial.png")
+                    if not path.exists():
+                        path = ui_dir / "tutorial.png"
+
+                    print(f"[INFO] Cargando tutorial desde: {path} (lang={lang})")
+                    tutorial_img = pygame.image.load(path).convert_alpha()
+                    tutorial_overlay = TutorialOverlay(
+                        (constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA),
+                        tutorial_img
+                    )
+
+                    tutorial_context = "game"
+                    estado = ESTADO_TUTORIAL
+                    musica.set_master_volume(settings["volume"] * 0.5)  # volumen reducido
+
+                except Exception as e:
+                    print(f"[ADVERTENCIA] No se pudo cargar el tutorial ({path}): {e}")
+                    # Fallback: entrar directo al juego
+                    spawn_grace = SPAWN_GRACE
+                    spawn_skip_frames = SPAWN_SKIP_FRAMES
+                    jugador.invencible = True
+                    jugador.invencible_timer = SPAWN_GRACE
+                    jugador.knockback_activo = False
+                    jugador.knockback_timer = 0.0
+                    jugador.vel_y = 0
+                    jugador.en_piso = True
+                    estado = ESTADO_JUEGO
+
             else:
                 # === SPAWN FIX: al entrar directo al juego, activar gracia/frames ===
                 spawn_grace = SPAWN_GRACE
@@ -2493,6 +2523,7 @@ def main():
                 jugador.vel_y = 0
                 jugador.en_piso = True
                 estado = ESTADO_JUEGO
+
 
         elif estado == ESTADO_TUTORIAL:
             pass  # la interacción se maneja en eventos
