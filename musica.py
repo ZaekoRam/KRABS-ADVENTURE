@@ -182,6 +182,7 @@ SFX_LIB = {
     "death": SFX_DIR / "death.wav",
     "golpe": SFX_DIR / "golpe.wav",
     "stun":  SFX_DIR / "stun.wav",
+    "1up":  SFX_DIR / "1up.ogg",
 }
 
 _SFX_CACHE = {}

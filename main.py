@@ -13,9 +13,8 @@ import imageio
 from enemigos import Enemigo
 from enemigos import Enemigo_walk
 from enemigos import EnemigoPezueso
-from items import Manzana, bolsa
+from items import botella, bolsa, llanta, lamina, gustambo
 from fuentes import get_font
-()
 from parallax import create_parallax_nivel1, create_parallax_nivel2, create_parallax_nivel3
 
 import sys
@@ -451,6 +450,12 @@ btn_lang_rect = pygame.Rect(0, 0, 260, 50)
 btn_lang_rect.center = (constantes.ANCHO_VENTANA // 2, 320)
 
 
+def can_stomp(jugador, enemigo, margen_px=8):
+    if not hasattr(jugador, "vel_y"): return False
+    if jugador.vel_y <= 0: return False  # debe venir cayendo
+    prev_bottom = getattr(jugador, "prev_bottom", None)
+    if prev_bottom is None: return False
+    return prev_bottom <= (enemigo.rect.top + margen_px)
 
 def esta_en_suelo(j, col_rects) -> bool:
     """Chequeo inmediato de suelo: mira 1px por debajo del jugador."""
@@ -1008,6 +1013,42 @@ class Bubble:
     def draw(self, surface):
         col = (255, 255, 255, int(self.alpha))
         pygame.draw.circle(surface, col, (int(self.x), int(self.y)), self.r)
+
+# ---------------- Texto flotante (+1 VIDA) ----------------
+class FloatingText:
+    def __init__(self, text, world_pos, font, color=(255,255,255), rise_speed=60, duration=0.9):
+        self.text = text
+        self.x, self.y = world_pos  # coordenadas del mundo
+        self.font = font
+        self.color = color
+        self.rise_speed = float(rise_speed)
+        self.duration = float(duration)
+        self.age = 0.0
+        # prerender + sombra
+        self.surf = self.font.render(self.text, True, self.color)
+        self.shadow = self.font.render(self.text, True, (0,0,0))
+
+    def update(self, dt):
+        self.age += dt
+        self.y -= self.rise_speed * dt    # sube
+        return self.age < self.duration   # True si sigue viva
+
+    def draw(self, surface, cam_offset):
+        ox, oy = cam_offset
+        # fade-out suave
+        alpha = max(0, 255 - int((self.age / self.duration) * 255))
+        if alpha <= 0: return
+        surf = self.surf.copy()
+        shadow = self.shadow.copy()
+        surf.set_alpha(alpha)
+        shadow.set_alpha(alpha)
+
+        # dibuja con leve sombra
+        sx = int(self.x - ox)
+        sy = int(self.y - oy)
+        surface.blit(shadow, (sx + 2, sy + 2))
+        surface.blit(surf, (sx, sy))
+
 
 # -------------------- VICTORY SCREEN COMPLETA --------------------
 class VictoryScreen:
@@ -1782,6 +1823,12 @@ def main():
     puntuacion = 0
     tutorial_shown_level1 = False
     tutorial_context = None
+    # --- Efectos de texto flotante ---
+    floating_texts = []
+
+    # --- Vida extra por basura ---
+    trash_collected = 0  # contador actual de basura recogida
+    trash_threshold = 3  # umbral (se ajusta por dificultad al cargar nivel)
 
     # === SPAWN FIX: contadores de gracia/frames ===
     spawn_grace = 0.0
@@ -2302,6 +2349,10 @@ def main():
                 print("Aviso música de nivel:", e)
             puntuacion = 0
             timer = tiempo_total
+            # --- Umbral de vida por basura según dificultad ---
+            trash_collected = 0
+            trash_threshold = 3 if selected_difficulty == "FACIL" else 5
+
             if nivel_actual == 1:
                 parallax = create_parallax_nivel1()
             elif nivel_actual == 2:
@@ -2374,7 +2425,6 @@ def main():
             elif nivel_actual == 2:
                 enemigos.add(
                     Enemigo_walk(x=299, y=833, velocidad=40),
-                    Enemigo(x=450, y=675, velocidad=35, escala=2.5),
                     Enemigo_walk(x=1578, y=831, velocidad=40),
                     Enemigo(x=2331, y=830, velocidad=35, escala=2.5),
                     Enemigo(x=2903, y=607, velocidad=35, escala=2.5),
@@ -2410,6 +2460,41 @@ def main():
                     Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
                     Enemigo(x=8319, y=448, velocidad=35, escala=2.5),
                     EnemigoPezueso(
+                        x=3350, y=400, jugador=jugador,
+                        velocidad_patrulla=100, velocidad_furia=260,
+                        radio_det=220, duracion_furia_ms=1800,
+                        dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
+                        escala_extra=1.0
+                    ),
+                    EnemigoPezueso(
+                        x=4110, y=390, jugador=jugador,
+                        velocidad_patrulla=100, velocidad_furia=260,
+                        radio_det=220, duracion_furia_ms=1800,
+                        dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
+                        escala_extra=1.0
+                    ),
+                    EnemigoPezueso(
+                        x=5430, y=600, jugador=jugador,
+                        velocidad_patrulla=100, velocidad_furia=260,
+                        radio_det=220, duracion_furia_ms=1800,
+                        dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
+                        escala_extra=1.0
+                    ),
+                    EnemigoPezueso(
+                        x=6610, y=485, jugador=jugador,
+                        velocidad_patrulla=100, velocidad_furia=260,
+                        radio_det=220, duracion_furia_ms=1800,
+                        dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
+                        escala_extra=1.0
+                    ),
+                    EnemigoPezueso(
+                        x=8450, y=330, jugador=jugador,
+                        velocidad_patrulla=100, velocidad_furia=260,
+                        radio_det=220, duracion_furia_ms=1800,
+                        dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
+                        escala_extra=1.0
+                    ),
+                    EnemigoPezueso(
                         x=300, y=500, jugador=jugador,
                         velocidad_patrulla=100, velocidad_furia=260,
                         radio_det=220, duracion_furia_ms=1800,
@@ -2421,29 +2506,29 @@ def main():
             # --- agrega items por nivel (SIN volver a hacer items = Group()) ---
             if nivel_actual == 0:
                 items.add(
-                    Manzana(x=2298, y=591),
-                    Manzana(x=2590, y=463),
+                    botella(x=2298, y=591),
+                    botella(x=2590, y=463),
                     bolsa(x=2740, y=375)
                 )
 
             elif nivel_actual == 1:
                 items.add(
-                    Manzana(x=338, y=479),
-                    Manzana(x=724, y=374),
-                    Manzana(x=981, y=309),
-                    Manzana(x=1234, y=383),
-                    Manzana(x=2003, y=387),
-                    Manzana(x=2245, y=298),
-                    Manzana(x=2767, y=348),
-                    Manzana(x=2216, y=526),
-                    Manzana(x=4481, y=425),
-                    Manzana(x=4585, y=425),
-                    Manzana(x=4681, y=425),
-                    Manzana(x=3403, y=379),
-                    Manzana(x=3981, y=384),
+                    botella(x=338, y=479),
+                    lamina(x=724, y=374),
+                    llanta(x=981, y=309),
+                    lamina(x=1234, y=383),
+                    llanta(x=2003, y=387),
+                    botella(x=2245, y=298),
+                    llanta(x=2767, y=348),
+                    lamina(x=2216, y=526),
+                    botella(x=4481, y=425),
+                    llanta(x=4585, y=425),
+                    bolsa(x=4681, y=425),
+                    botella(x=3403, y=379),
+                    lamina(x=3981, y=384),
                     bolsa(x=2508, y=150),
-                    bolsa(x=5342, y=254),
-                    bolsa(x=3715, y=260)
+                    gustambo(x=5342, y=254),
+                    gustambo(x=3690, y=260)
                 )
 
             # === Ajustes por dificultad ===
@@ -2535,6 +2620,7 @@ def main():
                 vy = 0.0
                 if fly_up:   vy -= FLY_SPEED
                 if fly_down: vy += FLY_SPEED
+
 
                 jugador.forma.x += int(vx * dt)
                 jugador.forma.y += int(vy * dt)
@@ -2659,8 +2745,39 @@ def main():
             for item in list(items.sprites()):
                 if item.tocar_jugador(jugador):
                     puntuacion += item.puntos
-                    musica.sfx("coin", volume=0.8)
+                    try:
+                        musica.sfx("coin", volume=0.8)
+                    except Exception:
+                        pass
                     item.kill()
+
+                    # === VIDA EXTRA POR BASURA ===
+                    if isinstance(item, (botella, bolsa,lamina,llanta,gustambo)):
+                        trash_collected += 1
+                        if trash_collected >= trash_threshold:
+                            trash_collected -= trash_threshold
+                            if jugador.vida_actual < 4:
+                                jugador.vida_actual = min(jugador.vida_actual + 1, jugador.vida_maxima)
+                                try:
+                                    musica.sfx("1up", volume= 10000000.5)  # puedes subirlo a 1.2 si tu sfx lo permite
+                                except Exception:
+                                    pass
+
+                            # 🔤 Texto i18n  <-- ¡YA NO ESTÁ DENTRO DEL except!
+                                txt_1up = "+1 LIFE" if (settings.get("language") == "en") else "+1 VIDA"
+                                ft_font = get_font(constantes.FONT_HUD)
+
+                                spawn_x = jugador.forma.centerx
+                                spawn_y = jugador.forma.top - 8
+
+                                floating_texts.append(
+                                    FloatingText(
+                                        txt_1up, (spawn_x, spawn_y), ft_font,
+                                        color=(255, 255, 120), rise_speed=70, duration=1.0
+                                    )
+                                )
+
+                                print(f"[1UP] +1 vida por basura (umbral {trash_threshold})")
 
             # I-frames
             if getattr(jugador, "invencible", False):
@@ -2668,6 +2785,9 @@ def main():
                 if jugador.invencible_timer <= 0:
                     jugador.invencible = False
                     jugador.stun_sound_played = False
+
+            # GUARDA EL BORDE INFERIOR DEL FRAME ANTERIOR PARA DETECTAR STOMP
+            jugador.prev_bottom = jugador.forma.bottom
 
             # Knockback
             if getattr(jugador, "knockback_activo", False):
@@ -2739,21 +2859,57 @@ def main():
             # Ataque
             if jugador.attacking and jugador.attack_timer > 0:
                 atk = jugador.get_attack_rect()
+
                 for e in list(enemigos):
+                    # --- STOMP: requiere contacto cuerpo a cuerpo ---
+                    if jugador.forma.colliderect(e.rect):
+                        if hasattr(e, "state") and e.state == "alive" and can_stomp(jugador, e):
+                            if hasattr(e, "stomp_kill"):
+                                e.stomp_kill()
+                            else:
+                                e.kill()
+                            try:
+                                musica.sfx("stomp", volume=0.9)
+                            except:
+                                pass
+                            jugador.vel_y = -abs(getattr(constantes, "SALTO_VEL", -750)) * 0.45
+                            jugador.en_piso = False
+                            puntuacion += getattr(e, "puntos", 100)
+                            continue  # ya resolvimos con stomp
+
+                    # --- ATAQUE NORMAL: usa el rectángulo de alcance, NO requiere contacto ---
                     if atk.colliderect(e.rect):
                         if hasattr(e, "hurt"):
                             e.hurt(jugador.attack_damage)
                             if not jugador.hit_sound_played:
                                 musica.sfx("golpe", volume=0.9)
                                 jugador.hit_sound_played = True
-                        if e.vida <= 0:
+                        if getattr(e, "vida", 1) <= 0:
                             puntuacion += e.puntos
+
+            if jugador.attack_timer <= 0:
+                jugador.hit_sound_played = False
 
             if jugador.attack_timer <= 0:
                 jugador.hit_sound_played = False
 
             # Daño del enemigo
             for e in enemigos:
+                if not jugador.forma.colliderect(e.rect):
+                    continue
+                if hasattr(e, "state") and e.state == "alive" and can_stomp(jugador, e):
+                    if hasattr(e, "stomp_kill"):
+                        e.stomp_kill()
+                    else:
+                        e.kill()
+                    try:
+                        musica.sfx("stomp", volume=0.9)
+                    except:
+                        pass
+                    jugador.vel_y = -abs(getattr(constantes, "SALTO_VEL", -750)) * 0.45
+                    jugador.en_piso = False
+                    puntuacion += getattr(e, "puntos", 100)
+                    continue
                 if e.tocar_jugador(jugador) and not getattr(jugador, "invencible", False):
                     if selected_difficulty == "DIFICIL":
                         jugador.recibir_dano(2)
@@ -2848,6 +3004,8 @@ def main():
             # CAMBIO AQUÍ: Ya no hay temporizador automático, solo actualizamos botones
             continue_ui.update(mouse_pos)
             # El cambio de estado ahora se maneja completamente con los botones/teclado
+        # === Actualizar textos flotantes (+1 VIDA) ===
+        floating_texts[:] = [ft for ft in floating_texts if ft.update(dt)]
 
         # -------------------- DRAW --------------------
 
@@ -3038,6 +3196,11 @@ def main():
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
             if estado == "PAUSA":
                 pause_menu.draw(ventana)
+
+            # Dibujar textos flotantes (después de dibujar jugador/ítems)
+            for ft in floating_texts:
+                ft.draw(ventana, cam.offset())
+
             # HUD solo si NO hay cutscene de victoria (para que no parezca congelado)
             if not ("secuencia_victoria" in locals() and secuencia_victoria.activa):
                 draw_timer(ventana, font_hud, timer, pos=(20, 20))

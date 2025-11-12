@@ -134,7 +134,7 @@ class Personaje(pygame.sprite.Sprite):
             return pygame.Rect(0, 0, 0, 0)
 
         # Ajusta a tu gusto (alcance y grosor)
-        ATTACK_RANGE = max(24, int(self.image.get_width() * 0.9))  # px hacia adelante
+        ATTACK_RANGE = max(50, int(self.image.get_width() * 0.9))  # px hacia adelante
         ATTACK_THICK = max(16, int(self.image.get_height() * 0.55))  # altura del hitbox
 
         # Altura: centrado en el torso. Si quieres "barrida" al suelo, ver opción abajo.
