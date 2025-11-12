@@ -136,7 +136,22 @@ Los peligros que dañan el ecosistema y a Kraby:
  ![Image](https://github.com/user-attachments/assets/80e21474-6c03-451f-b117-525d5910eed2)  ![Image](https://github.com/user-attachments/assets/2eff2662-0ef8-46f5-9d8f-e2826fa2ea8b) 
  
 
+### 🏃 Un Vistazo Rápido al Gameplay
 
+**¡Observa la acción en este ciclo de juego completo\!**
+Aquí te mostramos los momentos clave: desde el desplazamiento y la interacción, hasta los resultados de ganar y perder.
+
+* **Movimiento y Exploración:**
+    ![Image](https://github.com/user-attachments/assets/d41a4f61-67bf-44e5-a1bb-4bf7dbcf15ab)
+
+* **Impacto y Reacción (Hacer/Recibir Daño):**
+    ![Image](https://github.com/user-attachments/assets/b27a9ef0-5563-4c05-a262-6c4e409ed002)
+    ![Image](https://github.com/user-attachments/assets/ef8677be-eef9-4bc3-adc6-1e36da01f37b)
+
+* **Hacia la Meta:**
+    ![Image](https://github.com/user-attachments/assets/650cda0e-90f8-46bb-ac3d-91bb3cb963ed)
+
+ 
 
 ---
 
