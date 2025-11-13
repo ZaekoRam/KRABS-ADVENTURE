@@ -21,6 +21,169 @@ import sys
 
 
 # -------------------- Secuencia de Victoria (animación tipo Mario) --------------------
+class TrashFallFX:
+    def __init__(self, w, h, max_pieces=None, spawn_rate=3):
+        self.w = w
+        self.h = h
+        self.max_pieces = max_pieces   # máximo de piezas en pantalla
+        self.spawn_rate = spawn_rate   # piezas por segundo (aprox)
+        self.timer = 0.0
+        self.pieces = []
+        self.bottom_margin = 40        # cuánto “mar” dejamos abajo
+
+        # ----- CARGAR IMÁGENES DE BASURA -----
+        base_dir = Path(__file__).resolve().parent
+        items_dir = base_dir / "assets" / "images" / "items"
+
+        filenames = [
+            "lamina.png",
+            "llanta.png",
+            "tambo.png",
+            "botella.png"
+        ]
+
+        self.images = []
+        for name in filenames:
+            p = items_dir / name
+            if p.exists():
+                img = pygame.image.load(str(p)).convert_alpha()
+                self.images.append(img)
+            else:
+                print(f"[TrashFallFX] No se encontró {p}")
+
+        # fallback por si no se encontró nada
+        if not self.images:
+            dummy = pygame.Surface((20, 20), pygame.SRCALPHA)
+            dummy.fill((200, 200, 200, 180))
+            self.images.append(dummy)
+
+    def reset(self):
+        """Limpia todas las piezas (por si quieres reiniciar efecto)."""
+        self.pieces.clear()
+        self.timer = 0.0
+
+    def spawn_piece(self):
+        if len(self.pieces) >= self.max_pieces:
+            return
+
+        base_img = random.choice(self.images)
+
+        # Tamaño aleatorio para variedad
+        scale = random.uniform(0.55, 0.9)
+        new_w = int(base_img.get_width() * scale)
+        new_h = int(base_img.get_height() * scale)
+
+        img = pygame.transform.smoothscale(base_img, (new_w, new_h))
+        img.set_alpha(random.randint(160, 230))
+
+        # Posición inicial (un poco arriba de la pantalla)
+        x = random.randint(0, max(0, self.w - new_w))
+        y = random.randint(-250, -60)
+
+        # Velocidades para simular “agua”
+        vy = random.uniform(20, 40)     # velocidad vertical inicial (lenta)
+        vx = random.uniform(-10, 10)    # pequeña deriva horizontal
+
+        self.pieces.append({
+            "x": float(x),
+            "y": float(y),
+            "vx": vx,
+            "vy": vy,
+            "surf": img,
+            "w": new_w,
+            "h": new_h,
+            "settled": False,          # si ya se quedó en el fondo
+        })
+
+    def update(self, dt):
+        # Spawn “de poco en poco”
+        if self.spawn_rate > 0:
+            self.timer += dt
+            spawn_interval = 1.0 / self.spawn_rate
+            while self.timer >= spawn_interval:
+                self.timer -= spawn_interval
+                # 80% de probabilidad de generar una pieza en ese tick
+                if random.random() < 0.8:
+                    self.spawn_piece()
+
+        # Actualizar físicas
+        for piece in self.pieces:
+            if piece["settled"]:
+                continue  # ya está en el fondo, no se mueve
+
+            # Simulamos “peso en agua”: poca aceleración
+            piece["vy"] += 25 * dt      # gravedad suave
+            if piece["vy"] > 80:        # límite de velocidad (para que no caigan en seco)
+                piece["vy"] = 80
+
+            # Movimiento
+            piece["y"] += piece["vy"] * dt
+            piece["x"] += piece["vx"] * dt
+
+            # Ligeras correcciones: que no se salgan a los lados
+            if piece["x"] < -10:
+                piece["x"] = -10
+                piece["vx"] *= -0.3
+            elif piece["x"] + piece["w"] > self.w + 10:
+                piece["x"] = self.w - piece["w"] + 10
+                piece["vx"] *= -0.3
+
+            # Fondo del “mar”
+            bottom_limit = self.h - self.bottom_margin
+            if piece["y"] + piece["h"] >= bottom_limit:
+                piece["y"] = bottom_limit - piece["h"]
+                piece["vy"] = 0
+                piece["vx"] *= 0.15   # casi se detiene en horizontal
+                piece["settled"] = True  # se queda acumulada
+
+    def draw(self, surface):
+        for piece in self.pieces:
+            surface.blit(piece["surf"], (int(piece["x"]), int(piece["y"])))
+
+    def update(self, dt):
+        # Spawn “de poco en poco”
+        if self.spawn_rate > 0:
+            self.timer += dt
+            spawn_interval = 1.0 / self.spawn_rate
+            while self.timer >= spawn_interval:
+                self.timer -= spawn_interval
+                if random.random() < 0.8:
+                    self.spawn_piece()
+
+        # Actualizar físicas
+        for piece in self.pieces:
+            if piece["settled"]:
+                continue
+
+            # gravedad suave
+            piece["vy"] += 25 * dt
+            if piece["vy"] > 80:
+                piece["vy"] = 80
+
+            # movimiento
+            piece["y"] += piece["vy"] * dt  # <--- ESTA LÍNEA ES LA IMPORTANTE
+            piece["x"] += piece["vx"] * dt
+
+            # límites izquierda/derecha
+            if piece["x"] < -10:
+                piece["x"] = -10
+                piece["vx"] *= -0.3
+            elif piece["x"] + piece["w"] > self.w + 10:
+                piece["x"] = self.w - piece["w"] + 10
+                piece["vx"] *= -0.3
+
+            # suelo
+            bottom_limit = self.h - self.bottom_margin
+            if piece["y"] + piece["h"] >= bottom_limit:
+                piece["y"] = bottom_limit - piece["h"]
+                piece["vy"] = 0
+                piece["vx"] *= 0.15
+                piece["settled"] = True
+
+    def draw(self, surface):
+        # Dibujar cada sprite de basura
+        for p in self.pieces:
+            surface.blit(p["surf"], (int(p["x"]), int(p["y"])))
 class SecuenciaVictoria:
     def __init__(self, jugador, bandera_rect, nivel, on_finish):
         self.jugador = jugador
@@ -546,6 +709,7 @@ def draw_puntuacion(surface, font, puntuacion, pos=(20, 80)):
 
 
 def reiniciar_nivel(nivel, jugador):
+
     x, y_spawn = 100, 670
     if nivel.spawn:
         x, y_spawn = int(nivel.spawn[0]), int(nivel.spawn[1])
@@ -885,6 +1049,9 @@ class GameOverScreen:
         self.font_sub = get_font(constantes.FONT_UI_ITEM)
         self.font_item = get_font(constantes.FONT_UI_ITEM)
 
+        # 🎯 efecto de basura
+        self.trash_fx = TrashFallFX(self.w, self.h, max_pieces=10000000, spawn_rate=20)
+
         # Imagen opcional (puedes dejar fondo del juego)
         try:
             self.bg = pygame.image.load(IMG_DIR / "ui" / "game_over.png").convert()
@@ -900,6 +1067,11 @@ class GameOverScreen:
 
         self.btn_retry = BotonSimple(tr("continue"), (self.w // 2, center_y), BTN_W, BTN_H)
         self.btn_menu  = BotonSimple(tr("menu"), (self.w // 2, center_y + spacing), BTN_W, BTN_H)
+
+    def tick(self, dt):
+        # solo actualiza la basura
+        if hasattr(self, "trash_fx"):
+            self.trash_fx.update(dt)
 
     def reset(self):
         pass
@@ -933,6 +1105,10 @@ class GameOverScreen:
         dim = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 120))
         surface.blit(dim, (0, 0))
+
+        # 🌎♻️ BASURA CAYENDO (detrás del texto y botones)
+        if hasattr(self, "trash_fx"):
+            self.trash_fx.draw(surface)
 
         # --- TÍTULO PRINCIPAL ---
         title = self.font_title.render(tr("go_title"), True, (255, 180, 50))
@@ -2375,6 +2551,7 @@ def main():
                 parallax = create_parallax_nivel3()
             else:
                 parallax = create_parallax_nivel1()  # fallback
+            continue_ui.trash_fx.reset()
 
             prev_cam_offset_x = cam.offset()[0]
             mover_derecha = False
@@ -2494,13 +2671,6 @@ def main():
                         dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
                         escala_extra=1.0
                     ),
-                    EnemigoPezueso(
-                        x=300, y=500, jugador=jugador,
-                        velocidad_patrulla=100, velocidad_furia=260,
-                        radio_det=220, duracion_furia_ms=1800,
-                        dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
-                        escala_extra=1.0
-                    ),
                 )
 
             # --- agrega items por nivel (SIN volver a hacer items = Group()) ---
@@ -2529,6 +2699,55 @@ def main():
                     bolsa(x=2508, y=150),
                     gustambo(x=5342, y=254),
                     gustambo(x=3690, y=260)
+                )
+            elif nivel_actual == 2:
+                items.add(
+                    botella(x=644, y=429),
+                    botella(x=923, y=397),
+                    llanta(x=1530, y=600),
+                    lamina(x=1765, y=524),
+                    bolsa(x=2160, y=655),
+                    llanta(x=2558, y=630),
+                    botella(x=2890, y=550),
+                    botella(x=2890, y=780),
+                    bolsa(x=3258, y=622),
+                    gustambo(x=3845, y=760),
+                    botella(x=3850, y=516),
+                    botella(x=4760, y=440),
+                    lamina(x=5420, y=780),
+                    botella(x=5420, y=520),
+                    gustambo(x=6320,y=340)
+                )
+            elif nivel_actual == 3:
+                items.add(
+                    lamina(x=1000, y=560),
+                    botella(x=2180, y=650),
+                    botella(x=2030, y=650),
+                    botella(x=2180, y=470),
+                    botella(x=2030, y=470),
+                    bolsa(x=2120, y=800),
+                    botella(x=3130, y=630),
+                    lamina(x=3370, y=580),
+                    bolsa(x=3570, y=500),
+                    lamina(x=3710, y=580),
+                    botella(x=3930, y=480),
+                    llanta(x=4180, y=620),
+                    llanta(x=4400, y=500),
+                    gustambo(x=4600, y=440),
+                    llanta(x=4650, y=810),
+                    llanta(x=4400, y=810),
+                    llanta(x=4300, y=810),
+                    gustambo(x=5890, y=630),
+                    llanta(x=5890, y=800),
+                    botella(x=6770, y=640),
+                    botella(x=6600, y=530),
+                    lamina(x=6280, y=630),
+                    bolsa(x=7470, y=630),
+                    bolsa(x=7470, y=830),
+                    bolsa(x=7600, y=830),
+                    gustambo(x=7510, y=430),
+                    bolsa(x=7600, y=630),
+                    gustambo(x=8500, y=250)
                 )
 
             # === Ajustes por dificultad ===
@@ -3001,6 +3220,9 @@ def main():
                 continue_ui.reset()
 
         elif estado == ESTADO_CONTINUE:
+            continue_ui.tick(dt)  # 🔹 actualiza la basura
+            continue_ui.update(mouse_pos)  # tu código de botones
+            continue_ui.draw(ventana)  # dibuja todo (fondo + basura + UI)
             # CAMBIO AQUÍ: Ya no hay temporizador automático, solo actualizamos botones
             continue_ui.update(mouse_pos)
             # El cambio de estado ahora se maneja completamente con los botones/teclado

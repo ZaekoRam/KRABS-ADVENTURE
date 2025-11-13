@@ -109,15 +109,10 @@ El jugador podra visualizar cuantas vidas tiene completas y dañadas
 
 El jugador debe recolectar y clasificar diferentes tipos de residuos:
 
-* **1. Desecho Orgánico (Cáscara de Plátano):** Residuos biodegradables.
+
+* **1. Residuos Inclasificables/Mixtos (Bolsa de Basura y botella):** Objetos que deben ser llevados a una estación especial.
   
-   <img width="32" height="32" alt="Image" src="https://github.com/user-attachments/assets/c1ced826-01f0-4fa0-b0f6-cd9d9c2d8f14" />
-* **2. Desecho Orgánico (Mitad de Manzana):** Otro ejemplo de residuo biodegradable.
-  
-   <img width="32" height="32" alt="Image" src="https://github.com/user-attachments/assets/15bde8f0-f8e0-44df-8367-86954c9fe399" />
-* **3. Residuos Inclasificables/Mixtos (Bolsa de Basura y botella):** Objetos que deben ser llevados a una estación especial.
-  
-  <img width="32" height="32" alt="Image" src="https://github.com/user-attachments/assets/88963e0f-77c7-46a1-8253-959e260996f5" /> <img width="32" height="32" alt="Image" src="https://github.com/user-attachments/assets/bd067133-286d-4b9b-8a16-403ecb781339" />
+  <img width="32" height="32" alt="Image" src="https://github.com/user-attachments/assets/88963e0f-77c7-46a1-8253-959e260996f5" /> <img width="50" height="50" alt="Image" src="https://github.com/user-attachments/assets/4ce9f606-a9d4-4a44-a988-854774359568" /> <img width="50" height="50" alt="Image" src="https://github.com/user-attachments/assets/ef585e3b-d441-46c5-b686-8b518acd5d77" /> <img width="50" height="50" alt="Image" src="https://github.com/user-attachments/assets/a6a91a18-a214-41f5-a40c-22a8d09e5ac4" /> <img width="50" height="50" alt="Image" src="https://github.com/user-attachments/assets/29e3f74f-7d16-4cfd-9bea-7f2664a50a58" />
 
 ### 💀 Peligros y Obstáculos
 
@@ -142,7 +137,7 @@ Los peligros que dañan el ecosistema y a Kraby:
 Aquí te mostramos los momentos clave: desde el desplazamiento y la interacción, hasta los resultados de ganar y perder.
 
 * **Movimiento y Exploración:**
-    ![Image](https://github.com/user-attachments/assets/d41a4f61-67bf-44e5-a1bb-4bf7dbcf15ab)
+    ![Image](https://github.com/user-attachments/assets/76a41e22-4995-4949-a446-5eca7500531e)
 
 * **Impacto y Reacción (Hacer/Recibir Daño):**
     ![Image](https://github.com/user-attachments/assets/b27a9ef0-5563-4c05-a262-6c4e409ed002)
