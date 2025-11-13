@@ -370,14 +370,14 @@ TXT = {
         "v2_hint": "ENTER/SPACE: Menu",
 
         # Selectores
-        "sel_char_title": "CHARACTER SELECT",
-        "sel_level_title": "LEVEL SELECT",
+        "sel_char_title": "CHARACTER SELECTION",
+        "sel_level_title": "LEVEL SELECTION",
         "level_1": "LEVEL 1",
         "level_2": "LEVEL 2",
         "level_3": "LEVEL 3",
         "level_hint": "Click or press 1/2/3 • ESC to go back",
 
-        "diff_title": "DIFFICULTY",
+        "diff_title": "LEVEL",
         "diff_easy": "BEGINNER",
         "diff_hard": "CHALLENGING",
         "diff_hint": "Click or ←/→ to play • ESC to go back",
@@ -1851,7 +1851,12 @@ ESTADO_VICTORY_SCREEN = "VICTORY_SCREEN"
 
 
 def main():
-    pygame.mixer.pre_init(44100, -16, 2, 512)
+    pygame.mixer.pre_init(
+        frequency=44100,  # estándar
+        size=-16,  # 16-bits
+        channels=2,  # estéreo
+        buffer=1024  # prueba 1024 o 2048
+    )
     pygame.init()
     if not pygame.mixer.get_init():
         pygame.mixer.init(44100, -16, 2, 512)
@@ -2692,8 +2697,8 @@ def main():
                     llanta(x=2767, y=348),
                     lamina(x=2216, y=526),
                     botella(x=4481, y=425),
-                    llanta(x=4585, y=425),
-                    bolsa(x=4681, y=425),
+                    botella(x=4585, y=425),
+                    botella(x=4681, y=425),
                     botella(x=3403, y=379),
                     lamina(x=3981, y=384),
                     bolsa(x=2508, y=150),

@@ -135,7 +135,6 @@
   <object id="96" x="5375.33" y="574.667" width="126" height="20"/>
   <object id="98" x="576.667" y="640" width="24.6667" height="319.667"/>
   <object id="99" x="1032" y="640.667" width="46" height="320"/>
-  <object id="100" x="915.333" y="835.333" width="5.33333" height="7.33333"/>
   <object id="101" x="-105.333" y="576" width="108" height="384"/>
  </objectgroup>
  <objectgroup id="4" name="barrera_enemigos">
