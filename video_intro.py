@@ -23,7 +23,7 @@ def play_intro_or_skip(lang: str, screen, clock):
     player = MediaPlayer(
         str(video_path),
         ff_opts={
-            "sync": "audio",
+        "sync": "audio",
             "out_fmt": "yuv420p",
             "paused": False,
             # --- Fuerza un formato de audio estándar ---
@@ -73,7 +73,7 @@ def play_intro_or_skip(lang: str, screen, clock):
             pygame.display.flip()
 
         # --- Control de FPS (30) ---
-        clock.tick(32)
+        clock.tick(30)
 
     # --- Cierre seguro ---
     try:
