@@ -2707,8 +2707,8 @@ def main():
                 )
             elif nivel_actual == 2:
                 items.add(
-                    botella(x=644, y=429),
-                    botella(x=923, y=397),
+                    botella(x=780, y=510),
+                    botella(x=950, y=460),
                     llanta(x=1530, y=600),
                     lamina(x=1765, y=524),
                     bolsa(x=2160, y=655),
@@ -2725,9 +2725,9 @@ def main():
                 )
             elif nivel_actual == 3:
                 items.add(
-                    lamina(x=1000, y=560),
-                    botella(x=2180, y=650),
-                    botella(x=2030, y=650),
+                    lamina(x=930, y=500),
+                    botella(x=2180, y=600),
+                    botella(x=2030, y=600),
                     botella(x=2180, y=470),
                     botella(x=2030, y=470),
                     bolsa(x=2120, y=800),
@@ -2736,16 +2736,19 @@ def main():
                     bolsa(x=3570, y=500),
                     lamina(x=3710, y=580),
                     botella(x=3930, y=480),
-                    llanta(x=4180, y=620),
-                    llanta(x=4400, y=500),
-                    gustambo(x=4600, y=440),
+                    llanta(x=4120, y=660),
+                    llanta(x=4300, y=600),
+                    llanta(x=4470,y= 540),
+                    gustambo(x=4650, y=470),
                     llanta(x=4650, y=810),
                     llanta(x=4400, y=810),
                     llanta(x=4300, y=810),
                     gustambo(x=5890, y=630),
                     llanta(x=5890, y=800),
-                    botella(x=6770, y=640),
+                    botella(x=6730, y=600),
+                    botella(x=6470, y=600),
                     botella(x=6600, y=530),
+                    botella(x=6890,y=680),
                     lamina(x=6280, y=630),
                     bolsa(x=7470, y=630),
                     bolsa(x=7470, y=830),
