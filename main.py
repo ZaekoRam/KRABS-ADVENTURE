@@ -867,6 +867,7 @@ class BotonSimple:
 
 
 # -------------------- TMX Level --------------------
+# -------------------- TMX Level --------------------
 class NivelTiled:
     def __init__(self, ruta_tmx: Path):
         self.tmx = load_pygame(str(ruta_tmx))
@@ -878,6 +879,9 @@ class NivelTiled:
         self.goal_rects = []
         self.enemy_barrier_rects = []
         self.collision_rects = []
+        self.condicion_rects = []  # ←←← AQUI GUARDAMOS LAS PAREDES INVISIBLES DE BASURA
+
+        # ------------------ Barreras de enemigos ------------------
         try:
             barrier_layer = self.tmx.get_layer_by_name("barrera_enemigos")
             import pytmx
@@ -889,6 +893,7 @@ class NivelTiled:
         except ValueError:
             print("ADVERTENCIA: Capa 'barrera_enemigos' no encontrada. Los enemigos podrían caerse.")
 
+        # ------------------ Colisiones normales ------------------
         try:
             collision_layer = self.tmx.get_layer_by_name("collisions")
             import pytmx
@@ -899,10 +904,11 @@ class NivelTiled:
                         self.collision_rects.append(rect)
                 print(f"DEBUG: Se cargaron {len(self.collision_rects)} rectángulos de colisión.")
             else:
-                print("ADVERTENCIA: La capa 'Collisions' existe pero no es una TiledObjectGroup.")
+                print("ADVERTENCIA: La capa 'collisions' existe pero no es un TiledObjectGroup.")
         except ValueError:
-            print("ADVERTENCIA: Capa de colisiones 'Collisions' no encontrada en el archivo TMX.")
+            print("ADVERTENCIA: Capa de colisiones 'collisions' no encontrada en el archivo TMX.")
 
+        # ------------------ Meta ------------------
         try:
             Meta_layer = self.tmx.get_layer_by_name("Meta")
             import pytmx
@@ -914,6 +920,24 @@ class NivelTiled:
         except ValueError:
             pass
 
+        # ------------------ *** CAPA CONDICION (PARED INVISIBLE) *** ------------------
+        try:
+            condicion_layer = self.tmx.get_layer_by_name("Condicion")
+            import pytmx
+            if isinstance(condicion_layer, pytmx.TiledObjectGroup):
+                for obj in condicion_layer:
+                    if obj.width > 0 and obj.height > 0:
+                        rect = pygame.Rect(int(obj.x), int(obj.y), int(obj.width), int(obj.height))
+                        self.condicion_rects.append(rect)
+
+                print(f"DEBUG: Se cargaron {len(self.condicion_rects)} rectángulos de condición.")
+            else:
+                print("ADVERTENCIA: La capa 'condicion' existe pero no es un TiledObjectGroup.")
+
+        except ValueError:
+            print("ADVERTENCIA: Capa 'condicion' no encontrada en el archivo TMX.")
+
+        # ------------------ Spawn del jugador ------------------
         self.spawn = None
         if "Spawns" in self.tmx.objectgroups:
             for obj in self.tmx.objectgroups["Spawns"]:
@@ -930,22 +954,24 @@ class NivelTiled:
                     self.spawn = (spawn_x, spawn_y)
                     break
 
+    # ------------------ Dibujado ------------------
     def draw(self, surface: pygame.Surface, camera_offset):
-        ox, oy = camera_offset;
+        ox, oy = camera_offset
         sw, sh = surface.get_size()
-        x0 = max(0, ox // self.tile_w);
+        x0 = max(0, ox // self.tile_w)
         y0 = max(0, oy // self.tile_h)
         x1 = min(self.tmx.width, (ox + sw) // self.tile_w + 2)
         y1 = min(self.tmx.height, (oy + sh) // self.tile_h + 2)
+
         for layer in self.tmx.visible_layers:
             if hasattr(layer, "tiles"):
                 for x, y, image in layer.tiles():
                     if x0 <= x < x1 and y0 <= y < y1:
-                        surface.blit(image, (x * self.tile_w - ox, y * self.tile_h - oy))
+                        surface.blit(image, (x * self.tile_w - ox,
+                                             y * self.tile_h - oy))
 
     def world_size(self):
         return self.width_px, self.height_px
-
 
 # -------------------- Camera --------------------
 class Camara:
@@ -1039,7 +1065,84 @@ class PauseMenu:
             r = surf.get_rect(center=(self.w // 2, py + 120 + i * 60))
             surface.blit(surf, r)
 
+class TrashMeter:
+    def __init__(self, x, y, total_basura, dificultad="facil"):
+        self.x = x
+        self.y = y
 
+        # Cargas SOLO tu sprite del bote vacío
+        self.frame_img = pygame.image.load("assets/images/ui/medidor_basura.png").convert_alpha()
+        self.w = self.frame_img.get_width()
+        self.h = self.frame_img.get_height()
+
+        # Superficie donde dibujaremos el relleno (del mismo tamaño que el sprite)
+        self.fill_surface = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
+
+        # Total de basura en el nivel
+        self.total_basura = total_basura
+
+        # Requisito según dificultad
+        if dificultad == "facil":
+            porcentaje_req = 0.70
+        elif dificultad == "dificil":
+            porcentaje_req = 0.90
+        else:
+            porcentaje_req = 0.80
+
+        requerido = int(round(self.total_basura * porcentaje_req))
+        self.requerida = max(1, min(self.total_basura, requerido))
+
+        self.recogida = 0
+
+        # 🔧 Ajusta esta zona para decir dónde se llena dentro del sprite
+        # (ej. la “ventana” del bote donde se ve el relleno)
+        self.fill_rect_area = pygame.Rect(10, 10, self.w - 20, self.h - 20)
+        # ↑ margen de 10 px por cada lado (ajústalo a tu sprite real)
+
+        # Color del relleno (puedes cambiar a lo que combine con tu arte)
+        self.fill_color = (50, 200, 100, 230)  # RGBA (con alpha)
+
+    def agregar_basura(self, cantidad=1):
+        self.recogida += cantidad
+        if self.recogida > self.total_basura:
+            self.recogida = self.total_basura
+
+    @property
+    def completado(self):
+        return self.recogida >= self.requerida
+
+    def draw(self, surface):
+        # Limpiamos la superficie de relleno (la dejamos transparente)
+        self.fill_surface.fill((0, 0, 0, 0))
+
+        # porcentaje de relleno en función de la basura requerida
+        porcentaje = self.recogida / self.requerida
+        if porcentaje < 0:
+            porcentaje = 0
+        if porcentaje > 1:
+            porcentaje = 1
+
+        # Vamos a llenar de ABAJO hacia ARRIBA dentro de fill_rect_area
+        area = self.fill_rect_area
+        full_h = area.height
+        filled_h = int(full_h * porcentaje)
+
+        if filled_h > 0:
+            # Rectángulo del relleno, pegado abajo
+            fill_rect = pygame.Rect(
+                area.left,
+                area.bottom - filled_h,  # empieza desde abajo
+                area.width,
+                filled_h
+            )
+
+            pygame.draw.rect(self.fill_surface, self.fill_color, fill_rect)
+
+        # 1) Dibujas primero el relleno
+        surface.blit(self.fill_surface, (self.x, self.y))
+
+        # 2) Luego dibujas encima tu PNG del bote vacío
+        surface.blit(self.frame_img, (self.x, self.y))
 
 # -------------------- Game Over Screen --------------------
 class GameOverScreen:
@@ -2642,35 +2745,35 @@ def main():
                     Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
                     Enemigo(x=8319, y=448, velocidad=35, escala=2.5),
                     EnemigoPezueso(
-                        x=3350, y=400, jugador=jugador,
+                        x=3350, y=380, jugador=jugador,
                         velocidad_patrulla=100, velocidad_furia=260,
                         radio_det=220, duracion_furia_ms=1800,
                         dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
                         escala_extra=1.0
                     ),
                     EnemigoPezueso(
-                        x=4110, y=390, jugador=jugador,
+                        x=4110, y=340, jugador=jugador,
                         velocidad_patrulla=100, velocidad_furia=260,
                         radio_det=220, duracion_furia_ms=1800,
                         dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
                         escala_extra=1.0
                     ),
                     EnemigoPezueso(
-                        x=5430, y=600, jugador=jugador,
+                        x=5430, y=500, jugador=jugador,
                         velocidad_patrulla=100, velocidad_furia=260,
                         radio_det=220, duracion_furia_ms=1800,
                         dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
                         escala_extra=1.0
                     ),
                     EnemigoPezueso(
-                        x=6610, y=485, jugador=jugador,
+                        x=6610, y=455, jugador=jugador,
                         velocidad_patrulla=100, velocidad_furia=260,
                         radio_det=220, duracion_furia_ms=1800,
                         dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
                         escala_extra=1.0
                     ),
                     EnemigoPezueso(
-                        x=8450, y=330, jugador=jugador,
+                        x=8450, y=310, jugador=jugador,
                         velocidad_patrulla=100, velocidad_furia=260,
                         radio_det=220, duracion_furia_ms=1800,
                         dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
@@ -2753,6 +2856,29 @@ def main():
                     bolsa(x=7600, y=630),
                     gustambo(x=8500, y=250)
                 )
+
+            # --- MEDIDOR DE BASURA POR NIVEL ---
+            trash_total = 0
+            for it in items:
+                if isinstance(it, (botella, bolsa, lamina, llanta, gustambo)):
+                    trash_total += 1
+
+            if trash_total <= 0:
+                trash_total = 1  # evitar división entre 0
+
+            # Dificultad para el medidor
+            if selected_difficulty == "DIFICIL":
+                dif = "dificil"
+            else:
+                dif = "facil"
+
+            # Crear el medidor UNA VEZ por carga de nivel
+            medidor = TrashMeter(1000, 20, trash_total, dificultad=dif)
+
+            # Flags para la puerta condicional
+            mostrando_mensaje_gate = False
+            ultimo_gate_rect = None
+
 
             # === Ajustes por dificultad ===
             if selected_difficulty == "DIFICIL":
@@ -2837,6 +2963,27 @@ def main():
             pass  # la interacción se maneja en eventos
 
         elif estado == ESTADO_JUEGO:
+
+
+            # Para puerta/barrera:
+            if medidor.completado:
+                mostrando_mensaje_gate = False
+                # YA NO revisas colisión → la pared desaparece
+            if not medidor.completado:
+                for rect in nivel.condicion_rects:
+                    if jugador.forma.colliderect(rect):
+                        # bloqueas movimiento como una pared normal
+                        if jugador.vel_x > 0:
+                            jugador.rect.right = rect.left
+                        elif jugador.vel_x < 0:
+                            jugador.rect.left = rect.right
+
+                        if jugador.vel_y > 0:
+                            jugador.rect.bottom = rect.top
+                        elif jugador.vel_y < 0:
+                            jugador.rect.top = rect.bottom
+
+                        mostrando_mensaje_gate = True
 
             if fly_mode:
                 vx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
@@ -2977,6 +3124,9 @@ def main():
                     # === VIDA EXTRA POR BASURA ===
                     if isinstance(item, (botella, bolsa,lamina,llanta,gustambo)):
                         trash_collected += 1
+
+                        # 🔹 ACTUALIZAR MEDIDOR DE BASURA
+                        medidor.agregar_basura(1)
                         if trash_collected >= trash_threshold:
                             trash_collected -= trash_threshold
                             if jugador.vida_actual < 4:
@@ -3030,7 +3180,16 @@ def main():
             jugador.aplicar_gravedad(dt)
             dy = int(jugador.vel_y * dt)
 
+            # 🔹 Reiniciar flags de puerta cada frame
+            mostrando_mensaje_gate = False
+            ultimo_gate_rect = None
+
+            # ------------------------------
+            #   MOVIMIENTO HORIZONTAL (X)
+            # ------------------------------
             jugador.forma.x += int(dx)
+
+            # Colisión con paredes normales
             for rect in nivel.collision_rects:
                 if jugador.forma.colliderect(rect):
                     if dx > 0:
@@ -3038,7 +3197,24 @@ def main():
                     elif dx < 0:
                         jugador.forma.left = rect.right
 
+            # Colisión con PAREDES CONDICION (solo si NO has llenado el medidor)
+            if not medidor.completado:
+                for rect in nivel.condicion_rects:
+                    if jugador.forma.colliderect(rect):
+                        if dx > 0:
+                            jugador.forma.right = rect.left
+                        elif dx < 0:
+                            jugador.forma.left = rect.right
+
+                        mostrando_mensaje_gate = True
+                        ultimo_gate_rect = rect
+
+            # ------------------------------
+            #   MOVIMIENTO VERTICAL (Y)
+            # ------------------------------
             jugador.forma.y += dy
+
+            # Colisión con paredes normales
             for rect in nivel.collision_rects:
                 if jugador.forma.colliderect(rect):
                     if dy > 0:
@@ -3048,6 +3224,21 @@ def main():
                     elif dy < 0:
                         jugador.forma.top = rect.bottom
                         jugador.vel_y = 0
+
+            # Colisión con PAREDES CONDICION (solo si NO has llenado el medidor)
+            if not medidor.completado:
+                for rect in nivel.condicion_rects:
+                    if jugador.forma.colliderect(rect):
+                        if dy > 0:
+                            jugador.forma.bottom = rect.top
+                            jugador.vel_y = 0
+                            jugador.en_piso = True
+                        elif dy < 0:
+                            jugador.forma.top = rect.bottom
+                            jugador.vel_y = 0
+
+                        mostrando_mensaje_gate = True
+                        ultimo_gate_rect = rect
 
             if not getattr(jugador, "invencible", False):
                 jugador.set_dx(vx)
@@ -3352,17 +3543,18 @@ def main():
             ventana.blit(fondo_menu, (0, 0))
             diff_ui.draw(ventana)
 
+
         elif estado in ("JUEGO", "PAUSA"):
             # Fondo/parallax y mapa
             if parallax is not None:
                 parallax.draw(ventana)
             nivel.draw(ventana, cam.offset())
 
-            # Offset de cámara (úsalo para TODO lo que dibujas)
+            # Offset de cámara (úsalo para TODO lo que dibujas en mundo)
             ox, oy = cam.offset()
-            if nivel_actual == 0:
-                ox, oy = cam.offset()  # Obtiene el offset de la cámara
 
+            # --- TUTORIALES NIVEL 0 (se mantiene igual) ---
+            if nivel_actual == 0:
                 for prompt_id in g_active_prompt_ids:
                     # 1. Obtener los datos y los assets cacheados
                     try:
@@ -3372,7 +3564,7 @@ def main():
                         continue  # Seguridad por si algo falla
 
                     text_surf = cache["text_surf"]
-                    img_surf = cache["img_surf"]
+                    img_surf  = cache["img_surf"]
 
                     # 2. Calcular Posición en Pantalla
                     screen_x = data["world_x"] - ox
@@ -3380,7 +3572,7 @@ def main():
 
                     # 3. Dibujar Texto (si existe)
                     if text_surf:
-                        t = time.time() * 3
+                        t   = time.time() * 3
                         bob = int(math.sin(t) * 4)  # Animación de flote
                         text_rect = text_surf.get_rect(
                             centerx=screen_x,
@@ -3392,7 +3584,7 @@ def main():
                     if img_surf:
                         img_y_offset = data.get("img_y_offset", -50)
                         t_img = (time.time() * 3) + 0.5  # Flote desfasado
-                        bob = int(math.sin(t_img) * 4)
+                        bob   = int(math.sin(t_img) * 4)
 
                         img_rect = img_surf.get_rect(
                             centerx=screen_x,
@@ -3408,30 +3600,51 @@ def main():
                     fr = flag_img.get_rect(bottomleft=(bx, by))
                 else:
                     # fallback por si no existe la variable (usa la posición fija del mapa)
-                    fr = flag_img.get_rect(bottomleft=(flag_pos_world[0] - ox, flag_pos_world[1] - oy))
+                    fr = flag_img.get_rect(
+                        bottomleft=(flag_pos_world[0] - ox,
+                                    flag_pos_world[1] - oy)
+                    )
                 ventana.blit(flag_img, fr)
 
-            # Enemigos e ítems
-            # --- DIBUJAR ENEMIGOS CON OFFSET VISUAL ---
+            # --- DIBUJAR ENEMIGOS E ITEMS ---
             for e in enemigos:
                 ventana.blit(e.image, (e.rect.x - ox, e.rect.y - oy + e.render_offset_y))
+
             for item in items:
                 ventana.blit(item.image, (item.rect.x - ox, item.rect.y - oy))
 
-            # Jugador
+            # --- JUGADOR ---
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
+
             if estado == "PAUSA":
                 pause_menu.draw(ventana)
 
-            # Dibujar textos flotantes (después de dibujar jugador/ítems)
+            # --- TEXTOS FLOTANTES ---
             for ft in floating_texts:
                 ft.draw(ventana, cam.offset())
 
-            # HUD solo si NO hay cutscene de victoria (para que no parezca congelado)
+            # ==============================
+            # HUD: MEDIDOR DE BASURA + MENSAJE DE PUERTA
+            # ==============================
+            # Medidor de basura (es HUD, no depende de la cámara)
+            medidor.draw(ventana)
+
+            # Mensaje "ALTO, debes limpiar más..." si chocó con una puerta condicional
+            if (mostrando_mensaje_gate and not medidor.completado and (ultimo_gate_rect is not None)):
+                gate_screen_x = ultimo_gate_rect.centerx - ox
+                gate_screen_y = ultimo_gate_rect.top - oy - 40  # un poco arriba de la puerta
+
+                msg = "ALTO, debes limpiar más para poder pasar"
+                texto_surf = font_hud.render(msg, True, (255, 255, 255))
+                texto_rect = texto_surf.get_rect(center=(gate_screen_x, gate_screen_y))
+                ventana.blit(texto_surf, texto_rect)
+
+            # HUD clásico (timer, vida, puntuación) SOLO si no hay escena de victoria
             if not ("secuencia_victoria" in locals() and secuencia_victoria.activa):
                 draw_timer(ventana, font_hud, timer, pos=(20, 20))
                 draw_hud(ventana, jugador, vida_lleno_img, vida_vacio_img)
                 draw_puntuacion(ventana, font_hud, puntuacion)
+
 
         elif estado == "MUERTE":
             if parallax is not None:
