@@ -2678,30 +2678,29 @@ def main():
                     ),
                 )
 
-            # --- agrega items por nivel (SIN volver a hacer items = Group()) ---
             if nivel_actual == 0:
                 items.add(
-                    botella(x=2298, y=591),
-                    botella(x=2590, y=463),
-                    bolsa(x=2740, y=375)
+                    botella(x=2275, y=590),
+                    botella(x=2535, y=590),
+                    bolsa(x=2740, y=630)
                 )
 
             elif nivel_actual == 1:
                 items.add(
                     botella(x=338, y=479),
-                    lamina(x=724, y=374),
-                    llanta(x=981, y=309),
-                    lamina(x=1234, y=383),
-                    llanta(x=2003, y=387),
-                    botella(x=2245, y=298),
-                    llanta(x=2767, y=348),
+                    lamina(x=715, y=460),
+                    llanta(x=920, y=400),
+                    lamina(x=1225, y=383),
+                    llanta(x=1980, y=420),
+                    botella(x=2235, y=360),
+                    llanta(x=2750, y=370),
                     lamina(x=2216, y=526),
                     botella(x=4481, y=425),
                     botella(x=4585, y=425),
                     botella(x=4681, y=425),
-                    botella(x=3403, y=379),
-                    lamina(x=3981, y=384),
-                    bolsa(x=2508, y=150),
+                    botella(x=3370, y=450),
+                    lamina(x=3975, y=450),
+                    bolsa(x=2490, y=470),
                     gustambo(x=5342, y=254),
                     gustambo(x=3690, y=260)
                 )
