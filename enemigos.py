@@ -54,7 +54,7 @@ class Enemigo(pygame.sprite.Sprite):
         self.salto_timer = self.INTERVALO_SALTO
 
         # --- ATRIBUTOS DE VIDA Y DAÑO ---
-        self.vida = 3
+        self.vida = 2
         self.hit_flash_timer = 0
         self.HIT_FLASH_DURACION = 0.5  # Duración del destello rojo
 
@@ -186,7 +186,7 @@ class Enemigo(pygame.sprite.Sprite):
         return self.rect.colliderect(jugador.forma)
 
 class Enemigo_walk(pygame.sprite.Sprite):
-    def __init__(self, x, y, velocidad=80, vida=3, dano=1):
+    def __init__(self, x, y, velocidad=80, vida=2, dano=1):
         super().__init__()
         self.puntos = 200
 
@@ -208,7 +208,6 @@ class Enemigo_walk(pygame.sprite.Sprite):
 
         # --- Cargar 6 frames de caminar ---
         frames = []
-        # patrón principal: enemy_walk1..6.png
         for i in range(1, 7):
             p = enemy1_dir / f"enemigo_walk{i}.png"
             if p.exists():
@@ -218,22 +217,19 @@ class Enemigo_walk(pygame.sprite.Sprite):
         self.frame_index = 0
         self.anim_timer = 0.0
         self.ANIM_FRAME_TIME = 0.10  # ~10 fps
-        self.render_offset_y = 9  # <- prueba 4–10 px hasta que te guste
-
+        self.render_offset_y = 9
         self.image = self.frames_walk[self.frame_index]
-        self.desfase_baba = 10  # píxeles hacia abajo, ajusta a gusto (5–15 según el sprite)
-        self.rect = self.image.get_rect(midbottom=(x, y ))
-
-
+        self.desfase_baba = 10
+        self.rect = self.image.get_rect(midbottom=(x, y))
 
         # --- Movimiento horizontal ---
         self.velocidad_mov = velocidad  # px/seg
-        self.direccion = -1  # 1 derecha, -1 izquierda
+        self.direccion = -1             # 1 derecha, -1 izquierda
 
-        # --- Físicas verticales (para pararse en plataformas) ---
+        # --- Físicas verticales ---
         self.vel_y = 0.0
 
-        # --- Vida / Daño (compatibles con tu bloque de dificultad) ---
+        # --- Vida / Daño ---
         self.vida_maxima = vida
         self.vida = vida
         self.dano = dano
@@ -242,84 +238,132 @@ class Enemigo_walk(pygame.sprite.Sprite):
         self.hit_flash_timer = 0.0
         self.HIT_FLASH_DURACION = 0.5
 
+        # ========= NUEVO: Estado de "aplastado" =========
+        self.state = "alive"            # alive | squish | dead
+        self.squish_timer = 0.0
+        self.squish_duration = 0.8     # cuánto se muestra aplastado
+        self.squish_fps =8.0
+        self._squish_accum = 0.0
+        self.squish_index = 0
+
+        # Cargar 5 frames de aplastado (adapta nombres si los tuyos cambian)
+        self.frames_squish = []
+        # Intento 1: enemigo_squish1..5.png
+        ok = True
+        for i in range(1, 6):
+            p = enemy1_dir / f"enemigo_squish{i}.png"
+            if not p.exists(): ok = False; break
+        if ok:
+            for i in range(1, 6):
+                self.frames_squish.append(scale(load(enemy1_dir / f"enemigo_squish{i}.png")))
+        else:
+            # Intento 2: squish_0..4.png
+            self.frames_squish = []
+            ok = True
+            for i in range(5):
+                p = enemy1_dir / "squish" / f"squish{i}.png"
+                if not p.exists(): ok = False; break
+            if ok:
+                for i in range(5):
+                    self.frames_squish.append(scale(load(enemy1_dir / "squish" / f"squish{i}.png")))
+            else:
+                print(f"no se encontro squish")
+                # Fallback: sin arte, reutiliza el primer frame walk
+                self.frames_squish = [self.frames_walk[0] for _ in range(5)]
+
+    # ========= NUEVO: matar por stomp =========
+    def stomp_kill(self):
+        if self.state != "alive":
+            return
+        self.state = "squish"
+        self.squish_timer = self.squish_duration
+        self.squish_index = 0
+        self._squish_accum = 0.0
+        # detén su movimiento horizontal
+        self.velocidad_mov = 0
+
     def hurt(self, damage):
-        # Solo puede recibir daño si no está ya dañado y su vida es > 0
+        # Si ya está aplastándose, ignora golpes
+        if self.state != "alive":
+            return
         if self.hit_flash_timer <= 0 and self.vida > 0:
             self.vida -= damage
-            # Al recibir daño, se activa el temporizador. Mientras sea > 0,
-            # la condición de arriba no se cumplirá y el enemigo será invencible.
             self.hit_flash_timer = self.HIT_FLASH_DURACION
-
-            print(f"Enemigo golpeado, vida restante: {self.vida}")
+            # print(f"Enemigo golpeado, vida restante: {self.vida}")
             if self.vida <= 0:
+                self.state = "dead"
                 self.kill()
 
     def tocar_jugador(self, jugador):
+        # Considera que si está aplastado ya no hiere
+        if self.state != "alive":
+            return False
         return self.rect.colliderect(jugador.forma)
 
     def update(self, dt, plataformas):
+        # Si está muerto, nada
+        if self.state == "dead":
+            return
+
         # --- Flash ---
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= dt
 
-        # --- Movimiento X ---
-        self.rect.x += self.velocidad_mov * self.direccion * dt
+        if self.state == "alive":
+            # --- Movimiento X ---
+            self.rect.x += self.velocidad_mov * self.direccion * dt
 
-        # Rebotar en paredes/plataformas
-        for rect in plataformas:
-            if self.rect.colliderect(rect):
-                if self.direccion > 0:
-                    self.rect.right = rect.left
-                else:
-                    self.rect.left = rect.right
-                self.direccion *= -1
-                break
+            # Rebotar en paredes/plataformas
+            for rect in plataformas:
+                if self.rect.colliderect(rect):
+                    if self.direccion > 0:
+                        self.rect.right = rect.left
+                    else:
+                        self.rect.left = rect.right
+                    self.direccion *= -1
+                    break
 
-        # --- Gravedad + soporte ---
-        self.vel_y += constantes.GRAVEDAD * dt
-        self.rect.y += self.vel_y * dt
+            # --- Gravedad + soporte ---
+            self.vel_y += constantes.GRAVEDAD * dt
+            self.rect.y += self.vel_y * dt
 
-        for rect in plataformas:
-            if self.rect.colliderect(rect):
-                if self.vel_y > 0:
-                    self.rect.bottom = rect.top
-                    self.vel_y = 0
-                elif self.vel_y < 0:
-                    self.rect.top = rect.bottom
-                    self.vel_y = 0
+            for rect in plataformas:
+                if self.rect.colliderect(rect):
+                    if self.vel_y > 0:
+                        self.rect.bottom = rect.top
+                        self.vel_y = 0
+                    elif self.vel_y < 0:
+                        self.rect.top = rect.bottom
+                        self.vel_y = 0
 
-        # --- Animación caminar (6 frames) ---
-        self.anim_timer += dt
-        if self.anim_timer >= self.ANIM_FRAME_TIME:
-            self.anim_timer = 0.0
-            self.frame_index = (self.frame_index + 1) % len(self.frames_walk)
+            # --- Animación caminar (6 frames) ---
+            self.anim_timer += dt
+            if self.anim_timer >= self.ANIM_FRAME_TIME:
+                self.anim_timer = 0.0
+                self.frame_index = (self.frame_index + 1) % len(self.frames_walk)
+            self.image = self.frames_walk[self.frame_index]
 
-        self.image = self.frames_walk[self.frame_index]
+            # Destello rojo
+            if self.hit_flash_timer > 0:
+                self.image = self.image.copy()
+                self.image.fill((150, 0, 0), special_flags=pygame.BLEND_RGB_ADD)
 
-        # Destello rojo
-        if self.hit_flash_timer > 0:
-            self.image = self.image.copy()
-            self.image.fill((150, 0, 0), special_flags=pygame.BLEND_RGB_ADD)
+            # Volteo según dirección
+            if self.direccion == 1:
+                self.image = pygame.transform.flip(self.image, True, False)
 
-        # Volteo según dirección
-        if self.direccion == 1:
-            self.image = pygame.transform.flip(self.image, True, False)
+        elif self.state == "squish":
+            # Animación rápida de aplastado + autokill
+            self._squish_accum += dt
+            if self._squish_accum >= (1.0 / self.squish_fps):
+                self._squish_accum = 0.0
+                self.squish_index = min(self.squish_index + 1, len(self.frames_squish) - 1)
+            self.image = self.frames_squish[self.squish_index]
 
-
-# --- CLASE DEL PEZ HUESO ---
-# Pega esto al FINAL de tu archivo enemigos.py
-
-# --- CLASE DEL PEZ HUESO (AHORA "ENEMIGOPEZUCSO") ---
-# REEMPLAZA la clase EnemigoPezueso vieja con esta
-
-# --- CLASE DEL PEZ HUESO (AHORA "ENEMIGOPEZUCSO") ---
-# PEGA ESTE CÓDIGO COMPLETO EN ENEMIGOS.PY
-
-# --- CLASE DEL PEZ HUESO (AHORA "ENEMIGOPEZUCSO") ---
-# PEGA ESTE CÓDIGO COMPLETO EN ENEMIGOS.PY
-
-# --- CLASE DEL PEZ HUESO (AHORA "ENEMIGOPEZUCSO") ---
-# PEGA ESTE CÓDIGO COMPLETO EN ENEMIGOS.PY
+            self.squish_timer -= dt
+            if self.squish_timer <= 0:
+                self.state = "dead"
+                self.kill()
 
 class EnemigoPezueso(Enemigo):
     """

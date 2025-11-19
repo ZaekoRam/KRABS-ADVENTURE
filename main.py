@@ -13,15 +13,177 @@ import imageio
 from enemigos import Enemigo
 from enemigos import Enemigo_walk
 from enemigos import EnemigoPezueso
-from items import Manzana, bolsa
+from items import botella, bolsa, llanta, lamina, gustambo
 from fuentes import get_font
-()
 from parallax import create_parallax_nivel1, create_parallax_nivel2, create_parallax_nivel3
 
 import sys
 
 
 # -------------------- Secuencia de Victoria (animación tipo Mario) --------------------
+class TrashFallFX:
+    def __init__(self, w, h, max_pieces=None, spawn_rate=3):
+        self.w = w
+        self.h = h
+        self.max_pieces = max_pieces   # máximo de piezas en pantalla
+        self.spawn_rate = spawn_rate   # piezas por segundo (aprox)
+        self.timer = 0.0
+        self.pieces = []
+        self.bottom_margin = 40        # cuánto “mar” dejamos abajo
+
+        # ----- CARGAR IMÁGENES DE BASURA -----
+        base_dir = Path(__file__).resolve().parent
+        items_dir = base_dir / "assets" / "images" / "items"
+
+        filenames = [
+            "lamina.png",
+            "llanta.png",
+            "tambo.png",
+            "botella.png"
+        ]
+
+        self.images = []
+        for name in filenames:
+            p = items_dir / name
+            if p.exists():
+                img = pygame.image.load(str(p)).convert_alpha()
+                self.images.append(img)
+            else:
+                print(f"[TrashFallFX] No se encontró {p}")
+
+        # fallback por si no se encontró nada
+        if not self.images:
+            dummy = pygame.Surface((20, 20), pygame.SRCALPHA)
+            dummy.fill((200, 200, 200, 180))
+            self.images.append(dummy)
+
+    def reset(self):
+        """Limpia todas las piezas (por si quieres reiniciar efecto)."""
+        self.pieces.clear()
+        self.timer = 0.0
+
+    def spawn_piece(self):
+        if len(self.pieces) >= self.max_pieces:
+            return
+
+        base_img = random.choice(self.images)
+
+        # Tamaño aleatorio para variedad
+        scale = random.uniform(0.55, 0.9)
+        new_w = int(base_img.get_width() * scale)
+        new_h = int(base_img.get_height() * scale)
+
+        img = pygame.transform.smoothscale(base_img, (new_w, new_h))
+        img.set_alpha(random.randint(160, 230))
+
+        # Posición inicial (un poco arriba de la pantalla)
+        x = random.randint(0, max(0, self.w - new_w))
+        y = random.randint(-250, -60)
+
+        # Velocidades para simular “agua”
+        vy = random.uniform(20, 40)     # velocidad vertical inicial (lenta)
+        vx = random.uniform(-10, 10)    # pequeña deriva horizontal
+
+        self.pieces.append({
+            "x": float(x),
+            "y": float(y),
+            "vx": vx,
+            "vy": vy,
+            "surf": img,
+            "w": new_w,
+            "h": new_h,
+            "settled": False,          # si ya se quedó en el fondo
+        })
+
+    def update(self, dt):
+        # Spawn “de poco en poco”
+        if self.spawn_rate > 0:
+            self.timer += dt
+            spawn_interval = 1.0 / self.spawn_rate
+            while self.timer >= spawn_interval:
+                self.timer -= spawn_interval
+                # 80% de probabilidad de generar una pieza en ese tick
+                if random.random() < 0.8:
+                    self.spawn_piece()
+
+        # Actualizar físicas
+        for piece in self.pieces:
+            if piece["settled"]:
+                continue  # ya está en el fondo, no se mueve
+
+            # Simulamos “peso en agua”: poca aceleración
+            piece["vy"] += 25 * dt      # gravedad suave
+            if piece["vy"] > 80:        # límite de velocidad (para que no caigan en seco)
+                piece["vy"] = 80
+
+            # Movimiento
+            piece["y"] += piece["vy"] * dt
+            piece["x"] += piece["vx"] * dt
+
+            # Ligeras correcciones: que no se salgan a los lados
+            if piece["x"] < -10:
+                piece["x"] = -10
+                piece["vx"] *= -0.3
+            elif piece["x"] + piece["w"] > self.w + 10:
+                piece["x"] = self.w - piece["w"] + 10
+                piece["vx"] *= -0.3
+
+            # Fondo del “mar”
+            bottom_limit = self.h - self.bottom_margin
+            if piece["y"] + piece["h"] >= bottom_limit:
+                piece["y"] = bottom_limit - piece["h"]
+                piece["vy"] = 0
+                piece["vx"] *= 0.15   # casi se detiene en horizontal
+                piece["settled"] = True  # se queda acumulada
+
+    def draw(self, surface):
+        for piece in self.pieces:
+            surface.blit(piece["surf"], (int(piece["x"]), int(piece["y"])))
+
+    def update(self, dt):
+        # Spawn “de poco en poco”
+        if self.spawn_rate > 0:
+            self.timer += dt
+            spawn_interval = 1.0 / self.spawn_rate
+            while self.timer >= spawn_interval:
+                self.timer -= spawn_interval
+                if random.random() < 0.8:
+                    self.spawn_piece()
+
+        # Actualizar físicas
+        for piece in self.pieces:
+            if piece["settled"]:
+                continue
+
+            # gravedad suave
+            piece["vy"] += 25 * dt
+            if piece["vy"] > 80:
+                piece["vy"] = 80
+
+            # movimiento
+            piece["y"] += piece["vy"] * dt  # <--- ESTA LÍNEA ES LA IMPORTANTE
+            piece["x"] += piece["vx"] * dt
+
+            # límites izquierda/derecha
+            if piece["x"] < -10:
+                piece["x"] = -10
+                piece["vx"] *= -0.3
+            elif piece["x"] + piece["w"] > self.w + 10:
+                piece["x"] = self.w - piece["w"] + 10
+                piece["vx"] *= -0.3
+
+            # suelo
+            bottom_limit = self.h - self.bottom_margin
+            if piece["y"] + piece["h"] >= bottom_limit:
+                piece["y"] = bottom_limit - piece["h"]
+                piece["vy"] = 0
+                piece["vx"] *= 0.15
+                piece["settled"] = True
+
+    def draw(self, surface):
+        # Dibujar cada sprite de basura
+        for p in self.pieces:
+            surface.blit(p["surf"], (int(p["x"]), int(p["y"])))
 class SecuenciaVictoria:
     def __init__(self, jugador, bandera_rect, nivel, on_finish):
         self.jugador = jugador
@@ -208,14 +370,14 @@ TXT = {
         "v2_hint": "ENTER/SPACE: Menu",
 
         # Selectores
-        "sel_char_title": "CHARACTER SELECT",
-        "sel_level_title": "LEVEL SELECT",
+        "sel_char_title": "CHARACTER SELECTION",
+        "sel_level_title": "LEVEL SELECTION",
         "level_1": "LEVEL 1",
         "level_2": "LEVEL 2",
         "level_3": "LEVEL 3",
         "level_hint": "Click or press 1/2/3 • ESC to go back",
 
-        "diff_title": "DIFFICULTY",
+        "diff_title": "LEVEL",
         "diff_easy": "BEGINNER",
         "diff_hard": "CHALLENGING",
         "diff_hint": "Click or ←/→ to play • ESC to go back",
@@ -338,6 +500,34 @@ def _load_menu_img_variant(base_folder: str, lang: str, scale_w: int) -> pygame.
     raise FileNotFoundError(f"No pude cargar ninguna variante para {base_folder} ({lang}).")
 
 
+def _load_tutorial_img(base_folder: str, lang: str, scale_w: int) -> pygame.Surface:
+    """
+    Carga una imagen de tutorial, buscando por idioma.
+    Ruta: assets/images/tutorial/<lang>/<base_folder>.png
+    """
+    candidates = [
+        f"tutorial/{lang}/{base_folder}.png",  # assets/images/tutorial/en/key_move.png
+        f"tutorial/es/{base_folder}.png",  # Fallback a español
+    ]
+    for folder in candidates:
+        try:
+            # Reutiliza la lógica de cargar_primera_imagen (que busca en IMG_DIR)
+            # NOTA: cargar_primera_imagen espera una *carpeta*, no un archivo.
+            # Vamos a simplificarlo para este caso específico.
+
+            img_path = IMG_DIR / folder
+            if img_path.exists():
+                surf = pygame.image.load(str(img_path)).convert_alpha()
+                return scale_to_width(surf, scale_w)
+
+        except Exception:
+            continue
+    # Si no encuentra nada, crea un "placeholder"
+    surf = pygame.Surface((scale_w, scale_w))
+    surf.fill((255, 0, 255))  # Color magenta brillante si falta la imagen
+    return surf
+
+
 # ===== Helpers UI para Game Over =====
 def draw_text_center(surface, text, font, color, x_center, y, shadow=True):
     """Dibuja texto centrado; si shadow=True añade sombra suave."""
@@ -423,6 +613,12 @@ btn_lang_rect = pygame.Rect(0, 0, 260, 50)
 btn_lang_rect.center = (constantes.ANCHO_VENTANA // 2, 320)
 
 
+def can_stomp(jugador, enemigo, margen_px=8):
+    if not hasattr(jugador, "vel_y"): return False
+    if jugador.vel_y <= 0: return False  # debe venir cayendo
+    prev_bottom = getattr(jugador, "prev_bottom", None)
+    if prev_bottom is None: return False
+    return prev_bottom <= (enemigo.rect.top + margen_px)
 
 def esta_en_suelo(j, col_rects) -> bool:
     """Chequeo inmediato de suelo: mira 1px por debajo del jugador."""
@@ -448,6 +644,36 @@ def cargar_primera_imagen(carpeta_rel: str, usa_alpha: bool) -> pygame.Surface:
             surf = pygame.image.load(str(files[0]))
             return surf.convert_alpha() if usa_alpha else surf.convert()
     raise FileNotFoundError(f"No encontré imágenes en {carpeta}")
+
+
+def cargar_imagenes_desde_carpeta(carpeta_path):
+    """
+    Carga todas las imágenes .png de una carpeta específica.
+    La clave del diccionario será el nombre del archivo (sin .png).
+    Ej: 'tecla_w.png' -> {'tecla_w': <imagen_pygame>}
+    """
+    imagenes_cargadas = {}
+    carpeta = Path(carpeta_path)
+
+    if not carpeta.is_dir():
+        print(f"Error: La carpeta de imágenes {carpeta} no existe.")
+        return imagenes_cargadas
+
+    # Buscar todos los archivos .png en la carpeta
+    for archivo_path in carpeta.glob('*.png'):
+        try:
+            # 'archivo.stem' es el nombre sin extensión (ej: 'tecla_w')
+            key_imagen = archivo_path.stem
+            img = pygame.image.load(archivo_path).convert_alpha()
+
+            # Guardar en el diccionario
+            imagenes_cargadas[key_imagen] = img
+            # print(f"Cargada: {key_imagen}") # (Descomenta para depurar)
+
+        except Exception as e:
+            print(f"Error al cargar la imagen {archivo_path.name}: {e}")
+
+    return imagenes_cargadas
 
 
 def escalar_a_ventana(surf: pygame.Surface) -> pygame.Surface:
@@ -483,8 +709,8 @@ def draw_puntuacion(surface, font, puntuacion, pos=(20, 80)):
 
 
 def reiniciar_nivel(nivel, jugador):
-    x, y_spawn = 100, 670
 
+    x, y_spawn = 100, 670
     if nivel.spawn:
         x, y_spawn = int(nivel.spawn[0]), int(nivel.spawn[1])
     if hasattr(jugador, "colocar_en_midbottom"):
@@ -641,6 +867,7 @@ class BotonSimple:
 
 
 # -------------------- TMX Level --------------------
+# -------------------- TMX Level --------------------
 class NivelTiled:
     def __init__(self, ruta_tmx: Path):
         self.tmx = load_pygame(str(ruta_tmx))
@@ -652,6 +879,9 @@ class NivelTiled:
         self.goal_rects = []
         self.enemy_barrier_rects = []
         self.collision_rects = []
+        self.condicion_rects = []  # ←←← AQUI GUARDAMOS LAS PAREDES INVISIBLES DE BASURA
+
+        # ------------------ Barreras de enemigos ------------------
         try:
             barrier_layer = self.tmx.get_layer_by_name("barrera_enemigos")
             import pytmx
@@ -663,6 +893,7 @@ class NivelTiled:
         except ValueError:
             print("ADVERTENCIA: Capa 'barrera_enemigos' no encontrada. Los enemigos podrían caerse.")
 
+        # ------------------ Colisiones normales ------------------
         try:
             collision_layer = self.tmx.get_layer_by_name("collisions")
             import pytmx
@@ -673,10 +904,11 @@ class NivelTiled:
                         self.collision_rects.append(rect)
                 print(f"DEBUG: Se cargaron {len(self.collision_rects)} rectángulos de colisión.")
             else:
-                print("ADVERTENCIA: La capa 'Collisions' existe pero no es una TiledObjectGroup.")
+                print("ADVERTENCIA: La capa 'collisions' existe pero no es un TiledObjectGroup.")
         except ValueError:
-            print("ADVERTENCIA: Capa de colisiones 'Collisions' no encontrada en el archivo TMX.")
+            print("ADVERTENCIA: Capa de colisiones 'collisions' no encontrada en el archivo TMX.")
 
+        # ------------------ Meta ------------------
         try:
             Meta_layer = self.tmx.get_layer_by_name("Meta")
             import pytmx
@@ -688,6 +920,24 @@ class NivelTiled:
         except ValueError:
             pass
 
+        # ------------------ *** CAPA CONDICION (PARED INVISIBLE) *** ------------------
+        try:
+            condicion_layer = self.tmx.get_layer_by_name("Condicion")
+            import pytmx
+            if isinstance(condicion_layer, pytmx.TiledObjectGroup):
+                for obj in condicion_layer:
+                    if obj.width > 0 and obj.height > 0:
+                        rect = pygame.Rect(int(obj.x), int(obj.y), int(obj.width), int(obj.height))
+                        self.condicion_rects.append(rect)
+
+                print(f"DEBUG: Se cargaron {len(self.condicion_rects)} rectángulos de condición.")
+            else:
+                print("ADVERTENCIA: La capa 'condicion' existe pero no es un TiledObjectGroup.")
+
+        except ValueError:
+            print("ADVERTENCIA: Capa 'condicion' no encontrada en el archivo TMX.")
+
+        # ------------------ Spawn del jugador ------------------
         self.spawn = None
         if "Spawns" in self.tmx.objectgroups:
             for obj in self.tmx.objectgroups["Spawns"]:
@@ -704,22 +954,24 @@ class NivelTiled:
                     self.spawn = (spawn_x, spawn_y)
                     break
 
+    # ------------------ Dibujado ------------------
     def draw(self, surface: pygame.Surface, camera_offset):
-        ox, oy = camera_offset;
+        ox, oy = camera_offset
         sw, sh = surface.get_size()
-        x0 = max(0, ox // self.tile_w);
+        x0 = max(0, ox // self.tile_w)
         y0 = max(0, oy // self.tile_h)
         x1 = min(self.tmx.width, (ox + sw) // self.tile_w + 2)
         y1 = min(self.tmx.height, (oy + sh) // self.tile_h + 2)
+
         for layer in self.tmx.visible_layers:
             if hasattr(layer, "tiles"):
                 for x, y, image in layer.tiles():
                     if x0 <= x < x1 and y0 <= y < y1:
-                        surface.blit(image, (x * self.tile_w - ox, y * self.tile_h - oy))
+                        surface.blit(image, (x * self.tile_w - ox,
+                                             y * self.tile_h - oy))
 
     def world_size(self):
         return self.width_px, self.height_px
-
 
 # -------------------- Camera --------------------
 class Camara:
@@ -813,7 +1065,84 @@ class PauseMenu:
             r = surf.get_rect(center=(self.w // 2, py + 120 + i * 60))
             surface.blit(surf, r)
 
+class TrashMeter:
+    def __init__(self, x, y, total_basura, dificultad="facil"):
+        self.x = x
+        self.y = y
 
+        # Cargas SOLO tu sprite del bote vacío
+        self.frame_img = pygame.image.load("assets/images/ui/medidor_basura.png").convert_alpha()
+        self.w = self.frame_img.get_width()
+        self.h = self.frame_img.get_height()
+
+        # Superficie donde dibujaremos el relleno (del mismo tamaño que el sprite)
+        self.fill_surface = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
+
+        # Total de basura en el nivel
+        self.total_basura = total_basura
+
+        # Requisito según dificultad
+        if dificultad == "facil":
+            porcentaje_req = 0.70
+        elif dificultad == "dificil":
+            porcentaje_req = 0.90
+        else:
+            porcentaje_req = 0.80
+
+        requerido = int(round(self.total_basura * porcentaje_req))
+        self.requerida = max(1, min(self.total_basura, requerido))
+
+        self.recogida = 0
+
+        # 🔧 Ajusta esta zona para decir dónde se llena dentro del sprite
+        # (ej. la “ventana” del bote donde se ve el relleno)
+        self.fill_rect_area = pygame.Rect(10, 10, self.w - 20, self.h - 20)
+        # ↑ margen de 10 px por cada lado (ajústalo a tu sprite real)
+
+        # Color del relleno (puedes cambiar a lo que combine con tu arte)
+        self.fill_color = (50, 200, 100, 230)  # RGBA (con alpha)
+
+    def agregar_basura(self, cantidad=1):
+        self.recogida += cantidad
+        if self.recogida > self.total_basura:
+            self.recogida = self.total_basura
+
+    @property
+    def completado(self):
+        return self.recogida >= self.requerida
+
+    def draw(self, surface):
+        # Limpiamos la superficie de relleno (la dejamos transparente)
+        self.fill_surface.fill((0, 0, 0, 0))
+
+        # porcentaje de relleno en función de la basura requerida
+        porcentaje = self.recogida / self.requerida
+        if porcentaje < 0:
+            porcentaje = 0
+        if porcentaje > 1:
+            porcentaje = 1
+
+        # Vamos a llenar de ABAJO hacia ARRIBA dentro de fill_rect_area
+        area = self.fill_rect_area
+        full_h = area.height
+        filled_h = int(full_h * porcentaje)
+
+        if filled_h > 0:
+            # Rectángulo del relleno, pegado abajo
+            fill_rect = pygame.Rect(
+                area.left,
+                area.bottom - filled_h,  # empieza desde abajo
+                area.width,
+                filled_h
+            )
+
+            pygame.draw.rect(self.fill_surface, self.fill_color, fill_rect)
+
+        # 1) Dibujas primero el relleno
+        surface.blit(self.fill_surface, (self.x, self.y))
+
+        # 2) Luego dibujas encima tu PNG del bote vacío
+        surface.blit(self.frame_img, (self.x, self.y))
 
 # -------------------- Game Over Screen --------------------
 class GameOverScreen:
@@ -822,6 +1151,9 @@ class GameOverScreen:
         self.font_title = get_font(constantes.FONT_UI_TITLE)
         self.font_sub = get_font(constantes.FONT_UI_ITEM)
         self.font_item = get_font(constantes.FONT_UI_ITEM)
+
+        # 🎯 efecto de basura
+        self.trash_fx = TrashFallFX(self.w, self.h, max_pieces=10000000, spawn_rate=20)
 
         # Imagen opcional (puedes dejar fondo del juego)
         try:
@@ -838,6 +1170,11 @@ class GameOverScreen:
 
         self.btn_retry = BotonSimple(tr("continue"), (self.w // 2, center_y), BTN_W, BTN_H)
         self.btn_menu  = BotonSimple(tr("menu"), (self.w // 2, center_y + spacing), BTN_W, BTN_H)
+
+    def tick(self, dt):
+        # solo actualiza la basura
+        if hasattr(self, "trash_fx"):
+            self.trash_fx.update(dt)
 
     def reset(self):
         pass
@@ -871,6 +1208,10 @@ class GameOverScreen:
         dim = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 120))
         surface.blit(dim, (0, 0))
+
+        # 🌎♻️ BASURA CAYENDO (detrás del texto y botones)
+        if hasattr(self, "trash_fx"):
+            self.trash_fx.draw(surface)
 
         # --- TÍTULO PRINCIPAL ---
         title = self.font_title.render(tr("go_title"), True, (255, 180, 50))
@@ -951,6 +1292,42 @@ class Bubble:
     def draw(self, surface):
         col = (255, 255, 255, int(self.alpha))
         pygame.draw.circle(surface, col, (int(self.x), int(self.y)), self.r)
+
+# ---------------- Texto flotante (+1 VIDA) ----------------
+class FloatingText:
+    def __init__(self, text, world_pos, font, color=(255,255,255), rise_speed=60, duration=0.9):
+        self.text = text
+        self.x, self.y = world_pos  # coordenadas del mundo
+        self.font = font
+        self.color = color
+        self.rise_speed = float(rise_speed)
+        self.duration = float(duration)
+        self.age = 0.0
+        # prerender + sombra
+        self.surf = self.font.render(self.text, True, self.color)
+        self.shadow = self.font.render(self.text, True, (0,0,0))
+
+    def update(self, dt):
+        self.age += dt
+        self.y -= self.rise_speed * dt    # sube
+        return self.age < self.duration   # True si sigue viva
+
+    def draw(self, surface, cam_offset):
+        ox, oy = cam_offset
+        # fade-out suave
+        alpha = max(0, 255 - int((self.age / self.duration) * 255))
+        if alpha <= 0: return
+        surf = self.surf.copy()
+        shadow = self.shadow.copy()
+        surf.set_alpha(alpha)
+        shadow.set_alpha(alpha)
+
+        # dibuja con leve sombra
+        sx = int(self.x - ox)
+        sy = int(self.y - oy)
+        surface.blit(shadow, (sx + 2, sy + 2))
+        surface.blit(surf, (sx, sy))
+
 
 # -------------------- VICTORY SCREEN COMPLETA --------------------
 class VictoryScreen:
@@ -1206,92 +1583,143 @@ class CharacterSelectUI:
         self._draw_card(surface, self.rect_f, self.pic_f, self.txt_f, enabled=True, hover=(self.hover == 'f'))
 
 
-# -------------------- Level Select UI --------------------
+# -------------------------------
+# level_select_ui.py (o similar)
+# -------------------------------
 class LevelSelectUI:
-    """Selector visual de nivel 1, 2, 3 (front)."""
+    """Selector de nivel 1, 2, 3 + botón Tutorial (nivel 0)."""
 
     def __init__(self, size, thumbs=None):
         self.w, self.h = size
         self.font_title = get_font(constantes.FONT_UI_TITLE)
-        self.font_item = get_font(constantes.FONT_UI_ITEM)
+        self.font_item  = get_font(constantes.FONT_UI_ITEM)
+
+        # --- Tarjetas 1-3 ---
         self.card_w, self.card_h = 220, 240
         gap = 60
         cx = self.w // 2
         cy = self.h // 2 + 10
+
         self.rects = []
-        x0 = cx - self.card_w - gap
-        x1 = cx
-        x2 = cx + self.card_w + gap
-        for x in (x0, x1, x2):
+        for x in (cx - self.card_w - gap, cx, cx + self.card_w + gap):
             r = pygame.Rect(0, 0, self.card_w, self.card_h)
             r.center = (x, cy)
             self.rects.append(r)
+
         self.thumbs = thumbs or {}
         self.labels = [
             self.font_item.render(tr("level_1"), True, (20, 30, 60)),
             self.font_item.render(tr("level_2"), True, (20, 30, 60)),
             self.font_item.render(tr("level_3"), True, (20, 30, 60)),
         ]
+
+        # --- Botón "Tutorial" (nivel 0) ---
+        btn_w, btn_h = 260, 60
+        self.tutorial_rect = pygame.Rect(0, 0, btn_w, btn_h)
+        bottom_cards = max(r.bottom for r in self.rects)
+        self.tutorial_rect.center = (cx, bottom_cards + 80)
+        # Hitbox un poco más grande para facilitar el click
+        self.tutorial_hit = self.tutorial_rect.inflate(12, 12)
+        self._tutorial_hover = False
+
         self.hover = None
         self.selected = None
 
+    # ------------------------------------------------------------------ #
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
             self.hover = None
+            self._tutorial_hover = self.tutorial_hit.collidepoint(event.pos)
             for i, r in enumerate(self.rects):
                 if r.collidepoint(event.pos):
                     self.hover = i
                     break
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # 1) Tutorial primero (por si hay solapamientos)
+            if self.tutorial_hit.collidepoint(event.pos):
+                self.selected = 0
+                return 0
+            # 2) Tarjetas 1-3
             for i, r in enumerate(self.rects):
                 if r.collidepoint(event.pos):
                     self.selected = i + 1
                     return self.selected
+
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_1, pygame.K_KP1): self.selected = 1; return 1
             if event.key in (pygame.K_2, pygame.K_KP2): self.selected = 2; return 2
             if event.key in (pygame.K_3, pygame.K_KP3): self.selected = 3; return 3
+            if event.key == pygame.K_t:                self.selected = 0; return 0  # Tutorial
             if event.key in (pygame.K_RETURN, pygame.K_SPACE): self.selected = 2; return 2
+
         return None
 
+    # ------------------------------------------------------------------ #
     def _draw_card(self, surface, rect, n_level, label, hover=False, selected=False):
         pygame.draw.rect(surface, (15, 70, 130), rect, border_radius=8, width=5)
         inner = rect.inflate(-12, -12)
-        base_color = (200, 230, 255)
-        if selected: base_color = (180, 220, 255)
+        base_color = (180, 220, 255) if selected else (200, 230, 255)
         pygame.draw.rect(surface, base_color, inner, border_radius=6)
-        if hover: pygame.draw.rect(surface, (80, 180, 255), inner, width=4, border_radius=6)
+        if hover:
+            pygame.draw.rect(surface, (80, 180, 255), inner, width=4, border_radius=6)
+
         thumb = self.thumbs.get(n_level)
         if thumb:
-            tr = thumb.get_rect(center=(inner.centerx, inner.top + 80))
-            surface.blit(thumb, tr)
+            surface.blit(thumb, thumb.get_rect(center=(inner.centerx, inner.top + 80)))
         else:
-            ph = pygame.Surface((120, 80));
-            ph.fill((170, 210, 255))
-            pr = ph.get_rect(center=(inner.centerx, inner.top + 80))
-            surface.blit(ph, pr)
+            ph = pygame.Surface((120, 80)); ph.fill((170, 210, 255))
+            surface.blit(ph, ph.get_rect(center=(inner.centerx, inner.top + 80)))
+
         bar = pygame.Rect(inner.left + 8, inner.bottom - 56, inner.width - 16, 40)
         pygame.draw.rect(surface, (170, 210, 255), bar, border_radius=6)
-        lr = label.get_rect(center=bar.center)
-        surface.blit(label, lr)
+        surface.blit(label, label.get_rect(center=bar.center))
+
         if selected:
             tic = self.font_item.render("✓", True, (15, 40, 80))
-            trect = tic.get_rect(center=(inner.right - 28, inner.top + 26))
-            surface.blit(tic, trect)
+            surface.blit(tic, tic.get_rect(center=(inner.right - 28, inner.top + 26)))
 
+    # ------------------------------------------------------------------ #
+    def _draw_tutorial_button(self, surface):
+        # Marco y relleno
+        pygame.draw.rect(surface, (15, 70, 130), self.tutorial_rect, border_radius=10, width=4)
+        inner = self.tutorial_rect.inflate(-10, -10)
+        pygame.draw.rect(surface, (200, 230, 255), inner, border_radius=8)
+        if self._tutorial_hover:
+            pygame.draw.rect(surface, (80, 180, 255), inner, width=3, border_radius=8)
+
+        # Texto del botón (cámbialo por tr("tutorial") si usas i18n)
+        texto = tr("tutorial") if "tr" in globals() else "TUTORIAL"
+        txt = self.font_item.render(texto, True, (20, 30, 60))
+        surface.blit(txt, txt.get_rect(center=inner.center))
+
+        # Si quieres un icono en lugar de texto, descomenta:
+        # icon = self.thumbs.get(0)
+        # if icon:
+        #     surface.blit(icon, icon.get_rect(center=inner.center))
+
+    # ------------------------------------------------------------------ #
     def draw(self, surface):
+        # Título
         title = self.font_title.render(tr("sel_level_title"), True, (15, 40, 80))
         band = pygame.Surface((title.get_width() + 40, title.get_height() + 18), pygame.SRCALPHA)
         pygame.draw.rect(band, (180, 210, 255, 230), band.get_rect(), border_radius=8)
         band.blit(title, (20, 9))
-        band_rect = band.get_rect(center=(self.w // 2, 90))
-        surface.blit(band, band_rect)
+        surface.blit(band, band.get_rect(center=(self.w // 2, 90)))
+
+        # Tarjetas
         for i, r in enumerate(self.rects):
-            self._draw_card(surface, r, i + 1, self.labels[i], hover=(self.hover == i),
-                            selected=(self.selected == i + 1))
+            self._draw_card(surface, r, i + 1, self.labels[i],
+                            hover=(self.hover == i), selected=(self.selected == i + 1))
+
+        # Botón Tutorial
+        self._draw_tutorial_button(surface)
+
+        # Hint general (si te estorba, comenta estas 2 líneas)
         hint_txt = tr("level_hint")
-        hint = self.font_item.render(hint_txt, True, (20, 20, 20))  # negro para legibilidad
-        surface.blit(hint, hint.get_rect(center=(self.w // 2, self.h - 40)))
+        hint = self.font_item.render(hint_txt, True, (20, 20, 20))
+        surface.blit(hint, hint.get_rect(center=(self.w // 2, self.h - 28)))
+
 
 
 # -------------------- Difficulty Select UI --------------------
@@ -1526,7 +1954,12 @@ ESTADO_VICTORY_SCREEN = "VICTORY_SCREEN"
 
 
 def main():
-    pygame.mixer.pre_init(44100, -16, 2, 512)
+    pygame.mixer.pre_init(
+        frequency=44100,  # estándar
+        size=-16,  # 16-bits
+        channels=2,  # estéreo
+        buffer=1024  # prueba 1024 o 2048
+    )
     pygame.init()
     if not pygame.mixer.get_init():
         pygame.mixer.init(44100, -16, 2, 512)
@@ -1550,15 +1983,8 @@ def main():
     # === VIDEO INTRO (variable temporal) ===
     video_intro = None
 
-    # Tutorial (si existe)
-    try:
-        tutorial_img = pygame.image.load(IMG_DIR / "ui" / "tutorial.png").convert_alpha()
-    except Exception:
-        tutorial_img = None
-    tutorial_overlay = TutorialOverlay(
-        (constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA),
-        tutorial_img if tutorial_img else pygame.Surface((800, 450), pygame.SRCALPHA)
-    ) if tutorial_img else None
+    # No cargues el tutorial aquí; el idioma aún no está elegido.
+    tutorial_overlay = None
 
     # HUD imágenes
     try:
@@ -1580,10 +2006,10 @@ def main():
     # Posición por nivel (mundo, en píxeles) de la base de la bandera (bottom-left)
     # Ajusta estos valores a tu mapa:
     FLAG_POS_BY_LEVEL = {
-        1: (5490, 685),  # NIVEL 1
+        0: (4640, 870),
+        1: (5491, 683),  # NIVEL 1
         2: (6485, 845),  # NIVEL 2 (ejemplo)
-        3: (8675, 870),  # si algún día agregas nivel 3
-        0: (4670, 870)
+        3: (8673, 871),  # si algún día agregas nivel 3
     }
 
     # variable que usaremos al dibujar (se actualiza al cargar cada nivel)
@@ -1681,12 +2107,70 @@ def main():
     puntuacion = 0
     tutorial_shown_level1 = False
     tutorial_context = None
+    # --- Efectos de texto flotante ---
+    floating_texts = []
+
+    # --- Vida extra por basura ---
+    trash_collected = 0  # contador actual de basura recogida
+    trash_threshold = 3  # umbral (se ajusta por dificultad al cargar nivel)
 
     # === SPAWN FIX: contadores de gracia/frames ===
     spawn_grace = 0.0
     spawn_skip_frames = 0
 
     # Música menú
+
+    imagenes_tutorial = {}
+    NIVEL0_PROMPTS_DATA = [
+        {
+            "id": "move",
+            "img_name": "key_move",
+            "img_w": 700,
+            "img_y_offset": -50,
+            "world_x": 400,  # <-- La clave que faltaba
+            "world_y": 680,
+            "range_pre": 500,  # <-- La clave que faltaba
+            "range_post": 500,  # <-- La clave que faltaba
+        },
+        {
+            "id": "jump",
+            "img_name": "key_jump",
+            "img_w": 700,
+            "img_y_offset": -50,
+            "world_x": 1390,  # <-- La clave que faltaba
+            "world_y": 680,
+            "range_pre": 500,  # <-- La clave que faltaba
+            "range_post": 500,  # <-- La clave que faltaba
+        },
+        {
+            "id": "attack",
+            "img_name": "key_clean",
+            "img_w": 700,
+            "img_y_offset": -50,
+            "world_x": 3400,  # <-- La clave que faltaba
+            "world_y": 680,
+            "range_pre": 500,  # <-- La clave que faltaba
+            "range_post": 500,  # <-- La clave que faltaba
+        },
+        {
+            "id": "trash",
+            "img_name": "key_collect",
+            "img_w": 700,
+            "img_y_offset": -50,
+            "world_x": 2200,  # <-- La clave que faltaba
+            "world_y": 680,
+            "range_pre": 500,  # <-- La clave que faltaba
+            "range_post": 500,  # <-- La clave que faltaba
+        }
+    ]
+
+    # --- CACHÉ GLOBAL DE PROMPTS ---
+    #
+    # <<< --- ¡LA SOLUCIÓN ESTÁ AQUÍ! --- >>>
+    #
+    # Define los diccionarios y listas vacíos PRIMERO.
+    g_tutorial_cache = {}
+    g_active_prompt_ids = []
 
 
     mover_izquierda = mover_derecha = False
@@ -1706,6 +2190,45 @@ def main():
     victory_ui = VictoryScreen((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     freeze_cam_offset = None
 
+    def _rebuild_tutorial_cache(lang: str):
+        nonlocal g_tutorial_cache  # <-- Esto ahora funciona
+        g_tutorial_cache.clear()
+
+        font = get_font(constantes.FONT_HUD)
+
+        for data in NIVEL0_PROMPTS_DATA:
+            prompt_id = data["id"]
+            key_text = data.get("key_text")
+            img_name = data.get("img_name")
+
+            text_surface = None
+            img_surface = None
+
+            # 1. Renderizar Texto (si existe)
+            if key_text:
+                text = tr(key_text)  # Traduce usando tu función tr()
+                color = (255, 255, 0)  # Amarillo
+
+                # Añadir sombra
+                text_surface = font.render(text, True, color)
+                shadow_surf = font.render(text, True, (0, 0, 0))
+                w, h = text_surface.get_size()
+                temp_surf = pygame.Surface((w + 4, h + 4), pygame.SRCALPHA)
+                temp_surf.blit(shadow_surf, (2, 2))
+                temp_surf.blit(text_surface, (0, 0))
+                text_surface = temp_surf
+
+            # 2. Cargar Imagen (si existe)
+            if img_name:
+                img_surface = _load_tutorial_img(
+                    img_name, lang, data.get("img_w", 64)
+                )
+
+            # Guardar en el caché
+            g_tutorial_cache[prompt_id] = {
+                "text_surf": text_surface,
+                "img_surf": img_surface,
+            }
     def _rebuild_menu_buttons(lang: str):
         nonlocal btn_play, btn_opc, btn_salir  # ahora existen arriba
 
@@ -1719,12 +2242,14 @@ def main():
 
     current_lang = settings["language"] or "es"
     _rebuild_menu_buttons(current_lang)
+    _rebuild_tutorial_cache(current_lang)  # <<< --- AÑADE ESTA LÍNEA (carga inicial)
 
     # --------- Game Loop ---------
     while run:
         if settings["language"] != current_lang:
             current_lang = settings["language"]
             _rebuild_menu_buttons(current_lang)
+            _rebuild_tutorial_cache(current_lang)  # <<< --- AÑADE ESTA LÍNEA (recarga)
         target_fps = 30 if estado == ESTADO_INTRO_VIDEO else constantes.FPS
         dt = reloj.tick(target_fps) / 1000.0
         mouse_pos = pygame.mouse.get_pos();
@@ -1837,8 +2362,11 @@ def main():
 
             elif estado == ESTADO_SELECT_NIVEL:
                 choice = level_select_ui.handle_event(event)
-                if choice == 1:
+                if choice == 0:
                     nivel_actual = 0
+                    estado = ESTADO_CARGANDO
+                if choice == 1:
+                    nivel_actual = 1
                     # Ir a dificultad
                     diff_ui = DifficultySelectUI((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), icon_easy,
                                                  icon_hard)
@@ -2082,6 +2610,11 @@ def main():
 
         elif estado == ESTADO_CARGANDO:
             # Carga el TMX según nivel_actual
+            ruta_carpeta_tutorial = BASE_DIR / "assets" / "tutorial" / lang
+
+            # 3. Llama a la nueva función para cargar las imágenes
+            #    Esto llena tu diccionario 'imagenes_tutorial'
+            imagenes_tutorial = cargar_imagenes_desde_carpeta(ruta_carpeta_tutorial)
             nivel = NivelTiled(MAP_DIR / f"nivel{nivel_actual}.tmx")
             cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
             flag_pos_world = FLAG_POS_BY_LEVEL.get(nivel_actual, FLAG_POS_BY_LEVEL.get(1, (0, 0)))
@@ -2100,6 +2633,10 @@ def main():
                 print("Aviso música de nivel:", e)
             puntuacion = 0
             timer = tiempo_total
+            # --- Umbral de vida por basura según dificultad ---
+            trash_collected = 0
+            trash_threshold = 3 if selected_difficulty == "FACIL" else 5
+
             if nivel_actual == 1:
                 parallax = create_parallax_nivel1()
             elif nivel_actual == 2:
@@ -2110,6 +2647,7 @@ def main():
                 parallax = create_parallax_nivel1()  # fallback
 
             prev_cam_offset_x = cam.offset()[0]
+
             reiniciar_nivel(nivel, jugador)
             cam = Camara((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), nivel.world_size())
             cam.follow(jugador.forma, lerp=1.0)
@@ -2121,6 +2659,7 @@ def main():
                 parallax = create_parallax_nivel3()
             else:
                 parallax = create_parallax_nivel1()  # fallback
+            continue_ui.trash_fx.reset()
 
             prev_cam_offset_x = cam.offset()[0]
             mover_derecha = False
@@ -2136,6 +2675,11 @@ def main():
                 else:
                     estado = ESTADO_VICTORIA
 
+            # --- crea grupos SOLO una vez ---
+            enemigos = pygame.sprite.Group()
+            items = pygame.sprite.Group()
+
+            # Secuencia de victoria
             secuencia_victoria = SecuenciaVictoria(
                 jugador,
                 pygame.Rect(flag_pos_world[0], flag_pos_world[1] - 200, 32, 200),
@@ -2143,13 +2687,14 @@ def main():
                 on_finish=_ir_a_victoria
             )
 
+            # --- agrega enemigos por nivel ---
             if nivel_actual == 0:
                 enemigos.add(
-                    Enemigo(x=4000, y=860, velocidad=0, escala=2.5),
-                    Enemigo(x=4500, y=860, velocidad=0, escala=2.5),
+                    Enemigo(x=3550, y=675, velocidad=0, escala=2.5),
+                    Enemigo(x=3240, y=675, velocidad=0, escala=2.5),
                 )
 
-            if nivel_actual == 1:
+            elif nivel_actual == 1:
                 enemigos.add(
                     Enemigo(x=450, y=675, velocidad=34, escala=2.5),
                     Enemigo(x=800, y=675, velocidad=35, escala=2.5),
@@ -2161,10 +2706,10 @@ def main():
                     Enemigo(x=2830, y=643, velocidad=35, escala=2.5),
                     Enemigo(x=3725, y=320, escala=2.5)
                 )
+
             elif nivel_actual == 2:
                 enemigos.add(
-                    Enemigo_walk(x=299, y=833, velocidad = 40),
-                    Enemigo(x=450, y=675, velocidad=35, escala=2.5),
+                    Enemigo_walk(x=299, y=833, velocidad=40),
                     Enemigo_walk(x=1578, y=831, velocidad=40),
                     Enemigo(x=2331, y=830, velocidad=35, escala=2.5),
                     Enemigo(x=2903, y=607, velocidad=35, escala=2.5),
@@ -2176,11 +2721,11 @@ def main():
                     Enemigo_walk(x=5445, y=832, velocidad=40),
                     Enemigo(x=5442, y=574, velocidad=35, escala=2.5),
                     Enemigo_walk(x=6084, y=448, velocidad=40),
-
                 )
+
             elif nivel_actual == 3:
                 enemigos.add(
-                    Enemigo_walk(x=611, y=864, velocidad = 40),
+                    Enemigo_walk(x=611, y=864, velocidad=40),
                     Enemigo(x=869, y=671, velocidad=35, escala=2.5),
                     Enemigo_walk(x=1469, y=864, velocidad=40),
                     Enemigo_walk(x=2414, y=864, velocidad=40),
@@ -2194,51 +2739,146 @@ def main():
                     Enemigo_walk(x=4083, y=864, velocidad=40),
                     Enemigo_walk(x=5946, y=864, velocidad=40),
                     Enemigo(x=5933, y=735, velocidad=35, escala=2.5),
-                    Enemigo_walk(x=7548, y=864, velocidad=40),
+                    Enemigo(x=7548, y=864, velocidad=40),
                     Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
                     Enemigo(x=7550, y=543, velocidad=35, escala=2.5),
                     Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
                     Enemigo(x=8319, y=448, velocidad=35, escala=2.5),
                     EnemigoPezueso(
-                        x=300, y=500,
-                        jugador=jugador,
-                        velocidad_patrulla=100,
-                        velocidad_furia=260,
-                        radio_det=220,
-                        duracion_furia_ms=1800,
-                        dir_inicial=1,
-                        mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
+                        x=3350, y=380, jugador=jugador,
+                        velocidad_patrulla=100, velocidad_furia=260,
+                        radio_det=220, duracion_furia_ms=1800,
+                        dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
                         escala_extra=1.0
                     ),
-
+                    EnemigoPezueso(
+                        x=4110, y=340, jugador=jugador,
+                        velocidad_patrulla=100, velocidad_furia=260,
+                        radio_det=220, duracion_furia_ms=1800,
+                        dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
+                        escala_extra=1.0
+                    ),
+                    EnemigoPezueso(
+                        x=5430, y=500, jugador=jugador,
+                        velocidad_patrulla=100, velocidad_furia=260,
+                        radio_det=220, duracion_furia_ms=1800,
+                        dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
+                        escala_extra=1.0
+                    ),
+                    EnemigoPezueso(
+                        x=6610, y=455, jugador=jugador,
+                        velocidad_patrulla=100, velocidad_furia=260,
+                        radio_det=220, duracion_furia_ms=1800,
+                        dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
+                        escala_extra=1.0
+                    ),
+                    EnemigoPezueso(
+                        x=8450, y=310, jugador=jugador,
+                        velocidad_patrulla=100, velocidad_furia=260,
+                        radio_det=220, duracion_furia_ms=1800,
+                        dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
+                        escala_extra=1.0
+                    ),
                 )
-            items = pygame.sprite.Group()
+
             if nivel_actual == 0:
                 items.add(
-                    Manzana(x=1900, y=650),
-                    bolsa(x=3210, y=830)
+                    botella(x=2275, y=590),
+                    botella(x=2535, y=590),
+                    bolsa(x=2740, y=630)
                 )
-            if nivel_actual == 1:
+
+            elif nivel_actual == 1:
                 items.add(
-                    Manzana(x=338, y=479),
-                    Manzana(x=724, y=374),
-                    Manzana(x=981, y=309),
-                    Manzana(x=1234, y=383),
-                    Manzana(x=2003, y=387),
-                    Manzana(x=2245, y=298),
-                    Manzana(x=2767, y=348),
-                    Manzana(x=2216, y=526),
-                    Manzana(x=4481, y=425),
-                    Manzana(x=4585, y=425),
-                    Manzana(x=4585, y=425),
-                    Manzana(x=4681, y=425),
-                    Manzana(x=3403, y=379),
-                    Manzana(x=3981, y=384),
-                    Manzana(x=3981, y=384),
-                    bolsa(x=2508, y=150),
-                    bolsa(x=5342, y=254),
-                    bolsa(x=3715, y=260)
+                    botella(x=338, y=479),
+                    lamina(x=715, y=460),
+                    llanta(x=920, y=400),
+                    lamina(x=1225, y=383),
+                    llanta(x=1980, y=420),
+                    botella(x=2235, y=360),
+                    llanta(x=2750, y=370),
+                    lamina(x=2216, y=526),
+                    botella(x=4481, y=425),
+                    botella(x=4585, y=425),
+                    botella(x=4681, y=425),
+                    botella(x=3370, y=450),
+                    lamina(x=3975, y=450),
+                    bolsa(x=2490, y=470),
+                    gustambo(x=5342, y=254),
+                    gustambo(x=3690, y=260)
                 )
+            elif nivel_actual == 2:
+                items.add(
+                    botella(x=644, y=429),
+                    botella(x=923, y=397),
+                    llanta(x=1530, y=600),
+                    lamina(x=1765, y=524),
+                    bolsa(x=2160, y=655),
+                    llanta(x=2558, y=630),
+                    botella(x=2890, y=550),
+                    botella(x=2890, y=780),
+                    bolsa(x=3258, y=622),
+                    gustambo(x=3845, y=760),
+                    botella(x=3850, y=516),
+                    botella(x=4760, y=440),
+                    lamina(x=5420, y=780),
+                    botella(x=5420, y=520),
+                    gustambo(x=6320,y=340)
+                )
+            elif nivel_actual == 3:
+                items.add(
+                    lamina(x=1000, y=560),
+                    botella(x=2180, y=650),
+                    botella(x=2030, y=650),
+                    botella(x=2180, y=470),
+                    botella(x=2030, y=470),
+                    bolsa(x=2120, y=800),
+                    botella(x=3130, y=630),
+                    lamina(x=3370, y=580),
+                    bolsa(x=3570, y=500),
+                    lamina(x=3710, y=580),
+                    botella(x=3930, y=480),
+                    llanta(x=4180, y=620),
+                    llanta(x=4400, y=500),
+                    gustambo(x=4600, y=440),
+                    llanta(x=4650, y=810),
+                    llanta(x=4400, y=810),
+                    llanta(x=4300, y=810),
+                    gustambo(x=5890, y=630),
+                    llanta(x=5890, y=800),
+                    botella(x=6770, y=640),
+                    botella(x=6600, y=530),
+                    lamina(x=6280, y=630),
+                    bolsa(x=7470, y=630),
+                    bolsa(x=7470, y=830),
+                    bolsa(x=7600, y=830),
+                    gustambo(x=7510, y=430),
+                    bolsa(x=7600, y=630),
+                    gustambo(x=8500, y=250)
+                )
+
+            # --- MEDIDOR DE BASURA POR NIVEL ---
+            trash_total = 0
+            for it in items:
+                if isinstance(it, (botella, bolsa, lamina, llanta, gustambo)):
+                    trash_total += 1
+
+            if trash_total <= 0:
+                trash_total = 1  # evitar división entre 0
+
+            # Dificultad para el medidor
+            if selected_difficulty == "DIFICIL":
+                dif = "dificil"
+            else:
+                dif = "facil"
+
+            # Crear el medidor UNA VEZ por carga de nivel
+            medidor = TrashMeter(1000, 20, trash_total, dificultad=dif)
+
+            # Flags para la puerta condicional
+            mostrando_mensaje_gate = False
+            ultimo_gate_rect = None
+
 
             # === Ajustes por dificultad ===
             if selected_difficulty == "DIFICIL":
@@ -2273,11 +2913,39 @@ def main():
                     nivel_actual == 1
                     and selected_difficulty == "FACIL"
                     and not tutorial_shown_level1
-                    and tutorial_overlay
             ):
-                tutorial_context = "game"
-                estado = ESTADO_TUTORIAL
-                musica.set_master_volume(settings["volume"] * 0.5)  # volumen reducido
+                # Construir el overlay en este momento según el idioma
+                try:
+                    lang = settings.get("language") or "es"
+                    ui_dir = IMG_DIR / "ui"
+                    path = ui_dir / ("tutorial_en.png" if lang == "en" else "tutorial.png")
+                    if not path.exists():
+                        path = ui_dir / "tutorial.png"
+
+                    print(f"[INFO] Cargando tutorial desde: {path} (lang={lang})")
+                    tutorial_img = pygame.image.load(path).convert_alpha()
+                    tutorial_overlay = TutorialOverlay(
+                        (constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA),
+                        tutorial_img
+                    )
+
+                    tutorial_context = "game"
+                    estado = ESTADO_TUTORIAL
+                    musica.set_master_volume(settings["volume"] * 0.5)  # volumen reducido
+
+                except Exception as e:
+                    print(f"[ADVERTENCIA] No se pudo cargar el tutorial ({path}): {e}")
+                    # Fallback: entrar directo al juego
+                    spawn_grace = SPAWN_GRACE
+                    spawn_skip_frames = SPAWN_SKIP_FRAMES
+                    jugador.invencible = True
+                    jugador.invencible_timer = SPAWN_GRACE
+                    jugador.knockback_activo = False
+                    jugador.knockback_timer = 0.0
+                    jugador.vel_y = 0
+                    jugador.en_piso = True
+                    estado = ESTADO_JUEGO
+
             else:
                 # === SPAWN FIX: al entrar directo al juego, activar gracia/frames ===
                 spawn_grace = SPAWN_GRACE
@@ -2290,16 +2958,39 @@ def main():
                 jugador.en_piso = True
                 estado = ESTADO_JUEGO
 
+
         elif estado == ESTADO_TUTORIAL:
             pass  # la interacción se maneja en eventos
 
         elif estado == ESTADO_JUEGO:
+
+
+            # Para puerta/barrera:
+            if medidor.completado:
+                mostrando_mensaje_gate = False
+                # YA NO revisas colisión → la pared desaparece
+            if not medidor.completado:
+                for rect in nivel.condicion_rects:
+                    if jugador.forma.colliderect(rect):
+                        # bloqueas movimiento como una pared normal
+                        if jugador.vel_x > 0:
+                            jugador.rect.right = rect.left
+                        elif jugador.vel_x < 0:
+                            jugador.rect.left = rect.right
+
+                        if jugador.vel_y > 0:
+                            jugador.rect.bottom = rect.top
+                        elif jugador.vel_y < 0:
+                            jugador.rect.top = rect.bottom
+
+                        mostrando_mensaje_gate = True
 
             if fly_mode:
                 vx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
                 vy = 0.0
                 if fly_up:   vy -= FLY_SPEED
                 if fly_down: vy += FLY_SPEED
+
 
                 jugador.forma.x += int(vx * dt)
                 jugador.forma.y += int(vy * dt)
@@ -2328,6 +3019,19 @@ def main():
             # === SPAWN FIX: protección de los primeros frames y gracia ===
             if spawn_skip_frames > 0:
                 spawn_skip_frames -= 1
+            g_active_prompt_ids.clear()  # Limpia los prompts activos cada frame
+
+            if nivel_actual == 0:  # <-- SOLO en el nivel tutorial
+                player_x = jugador.forma.centerx
+
+                for data in NIVEL0_PROMPTS_DATA:
+                    world_x = data["world_x"]
+                    range_pre = data["range_pre"]
+                    range_post = data["range_post"]
+
+                    # Comprueba si el jugador está en el rango
+                    if (world_x - range_pre) <= player_x <= (world_x + range_post):
+                        g_active_prompt_ids.append(data["id"])
 
             if spawn_grace > 0.0:
                 spawn_grace = max(0.0, spawn_grace - dt)
@@ -2411,8 +3115,42 @@ def main():
             for item in list(items.sprites()):
                 if item.tocar_jugador(jugador):
                     puntuacion += item.puntos
-                    musica.sfx("coin", volume=0.8)
+                    try:
+                        musica.sfx("coin", volume=0.8)
+                    except Exception:
+                        pass
                     item.kill()
+
+                    # === VIDA EXTRA POR BASURA ===
+                    if isinstance(item, (botella, bolsa,lamina,llanta,gustambo)):
+                        trash_collected += 1
+
+                        # 🔹 ACTUALIZAR MEDIDOR DE BASURA
+                        medidor.agregar_basura(1)
+                        if trash_collected >= trash_threshold:
+                            trash_collected -= trash_threshold
+                            if jugador.vida_actual < 4:
+                                jugador.vida_actual = min(jugador.vida_actual + 1, jugador.vida_maxima)
+                                try:
+                                    musica.sfx("1up", volume= 10000000.5)  # puedes subirlo a 1.2 si tu sfx lo permite
+                                except Exception:
+                                    pass
+
+                            # 🔤 Texto i18n  <-- ¡YA NO ESTÁ DENTRO DEL except!
+                                txt_1up = "+1 LIFE" if (settings.get("language") == "en") else "+1 VIDA"
+                                ft_font = get_font(constantes.FONT_HUD)
+
+                                spawn_x = jugador.forma.centerx
+                                spawn_y = jugador.forma.top - 8
+
+                                floating_texts.append(
+                                    FloatingText(
+                                        txt_1up, (spawn_x, spawn_y), ft_font,
+                                        color=(255, 255, 120), rise_speed=70, duration=1.0
+                                    )
+                                )
+
+                                print(f"[1UP] +1 vida por basura (umbral {trash_threshold})")
 
             # I-frames
             if getattr(jugador, "invencible", False):
@@ -2420,6 +3158,9 @@ def main():
                 if jugador.invencible_timer <= 0:
                     jugador.invencible = False
                     jugador.stun_sound_played = False
+
+            # GUARDA EL BORDE INFERIOR DEL FRAME ANTERIOR PARA DETECTAR STOMP
+            jugador.prev_bottom = jugador.forma.bottom
 
             # Knockback
             if getattr(jugador, "knockback_activo", False):
@@ -2439,7 +3180,16 @@ def main():
             jugador.aplicar_gravedad(dt)
             dy = int(jugador.vel_y * dt)
 
+            # 🔹 Reiniciar flags de puerta cada frame
+            mostrando_mensaje_gate = False
+            ultimo_gate_rect = None
+
+            # ------------------------------
+            #   MOVIMIENTO HORIZONTAL (X)
+            # ------------------------------
             jugador.forma.x += int(dx)
+
+            # Colisión con paredes normales
             for rect in nivel.collision_rects:
                 if jugador.forma.colliderect(rect):
                     if dx > 0:
@@ -2447,7 +3197,24 @@ def main():
                     elif dx < 0:
                         jugador.forma.left = rect.right
 
+            # Colisión con PAREDES CONDICION (solo si NO has llenado el medidor)
+            if not medidor.completado:
+                for rect in nivel.condicion_rects:
+                    if jugador.forma.colliderect(rect):
+                        if dx > 0:
+                            jugador.forma.right = rect.left
+                        elif dx < 0:
+                            jugador.forma.left = rect.right
+
+                        mostrando_mensaje_gate = True
+                        ultimo_gate_rect = rect
+
+            # ------------------------------
+            #   MOVIMIENTO VERTICAL (Y)
+            # ------------------------------
             jugador.forma.y += dy
+
+            # Colisión con paredes normales
             for rect in nivel.collision_rects:
                 if jugador.forma.colliderect(rect):
                     if dy > 0:
@@ -2457,6 +3224,21 @@ def main():
                     elif dy < 0:
                         jugador.forma.top = rect.bottom
                         jugador.vel_y = 0
+
+            # Colisión con PAREDES CONDICION (solo si NO has llenado el medidor)
+            if not medidor.completado:
+                for rect in nivel.condicion_rects:
+                    if jugador.forma.colliderect(rect):
+                        if dy > 0:
+                            jugador.forma.bottom = rect.top
+                            jugador.vel_y = 0
+                            jugador.en_piso = True
+                        elif dy < 0:
+                            jugador.forma.top = rect.bottom
+                            jugador.vel_y = 0
+
+                        mostrando_mensaje_gate = True
+                        ultimo_gate_rect = rect
 
             if not getattr(jugador, "invencible", False):
                 jugador.set_dx(vx)
@@ -2491,21 +3273,57 @@ def main():
             # Ataque
             if jugador.attacking and jugador.attack_timer > 0:
                 atk = jugador.get_attack_rect()
+
                 for e in list(enemigos):
+                    # --- STOMP: requiere contacto cuerpo a cuerpo ---
+                    if jugador.forma.colliderect(e.rect):
+                        if hasattr(e, "state") and e.state == "alive" and can_stomp(jugador, e):
+                            if hasattr(e, "stomp_kill"):
+                                e.stomp_kill()
+                            else:
+                                e.kill()
+                            try:
+                                musica.sfx("stomp", volume=0.9)
+                            except:
+                                pass
+                            jugador.vel_y = -abs(getattr(constantes, "SALTO_VEL", -750)) * 0.45
+                            jugador.en_piso = False
+                            puntuacion += getattr(e, "puntos", 100)
+                            continue  # ya resolvimos con stomp
+
+                    # --- ATAQUE NORMAL: usa el rectángulo de alcance, NO requiere contacto ---
                     if atk.colliderect(e.rect):
                         if hasattr(e, "hurt"):
                             e.hurt(jugador.attack_damage)
                             if not jugador.hit_sound_played:
                                 musica.sfx("golpe", volume=0.9)
                                 jugador.hit_sound_played = True
-                        if e.vida <= 0:
+                        if getattr(e, "vida", 1) <= 0:
                             puntuacion += e.puntos
+
+            if jugador.attack_timer <= 0:
+                jugador.hit_sound_played = False
 
             if jugador.attack_timer <= 0:
                 jugador.hit_sound_played = False
 
             # Daño del enemigo
             for e in enemigos:
+                if not jugador.forma.colliderect(e.rect):
+                    continue
+                if hasattr(e, "state") and e.state == "alive" and can_stomp(jugador, e):
+                    if hasattr(e, "stomp_kill"):
+                        e.stomp_kill()
+                    else:
+                        e.kill()
+                    try:
+                        musica.sfx("stomp", volume=0.9)
+                    except:
+                        pass
+                    jugador.vel_y = -abs(getattr(constantes, "SALTO_VEL", -750)) * 0.45
+                    jugador.en_piso = False
+                    puntuacion += getattr(e, "puntos", 100)
+                    continue
                 if e.tocar_jugador(jugador) and not getattr(jugador, "invencible", False):
                     if selected_difficulty == "DIFICIL":
                         jugador.recibir_dano(2)
@@ -2597,9 +3415,14 @@ def main():
                 continue_ui.reset()
 
         elif estado == ESTADO_CONTINUE:
+            continue_ui.tick(dt)  # 🔹 actualiza la basura
+            continue_ui.update(mouse_pos)  # tu código de botones
+            continue_ui.draw(ventana)  # dibuja todo (fondo + basura + UI)
             # CAMBIO AQUÍ: Ya no hay temporizador automático, solo actualizamos botones
             continue_ui.update(mouse_pos)
             # El cambio de estado ahora se maneja completamente con los botones/teclado
+        # === Actualizar textos flotantes (+1 VIDA) ===
+        floating_texts[:] = [ft for ft in floating_texts if ft.update(dt)]
 
         # -------------------- DRAW --------------------
 
@@ -2720,14 +3543,54 @@ def main():
             ventana.blit(fondo_menu, (0, 0))
             diff_ui.draw(ventana)
 
+
         elif estado in ("JUEGO", "PAUSA"):
             # Fondo/parallax y mapa
             if parallax is not None:
                 parallax.draw(ventana)
             nivel.draw(ventana, cam.offset())
 
-            # Offset de cámara (úsalo para TODO lo que dibujas)
+            # Offset de cámara (úsalo para TODO lo que dibujas en mundo)
             ox, oy = cam.offset()
+
+            # --- TUTORIALES NIVEL 0 (se mantiene igual) ---
+            if nivel_actual == 0:
+                for prompt_id in g_active_prompt_ids:
+                    # 1. Obtener los datos y los assets cacheados
+                    try:
+                        data = next(p for p in NIVEL0_PROMPTS_DATA if p["id"] == prompt_id)
+                        cache = g_tutorial_cache[prompt_id]
+                    except (StopIteration, KeyError):
+                        continue  # Seguridad por si algo falla
+
+                    text_surf = cache["text_surf"]
+                    img_surf  = cache["img_surf"]
+
+                    # 2. Calcular Posición en Pantalla
+                    screen_x = data["world_x"] - ox
+                    screen_y_anchor = data["world_y"] - oy  # Ancla (bottom del texto)
+
+                    # 3. Dibujar Texto (si existe)
+                    if text_surf:
+                        t   = time.time() * 3
+                        bob = int(math.sin(t) * 4)  # Animación de flote
+                        text_rect = text_surf.get_rect(
+                            centerx=screen_x,
+                            bottom=screen_y_anchor + bob
+                        )
+                        ventana.blit(text_surf, text_rect)
+
+                    # 4. Dibujar Imagen (si existe)
+                    if img_surf:
+                        img_y_offset = data.get("img_y_offset", -50)
+                        t_img = (time.time() * 3) + 0.5  # Flote desfasado
+                        bob   = int(math.sin(t_img) * 4)
+
+                        img_rect = img_surf.get_rect(
+                            centerx=screen_x,
+                            bottom=screen_y_anchor + img_y_offset + bob
+                        )
+                        ventana.blit(img_surf, img_rect)
 
             # --- DIBUJAR BANDERA / BASURA ---
             if flag_img:
@@ -2737,25 +3600,51 @@ def main():
                     fr = flag_img.get_rect(bottomleft=(bx, by))
                 else:
                     # fallback por si no existe la variable (usa la posición fija del mapa)
-                    fr = flag_img.get_rect(bottomleft=(flag_pos_world[0] - ox, flag_pos_world[1] - oy))
+                    fr = flag_img.get_rect(
+                        bottomleft=(flag_pos_world[0] - ox,
+                                    flag_pos_world[1] - oy)
+                    )
                 ventana.blit(flag_img, fr)
 
-            # Enemigos e ítems
-            # --- DIBUJAR ENEMIGOS CON OFFSET VISUAL ---
+            # --- DIBUJAR ENEMIGOS E ITEMS ---
             for e in enemigos:
                 ventana.blit(e.image, (e.rect.x - ox, e.rect.y - oy + e.render_offset_y))
+
             for item in items:
                 ventana.blit(item.image, (item.rect.x - ox, item.rect.y - oy))
 
-            # Jugador
+            # --- JUGADOR ---
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
+
             if estado == "PAUSA":
                 pause_menu.draw(ventana)
-            # HUD solo si NO hay cutscene de victoria (para que no parezca congelado)
+
+            # --- TEXTOS FLOTANTES ---
+            for ft in floating_texts:
+                ft.draw(ventana, cam.offset())
+
+            # ==============================
+            # HUD: MEDIDOR DE BASURA + MENSAJE DE PUERTA
+            # ==============================
+            # Medidor de basura (es HUD, no depende de la cámara)
+            medidor.draw(ventana)
+
+            # Mensaje "ALTO, debes limpiar más..." si chocó con una puerta condicional
+            if (mostrando_mensaje_gate and not medidor.completado and (ultimo_gate_rect is not None)):
+                gate_screen_x = ultimo_gate_rect.centerx - ox
+                gate_screen_y = ultimo_gate_rect.top - oy - 40  # un poco arriba de la puerta
+
+                msg = "ALTO, debes limpiar más para poder pasar"
+                texto_surf = font_hud.render(msg, True, (255, 255, 255))
+                texto_rect = texto_surf.get_rect(center=(gate_screen_x, gate_screen_y))
+                ventana.blit(texto_surf, texto_rect)
+
+            # HUD clásico (timer, vida, puntuación) SOLO si no hay escena de victoria
             if not ("secuencia_victoria" in locals() and secuencia_victoria.activa):
                 draw_timer(ventana, font_hud, timer, pos=(20, 20))
                 draw_hud(ventana, jugador, vida_lleno_img, vida_vacio_img)
                 draw_puntuacion(ventana, font_hud, puntuacion)
+
 
         elif estado == "MUERTE":
             if parallax is not None:

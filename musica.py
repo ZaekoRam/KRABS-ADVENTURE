@@ -63,6 +63,7 @@ def set_jingle_volume(v: float):
 
 LIB = {
     "menu":     AUDIO_DIR / "menu.ogg",
+    "nivel0":   AUDIO_DIR / "nivel0.ogg",
     "nivel1":   AUDIO_DIR / "nivel1.ogg",
     "nivel2":   AUDIO_DIR / "nivel2.ogg",
     "nivel3":   AUDIO_DIR / "nivel3.ogg",
@@ -181,6 +182,9 @@ SFX_LIB = {
     "death": SFX_DIR / "death.wav",
     "golpe": SFX_DIR / "golpe.wav",
     "stun":  SFX_DIR / "stun.wav",
+    "1up":  SFX_DIR / "1up.ogg",
+    "stomp": SFX_DIR / "stomp.wav",
+
 }
 
 _SFX_CACHE = {}
