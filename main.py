@@ -2010,6 +2010,9 @@ def main():
         cartel_basura_en = pygame.transform.smoothscale(cartel_basura_en, (384, 40))
         vida_lleno_img = pygame.transform.scale(vida_lleno_img, (32, 32))
         vida_vacio_img = pygame.transform.scale(vida_vacio_img, (32, 32))
+        btn_exit_img = pygame.image.load("assets/images/ui/btn_exit.png").convert_alpha()
+        btn_exit_img = pygame.transform.smoothscale(btn_exit_img, (90, 90))
+
     except pygame.error as e:
         print(f"ERROR AL CARGAR IMÁGENES DEL HUD: {e}")
         vida_lleno_img = vida_vacio_img = None
@@ -2132,6 +2135,7 @@ def main():
     tutorial_context = None
     # --- Efectos de texto flotante ---
     floating_texts = []
+    btn_exit = ImageButton(btn_exit_img, center=(constantes.ANCHO_VENTANA - 80, 80))
 
     # --- Vida extra por basura ---
     trash_collected = 0  # contador actual de basura recogida
@@ -3516,6 +3520,7 @@ def main():
             menu_krab.draw(ventana)
 
         elif estado == ESTADO_OPC:
+
             ventana.blit(fondo_menu, (0, 0))
 
             lang = settings["language"]
@@ -3552,19 +3557,23 @@ def main():
             lang_value_str = t["lang_value"][settings["language"]]
             lang_value = get_font(constantes.FONT_HUD).render(lang_value_str, True, (180, 210, 255))
             ventana.blit(lang_value, (btn_lang_rect.centerx - lang_value.get_width() // 2, btn_lang_rect.top + 28))
+            btn_exit.draw(ventana)
 
 
         elif estado == ESTADO_SELECT_PERSONAJE:
             ventana.blit(fondo_menu, (0, 0))
             select_ui.draw(ventana)
+            btn_exit.draw(ventana)
 
         elif estado == ESTADO_SELECT_NIVEL:
             ventana.blit(fondo_menu, (0, 0))
             level_select_ui.draw(ventana)
+            btn_exit.draw(ventana)
 
         elif estado == ESTADO_DIFICULTAD:
             ventana.blit(fondo_menu, (0, 0))
             diff_ui.draw(ventana)
+            btn_exit.draw(ventana)
 
 
         elif estado in ("JUEGO", "PAUSA"):
