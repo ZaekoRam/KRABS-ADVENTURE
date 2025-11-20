@@ -1070,13 +1070,21 @@ class TrashMeter:
         self.x = x
         self.y = y
 
-        # Cargas SOLO tu sprite del bote vacío
+        # Cargar sprite del medidor
         self.frame_img = pygame.image.load("assets/images/ui/medidor_basura.png").convert_alpha()
-        self.w = self.frame_img.get_width()
-        self.h = self.frame_img.get_height()
+
+        # 🔥 Aumentar tamaño un poquititito (ajusta 1.05 → 1.03 / 1.08 / lo que necesites)
+        scale = 0.08   # 5% más grande
+        new_w = int(self.frame_img.get_width() * scale)
+        new_h = int(self.frame_img.get_height() * scale)
+
+        self.frame_img = pygame.transform.smoothscale(self.frame_img, (new_w, new_h))
+
+        self.w = new_w
+        self.h = new_h
 
         # Superficie donde dibujaremos el relleno (del mismo tamaño que el sprite)
-        self.fill_surface = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
+        self.fill_surface = pygame.Surface((self.w + 20, self.h + 20), pygame.SRCALPHA)
 
         # Total de basura en el nivel
         self.total_basura = total_basura
@@ -1096,11 +1104,17 @@ class TrashMeter:
 
         # 🔧 Ajusta esta zona para decir dónde se llena dentro del sprite
         # (ej. la “ventana” del bote donde se ve el relleno)
-        self.fill_rect_area = pygame.Rect(10, 10, self.w - 20, self.h - 20)
+        self.fill_rect_area = pygame.Rect(
+            int(self.w * 0.30),
+            int(self.h * 0.20),
+            int(self.w * 0.40),
+            int(self.h * 0.70)
+        )
+
         # ↑ margen de 10 px por cada lado (ajústalo a tu sprite real)
 
         # Color del relleno (puedes cambiar a lo que combine con tu arte)
-        self.fill_color = (50, 200, 100, 230)  # RGBA (con alpha)
+        self.fill_color = (0, 255, 255, 200)
 
     def agregar_basura(self, cantidad=1):
         self.recogida += cantidad
@@ -1139,10 +1153,10 @@ class TrashMeter:
             pygame.draw.rect(self.fill_surface, self.fill_color, fill_rect)
 
         # 1) Dibujas primero el relleno
-        surface.blit(self.fill_surface, (self.x, self.y))
+        surface.blit(self.fill_surface, (self.x -45, self.y ))
 
         # 2) Luego dibujas encima tu PNG del bote vacío
-        surface.blit(self.frame_img, (self.x, self.y))
+        surface.blit(self.frame_img, (self.x -40, self.y))
 
 # -------------------- Game Over Screen --------------------
 class GameOverScreen:
