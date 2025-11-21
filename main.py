@@ -1070,13 +1070,21 @@ class TrashMeter:
         self.x = x
         self.y = y
 
-        # Cargas SOLO tu sprite del bote vacío
+        # Cargar sprite del medidor
         self.frame_img = pygame.image.load("assets/images/ui/medidor_basura.png").convert_alpha()
-        self.w = self.frame_img.get_width()
-        self.h = self.frame_img.get_height()
+
+        # 🔥 Aumentar tamaño un poquititito (ajusta 1.05 → 1.03 / 1.08 / lo que necesites)
+        scale = 0.08   # 5% más grande
+        new_w = int(self.frame_img.get_width() * scale)
+        new_h = int(self.frame_img.get_height() * scale)
+
+        self.frame_img = pygame.transform.smoothscale(self.frame_img, (new_w, new_h))
+
+        self.w = new_w
+        self.h = new_h
 
         # Superficie donde dibujaremos el relleno (del mismo tamaño que el sprite)
-        self.fill_surface = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
+        self.fill_surface = pygame.Surface((self.w + 20, self.h + 20), pygame.SRCALPHA)
 
         # Total de basura en el nivel
         self.total_basura = total_basura
@@ -1096,11 +1104,17 @@ class TrashMeter:
 
         # 🔧 Ajusta esta zona para decir dónde se llena dentro del sprite
         # (ej. la “ventana” del bote donde se ve el relleno)
-        self.fill_rect_area = pygame.Rect(10, 10, self.w - 20, self.h - 20)
+        self.fill_rect_area = pygame.Rect(
+            int(self.w * 0.30),
+            int(self.h * 0.20),
+            int(self.w * 0.40),
+            int(self.h * 0.70)
+        )
+
         # ↑ margen de 10 px por cada lado (ajústalo a tu sprite real)
 
         # Color del relleno (puedes cambiar a lo que combine con tu arte)
-        self.fill_color = (50, 200, 100, 230)  # RGBA (con alpha)
+        self.fill_color = (0, 255, 255, 200)
 
     def agregar_basura(self, cantidad=1):
         self.recogida += cantidad
@@ -1139,10 +1153,10 @@ class TrashMeter:
             pygame.draw.rect(self.fill_surface, self.fill_color, fill_rect)
 
         # 1) Dibujas primero el relleno
-        surface.blit(self.fill_surface, (self.x, self.y))
+        surface.blit(self.fill_surface, (self.x -45, self.y ))
 
         # 2) Luego dibujas encima tu PNG del bote vacío
-        surface.blit(self.frame_img, (self.x, self.y))
+        surface.blit(self.frame_img, (self.x -40, self.y))
 
 # -------------------- Game Over Screen --------------------
 class GameOverScreen:
@@ -1988,10 +2002,17 @@ def main():
 
     # HUD imágenes
     try:
+        cartel_basura_es = pygame.image.load("assets/images/ui/alto_es.png").convert_alpha()
+        cartel_basura_en = pygame.image.load(IMG_DIR / "ui/alto_en.png").convert_alpha()
         vida_lleno_img = pygame.image.load(IMG_DIR / "vidas/vida_llena.png").convert_alpha()
         vida_vacio_img = pygame.image.load(IMG_DIR / "vidas/vida_vacia.png").convert_alpha()
+        cartel_basura_es = pygame.transform.smoothscale(cartel_basura_es, (384, 40))
+        cartel_basura_en = pygame.transform.smoothscale(cartel_basura_en, (384, 40))
         vida_lleno_img = pygame.transform.scale(vida_lleno_img, (32, 32))
         vida_vacio_img = pygame.transform.scale(vida_vacio_img, (32, 32))
+        btn_exit_img = pygame.image.load("assets/images/ui/btn_exit.png").convert_alpha()
+        btn_exit_img = pygame.transform.smoothscale(btn_exit_img, (90, 90))
+
     except pygame.error as e:
         print(f"ERROR AL CARGAR IMÁGENES DEL HUD: {e}")
         vida_lleno_img = vida_vacio_img = None
@@ -2010,6 +2031,11 @@ def main():
         1: (5491, 683),  # NIVEL 1
         2: (6485, 845),  # NIVEL 2 (ejemplo)
         3: (8673, 871),  # si algún día agregas nivel 3
+    }
+    CARTEL_BASURA_POS = {
+        1: (5000, 270),  # EJEMPLO: nivel 1 -> (x, y)
+        2: (5950, 300),  # EJEMPLO: nivel 2 -> (x, y)
+        3: (8170, 310),
     }
 
     # variable que usaremos al dibujar (se actualiza al cargar cada nivel)
@@ -2109,6 +2135,7 @@ def main():
     tutorial_context = None
     # --- Efectos de texto flotante ---
     floating_texts = []
+    btn_exit = ImageButton(btn_exit_img, center=(constantes.ANCHO_VENTANA - 80, 80))
 
     # --- Vida extra por basura ---
     trash_collected = 0  # contador actual de basura recogida
@@ -2128,7 +2155,7 @@ def main():
             "img_w": 700,
             "img_y_offset": -50,
             "world_x": 400,  # <-- La clave que faltaba
-            "world_y": 680,
+            "world_y": 800,
             "range_pre": 500,  # <-- La clave que faltaba
             "range_post": 500,  # <-- La clave que faltaba
         },
@@ -2138,7 +2165,7 @@ def main():
             "img_w": 700,
             "img_y_offset": -50,
             "world_x": 1390,  # <-- La clave que faltaba
-            "world_y": 680,
+            "world_y": 800,
             "range_pre": 500,  # <-- La clave que faltaba
             "range_post": 500,  # <-- La clave que faltaba
         },
@@ -2147,8 +2174,8 @@ def main():
             "img_name": "key_clean",
             "img_w": 700,
             "img_y_offset": -50,
-            "world_x": 3400,  # <-- La clave que faltaba
-            "world_y": 680,
+            "world_x": 3430,  # <-- La clave que faltaba
+            "world_y": 800,
             "range_pre": 500,  # <-- La clave que faltaba
             "range_post": 500,  # <-- La clave que faltaba
         },
@@ -2157,7 +2184,7 @@ def main():
             "img_name": "key_collect",
             "img_w": 700,
             "img_y_offset": -50,
-            "world_x": 2200,  # <-- La clave que faltaba
+            "world_x": 2443,  # <-- La clave que faltaba
             "world_y": 680,
             "range_pre": 500,  # <-- La clave que faltaba
             "range_post": 500,  # <-- La clave que faltaba
@@ -2261,6 +2288,27 @@ def main():
                 musica.stop(300);
                 run = False
 
+            if btn_exit.clicked(event):
+                print(f"Botón presionado en estado: {estado}")  # <--- DEBUG
+                # Definimos a dónde regresa según dónde estemos
+                if estado == ESTADO_OPC:
+                    estado = ESTADO_MENU
+                    _save_prefs(settings)  # Guardar cambios al salir
+
+                elif estado == ESTADO_SELECT_PERSONAJE:
+                    print("--> Entró a la condición SELECT_PERSONAJE. Cambiando a MENU...")
+                    estado = ESTADO_MENU
+                    _save_prefs(settings)
+
+                elif estado == ESTADO_SELECT_NIVEL:
+                    estado = ESTADO_SELECT_PERSONAJE
+                    # Reset de selección si es necesario
+
+                elif estado == ESTADO_DIFICULTAD:
+                    estado = ESTADO_SELECT_NIVEL
+
+
+
             elif estado == ESTADO_LANG_SELECT:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     mx, my = event.pos
@@ -2335,6 +2383,7 @@ def main():
 
             elif estado == ESTADO_SELECT_PERSONAJE:
                 now_ms = pygame.time.get_ticks()
+                btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
                 if now_ms - last_select_time >= SELECT_COOLDOWN_MS and not select_lock:
                     choice = select_ui.handle_event(event)
                     if choice in ("male", "female"):
@@ -3493,6 +3542,7 @@ def main():
             menu_krab.draw(ventana)
 
         elif estado == ESTADO_OPC:
+
             ventana.blit(fondo_menu, (0, 0))
 
             lang = settings["language"]
@@ -3529,19 +3579,23 @@ def main():
             lang_value_str = t["lang_value"][settings["language"]]
             lang_value = get_font(constantes.FONT_HUD).render(lang_value_str, True, (180, 210, 255))
             ventana.blit(lang_value, (btn_lang_rect.centerx - lang_value.get_width() // 2, btn_lang_rect.top + 28))
+            btn_exit.draw(ventana)
 
 
         elif estado == ESTADO_SELECT_PERSONAJE:
             ventana.blit(fondo_menu, (0, 0))
             select_ui.draw(ventana)
+            btn_exit.draw(ventana)
 
         elif estado == ESTADO_SELECT_NIVEL:
             ventana.blit(fondo_menu, (0, 0))
             level_select_ui.draw(ventana)
+            btn_exit.draw(ventana)
 
         elif estado == ESTADO_DIFICULTAD:
             ventana.blit(fondo_menu, (0, 0))
             diff_ui.draw(ventana)
+            btn_exit.draw(ventana)
 
 
         elif estado in ("JUEGO", "PAUSA"):
@@ -3616,8 +3670,7 @@ def main():
             # --- JUGADOR ---
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
 
-            if estado == "PAUSA":
-                pause_menu.draw(ventana)
+
 
             # --- TEXTOS FLOTANTES ---
             for ft in floating_texts:
@@ -3625,9 +3678,49 @@ def main():
 
             # ==============================
             # HUD: MEDIDOR DE BASURA + MENSAJE DE PUERTA
+            if not medidor.completado:
+                if nivel_actual in CARTEL_BASURA_POS:
+                    wx, wy = CARTEL_BASURA_POS[nivel_actual]  # coords del mundo
+                    # Distancia entre jugador y cartel
+                    dx = jugador.forma.centerx - wx
+                    dy = jugador.forma.centery - wy
+                    distancia = (dx * dx + dy * dy) ** 0.5  # sqrt rápido
+
+                    # Sólo mostrar si estás cerca
+                    if distancia < 200:  # <-- cambia este valor si quieres más o menos distancia
+                        sx = wx - ox
+                        sy = wy - oy
+
+                        # Imagen según idioma
+                        if settings.get("language") == "en":
+                            ventana.blit(cartel_basura_en, (sx, sy))
+                        else:
+                            ventana.blit(cartel_basura_es, (sx, sy))
+
             # ==============================
             # Medidor de basura (es HUD, no depende de la cámara)
             medidor.draw(ventana)
+
+            # Contador de basura: recogida / total
+            font_basura = get_font(constantes.FONT_UI_ITEM)  # o la fuente que uses para el HUD
+            texto_basura = f"{medidor.recogida} / {medidor.total_basura}"
+
+            # ==== CAMBIO DE COLOR SEGÚN COMPLETADO ====
+            if medidor.completado:  # ya juntó las necesarias
+                color = (0, 255, 150)  # verde aqua bonito
+            else:
+                color = (255, 255, 255)  # blanco normal
+
+            txt_surf = font_basura.render(texto_basura, True, color)
+
+            # Lo colocamos centrado debajo del bote (exacto como tú lo dejaste)
+            x = medidor.x + medidor.w // 5 - txt_surf.get_width() // 2
+            y = medidor.y + medidor.h + 5  # 5 px debajo del bote
+
+            ventana.blit(txt_surf, (x, y))
+
+            if estado == "PAUSA":
+                pause_menu.draw(ventana)
 
             # Mensaje "ALTO, debes limpiar más..." si chocó con una puerta condicional
             if (mostrando_mensaje_gate and not medidor.completado and (ultimo_gate_rect is not None)):
@@ -3681,37 +3774,109 @@ def main():
                 tutorial_overlay.draw(ventana)
 
         elif estado == ESTADO_VICTORIA:
+            # Dibujar fondo/parallax
             if parallax is not None:
                 parallax.draw(ventana)
+
+            # Dibujar nivel
             nivel.draw(ventana, cam.offset())
             ox, oy = cam.offset()
 
-            # Dibuja la bandera en su posición final (usa bandera_rect si existe, si no, fallback)
+            # Bandera en su posición final
             if flag_img:
                 if "secuencia_victoria" in locals():
                     bx = secuencia_victoria.bandera_rect.x - ox
                     by = secuencia_victoria.bandera_rect.bottom - oy
                     fr = flag_img.get_rect(bottomleft=(bx, by))
                 else:
-                    fr = flag_img.get_rect(bottomleft=(flag_pos_world[0] - ox, flag_pos_world[1] - oy))
+                    fr = flag_img.get_rect(bottomleft=(flag_pos_world[0] - ox,
+                                                       flag_pos_world[1] - oy))
                 ventana.blit(flag_img, fr)
 
             # Jugador
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
 
-            # Mensaje
-            msg = get_font(constantes.FONT_UI_TITLE).render(tr("victory"), True, (255, 255, 0))
+            # ===== OSCURECER UN POCO EL FONDO =====
+            overlay = pygame.Surface((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), pygame.SRCALPHA)
+            overlay.fill((0, 0, 40, 110))  # azul oscuro, suave
+            ventana.blit(overlay, (0, 0))
+
+            # ===== BURBUJA / PASTILLA DE VICTORIA =====
+            t = pygame.time.get_ticks() / 1000.0
+
+            font_title = get_font(constantes.FONT_UI_TITLE)
+            msg_text = tr("victory")  # "¡VICTORIA!"
+            msg = font_title.render(msg_text, True, (255, 255, 255))
+
+            # La colocamos un poco más arriba para no tapar el texto de "Pulsa ENTER..."
+            center_x = constantes.ANCHO_VENTANA // 2
+            center_y = constantes.ALTO_VENTANA // 2 - 40
+
+            # Tamaño más compacto (antes sumábamos demasiado)
+            bubble_w = msg.get_width() + 80
+            bubble_h = msg.get_height() + 32
+
+            # Pequeño “latido” suave
+            scale = 1.0 + 0.02 * math.sin(t * 3)
+            draw_w = int(bubble_w * scale)
+            draw_h = int(bubble_h * scale)
+
+            bubble_surf = pygame.Surface((draw_w, draw_h), pygame.SRCALPHA)
+
+            # Colores de la burbuja
+            base_color = (120, 210, 255, 180)  # azul agua
+            edge_color = (255, 255, 255, 230)  # borde blanco
+            highlight = (255, 255, 255, 90)  # brillo suave
+
+            rect = pygame.Rect(0, 0, draw_w, draw_h)
+
+            # Elipse principal (tipo pastilla)
+            pygame.draw.ellipse(bubble_surf, base_color, rect)
+            pygame.draw.ellipse(bubble_surf, edge_color, rect, width=3)
+
+            # Brillo en la parte superior izquierda
+            highlight_rect = pygame.Rect(draw_w * 0.1, draw_h * 0.1,
+                                         draw_w * 0.5, draw_h * 0.4)
+            pygame.draw.ellipse(bubble_surf, highlight, highlight_rect)
+
+            # Un par de burbujitas pequeñas cerca (ya no rodeando toda la pantalla)
+            for i in range(3):
+                offset_x = (-40 if i == 0 else (40 if i == 1 else 0))
+                offset_y = (-30 if i < 2 else 30)
+                r = 10 if i < 2 else 6
+
+                bx = draw_w // 2 + offset_x
+                by = draw_h // 2 + offset_y
+
+                pygame.draw.circle(bubble_surf, (180, 230, 255, 160), (bx, by), r)
+                pygame.draw.circle(bubble_surf, (255, 255, 255, 220), (bx, by), r, width=2)
+
+            # Dibujar burbuja en pantalla
+            bubble_rect = bubble_surf.get_rect(center=(center_x, center_y))
+            ventana.blit(bubble_surf, bubble_rect.topleft)
+
+            # Texto con sombra dentro de la burbuja
+            shadow = font_title.render(msg_text, True, (0, 0, 40))
+            ventana.blit(
+                shadow,
+                (center_x - shadow.get_width() // 2 + 2,
+                 center_y - shadow.get_height() // 2 + 3)
+            )
             ventana.blit(
                 msg,
-                (constantes.ANCHO_VENTANA // 2 - msg.get_width() // 2,
-                 constantes.ALTO_VENTANA // 2 - msg.get_height() // 2)
+                (center_x - msg.get_width() // 2,
+                 center_y - msg.get_height() // 2)
             )
-            hint = get_font(constantes.FONT_UI_ITEM).render(tr("victory_hint"), True, (255, 255, 255))
+
+            # ===== HINT DEBAJO =====
+            font_hint = get_font(constantes.FONT_UI_ITEM)
+            hint = font_hint.render(tr("victory_hint"), True, (240, 240, 240))
             ventana.blit(
                 hint,
                 (constantes.ANCHO_VENTANA // 2 - hint.get_width() // 2,
-                 constantes.ALTO_VENTANA // 2 + 60)
+                 center_y + bubble_rect.height // 2 + 25)
             )
+
         pygame.display.flip()
 
     pygame.quit()
