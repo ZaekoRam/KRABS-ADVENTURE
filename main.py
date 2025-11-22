@@ -280,21 +280,28 @@ settings = {
     "language": None,   # idioma elegido (None al inicio, luego "es" o "en")
 }
 
-# === TEXTOS (I18N) ===
 I18N = {
     "es": {
         "select_lang": "Selecciona tu idioma",
+        "select_language": "Selecciona tu idioma",   # <-- ESTA USA TU MENÚ
         "spanish": "Español",
         "english": "Inglés",
-        "skip": "Pulsa cualquier tecla para saltar",
+        "options_title": "OPCIONES",
+        "volume": "Volumen",
+        "skip": "Pulsa cualquier tecla para saltar"
     },
     "en": {
         "select_lang": "Select your language",
+        "select_language": "Select your language",   # <-- ESTA USA TU MENÚ
         "spanish": "Spanish",
         "english": "English",
-        "skip": "Press any key to skip",
+        "options_title": "OPTIONS",
+        "volume": "Volume",
+        "skip": "Press any key to skip"
     }
 }
+
+
 # === TEXTOS GLOBALES (UI multi-idioma) ===
 TXT = {
     "es": {
@@ -575,7 +582,7 @@ I18N = {
         "spanish": "Español",
         "english": "Inglés",
         "skip": "Pulsa cualquier tecla para saltar",
-        "options_title": "OPCIONES (ESC para volver)",
+        "options_title": "OPCIONES",
         "volume": "Volumen",
         "language": "Idioma",
         "lang_value": {"es": "Español", "en": "Inglés"},
@@ -587,7 +594,7 @@ I18N = {
         "spanish": "Spanish",
         "english": "English",
         "skip": "Press any key to skip",
-        "options_title": "OPTIONS (ESC to go back)",
+        "options_title": "OPTIONS",
         "volume": "Volume",
         "language": "Language",
         "lang_value": {"es": "Spanish", "en": "English"},
@@ -2053,6 +2060,16 @@ def main():
     btn_play = None
     btn_opc = None
     btn_salir = None
+    # ------------------ ASSETS UI ------------------
+
+    protagonista_img = pygame.image.load("assets/images/ui/protagonista.png").convert_alpha()
+    protagonista_img = pygame.transform.scale(protagonista_img, (330, 330))
+
+    flag_mx = pygame.image.load("assets/images/ui/flag_mx.png").convert_alpha()
+    flag_us = pygame.image.load("assets/images/ui/flag_us.png").convert_alpha()
+
+    flag_mx = pygame.transform.scale(flag_mx, (48, 32))
+    flag_us = pygame.transform.scale(flag_us, (48, 32))
 
     # -------------- Miniaturas de los niveles --------------
     thumbs = {}
@@ -2135,7 +2152,7 @@ def main():
     tutorial_context = None
     # --- Efectos de texto flotante ---
     floating_texts = []
-    btn_exit = ImageButton(btn_exit_img, center=(constantes.ANCHO_VENTANA - 80, 80))
+    btn_exit = ImageButton(btn_exit_img, center=(constantes.ANCHO_VENTANA - 1050, 40))
 
     # --- Vida extra por basura ---
     trash_collected = 0  # contador actual de basura recogida
@@ -2281,12 +2298,37 @@ def main():
         dt = reloj.tick(target_fps) / 1000.0
         mouse_pos = pygame.mouse.get_pos();
         mouse_down = pygame.mouse.get_pressed()[0]
+        click = False
 
         # -------------------- EVENTOS --------------------
+        click = False
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                musica.stop(300);
                 run = False
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                click = True
+
+            if btn_exit.clicked(event):
+                print(f"Botón presionado en estado: {estado}")  # <--- DEBUG
+                # Definimos a dónde regresa según dónde estemos
+                if estado == ESTADO_OPC:
+                    estado = ESTADO_MENU
+                    _save_prefs(settings)  # Guardar cambios al salir
+
+                elif estado == ESTADO_SELECT_PERSONAJE:
+                    print("--> Entró a la condición SELECT_PERSONAJE. Cambiando a MENU...")
+                    menu_leaving = False
+                    estado = ESTADO_MENU
+                    menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+
+                elif estado == ESTADO_SELECT_NIVEL:
+                    estado = ESTADO_SELECT_PERSONAJE
+                    select_lock = False  # <--- ¡AGREGA ESTO! IMPORTANTE
+                    # Reset de selección si es necesario
+
+                elif estado == ESTADO_DIFICULTAD:
+                    estado = ESTADO_SELECT_NIVEL
 
             elif estado == ESTADO_LANG_SELECT:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -2428,6 +2470,7 @@ def main():
 
 
             elif estado == ESTADO_OPC:
+                btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
                 if event.type == pygame.KEYDOWN:
                     # Volver al menú
                     if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
@@ -3519,45 +3562,136 @@ def main():
             btn_salir.draw(ventana)
             menu_krab.draw(ventana)
 
+
         elif estado == ESTADO_OPC:
 
             ventana.blit(fondo_menu, (0, 0))
+            # ============================================================
+            # KRABBY DEBAJO Y CENTRADO
+            # ============================================================
+            krab_rect = protagonista_img.get_rect()
+            krab_rect.centerx = constantes.ANCHO_VENTANA // 2 - 10
+            krab_rect.top = 330
+            ventana.blit(protagonista_img, krab_rect)
 
+            # ============================
+            # 1) LENGUAJE ACTUAL
+            # ============================
             lang = settings["language"]
             t = I18N[lang]
 
-            # Título
-            sub = get_font(constantes.FONT_SUBTITLE).render(t["options_title"], True, (255, 255, 255))
-            ventana.blit(sub, (constantes.ANCHO_VENTANA // 2 - sub.get_width() // 2, 60))
+            # ============================
+            # 2) TÍTULO: SOLO “OPCIONES”
+            # ============================
+            titulo_rect = pygame.Rect(0, 0, 320, 60)
+            titulo_rect.center = (constantes.ANCHO_VENTANA // 2, 80)
 
-            # Etiqueta Volumen
-            vol_label = get_font(constantes.FONT_HUD).render(t["volume"], True, (220, 220, 220))
-            ventana.blit(vol_label, (slider_bar_rect.centerx - vol_label.get_width() // 2, slider_bar_rect.top - 40))
+            pygame.draw.rect(ventana, (20, 40, 90), titulo_rect, border_radius=12)
+            pygame.draw.rect(ventana, (255, 255, 255), titulo_rect, width=3, border_radius=12)
 
-            # Slider (bar + progress + handle)
-            pygame.draw.rect(ventana, (80, 80, 90), slider_bar_rect, border_radius=SLIDER_H // 2)
-            progress_rect = slider_bar_rect.copy()
-            progress_rect.width = int(settings["volume"] * slider_bar_rect.width)
-            pygame.draw.rect(ventana, (120, 180, 255), progress_rect, border_radius=SLIDER_H // 2)
+            texto_titulo = get_font(constantes.FONT_SUBTITLE).render(t["options_title"], True, (255, 255, 255))
+            ventana.blit(texto_titulo, (titulo_rect.centerx - texto_titulo.get_width() // 2,
+                                        titulo_rect.centery - texto_titulo.get_height() // 2))
 
-            hx = slider_handle_pos_x()
-            hy = slider_bar_rect.centery
-            pygame.draw.circle(ventana, (240, 240, 255), (hx, hy), HANDLE_R)
+            # ============================
+            # 3) SLIDER DE VOLUMEN
+            # ============================
+            nuevo_slider = slider_bar_rect.copy()
+            nuevo_slider.width = 350
+            nuevo_slider.centerx = constantes.ANCHO_VENTANA // 2
+            nuevo_slider.y = 170
 
-            hint = get_font(constantes.FONT_HUD).render(t["hint"], True, (180, 180, 180))
-            ventana.blit(hint, (slider_bar_rect.centerx - hint.get_width() // 2, slider_bar_rect.bottom + 12))
+            vol_label = get_font(constantes.FONT_HUD).render(t["volume"], True, (255, 255, 255))
+            ventana.blit(vol_label, (nuevo_slider.centerx - vol_label.get_width() // 2, nuevo_slider.y - 40))
 
-            # Botón de idioma
-            pygame.draw.rect(ventana, (40, 40, 50), btn_lang_rect, border_radius=12)
-            pygame.draw.rect(ventana, (120, 120, 140), btn_lang_rect, width=2, border_radius=12)
+            pygame.draw.rect(ventana, (150, 200, 255), nuevo_slider, border_radius=8)
 
-            lang_label = get_font(constantes.FONT_HUD).render(t["language"], True, (230, 230, 230))
-            ventana.blit(lang_label, (btn_lang_rect.centerx - lang_label.get_width() // 2, btn_lang_rect.top + 6))
+            progress_rect = nuevo_slider.copy()
+            progress_rect.width = int(settings["volume"] * nuevo_slider.width)
+            pygame.draw.rect(ventana, (100, 130, 255), progress_rect, border_radius=8)
 
-            lang_value_str = t["lang_value"][settings["language"]]
-            lang_value = get_font(constantes.FONT_HUD).render(lang_value_str, True, (180, 210, 255))
-            ventana.blit(lang_value, (btn_lang_rect.centerx - lang_value.get_width() // 2, btn_lang_rect.top + 28))
+            hx = nuevo_slider.x + int(settings["volume"] * nuevo_slider.width)
+            hy = nuevo_slider.centery
+            pygame.draw.circle(ventana, (255, 255, 255), (hx, hy), 12)
+
+            # ============================
+            # 4) PANEL “Selecciona tu idioma”
+            # ============================
+            panel_idioma = pygame.Rect(0, 0, 420, 60)
+            panel_idioma.center = (constantes.ANCHO_VENTANA // 2, 260)
+
+            pygame.draw.rect(ventana, (20, 40, 90), panel_idioma, border_radius=10)
+            pygame.draw.rect(ventana, (255, 255, 255), panel_idioma, width=3, border_radius=10)
+
+            texto_sel = get_font(constantes.FONT_HUD).render(t["select_lang"], True, (255, 255, 255))
+            ventana.blit(texto_sel, (panel_idioma.centerx - texto_sel.get_width() // 2,
+                                     panel_idioma.centery - texto_sel.get_height() // 2))
+
+            # ============================
+            # 5) BOTONES DE IDIOMA
+            # ============================
+            btn_es = pygame.Rect(0, 0, 220, 70)
+            btn_es.center = (constantes.ANCHO_VENTANA // 2 - 150, 350)
+
+            btn_en = pygame.Rect(0, 0, 220, 70)
+            btn_en.center = (constantes.ANCHO_VENTANA // 2 + 150, 350)
+
+            # ============================
+            # 6) AURA (BOTÓN SELECCIONADO)
+            # ============================
+            if settings["language"] == "es":
+                pygame.draw.rect(ventana, (255, 255, 160), btn_es.inflate(18, 18), border_radius=12)
+
+            if settings["language"] == "en":
+                pygame.draw.rect(ventana, (255, 255, 160), btn_en.inflate(18, 18), border_radius=12)
+
+            # ============================
+            # 7) BOTÓN ESPAÑOL
+            # ============================
+            pygame.draw.rect(ventana, (20, 45, 100), btn_es, border_radius=10)
+            pygame.draw.rect(ventana, (255, 255, 255), btn_es, width=3, border_radius=10)
+
+            ventana.blit(flag_mx, (btn_es.x + 6, btn_es.y + 18))  # bandera más abajo
+
+            texto_es = get_font(constantes.FONT_HUD).render(t["spanish"], True, (255, 255, 255))
+            ventana.blit(texto_es, (btn_es.centerx - texto_es.get_width() // 2 + 18,
+                                    btn_es.y + 24))
+
+            # ============================
+            # 8) BOTÓN ENGLISH
+            # ============================
+            pygame.draw.rect(ventana, (20, 45, 100), btn_en, border_radius=10)
+            pygame.draw.rect(ventana, (255, 255, 255), btn_en, width=3, border_radius=10)
+
+            ventana.blit(flag_us, (btn_en.x + 8, btn_en.y + 18))  # bandera más abajo
+
+            texto_en = get_font(constantes.FONT_HUD).render(t["english"], True, (255, 255, 255))
+            ventana.blit(texto_en, (btn_en.centerx - texto_en.get_width() // 2 + 18,
+                                    btn_en.y + 24))
+
+            # ============================
+            # 9) CLIC DE LENGUAJE
+            # ============================
+            if click:
+                if btn_es.collidepoint(mouse_pos):
+                    settings["language"] = "es"
+
+                if btn_en.collidepoint(mouse_pos):
+                    settings["language"] = "en"
+
+            # ============================
+            # 10) ACTUALIZAR INSTANTE
+            # ============================
+            lang = settings["language"]
+            t = I18N[lang]
+
+
+
+            # ============================
+            # 12) BOTÓN SALIR
+            # ============================
             btn_exit.draw(ventana)
+
 
 
         elif estado == ESTADO_SELECT_PERSONAJE:
