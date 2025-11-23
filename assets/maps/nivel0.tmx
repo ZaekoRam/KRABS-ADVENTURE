@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="150" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="21">
  <tileset firstgid="1" source="Tiles - Beach.tsx"/>
- <tileset firstgid="217" source="D:/downloads/Nueva carpeta/Tiles - Beach.tsx"/>
+ <tileset firstgid="217" source="Tiles - Beach.tsx"/>
  <layer id="1" name="Capa de patrones 1" width="150" height="30">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,

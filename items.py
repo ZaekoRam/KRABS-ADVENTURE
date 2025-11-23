@@ -33,6 +33,12 @@ class bolsa(pygame.sprite.Sprite):
         try:
             ruta_imagen = Path(__file__).resolve().parent / "assets" / "images" / "items" / "bolsa_basura.png"
             self.image = pygame.image.load(str(ruta_imagen)).convert_alpha()
+            self.image = pygame.transform.scale2x(self.image)
+            # ====== ESCALAR LA IMAGEN ======
+            scale = 1  # <-- cambia este valor (1.0 = normal, 2.0 = doble)
+            new_w = int(self.image.get_width() * scale)
+            new_h = int(self.image.get_height() * scale)
+            self.image = pygame.transform.smoothscale(self.image, (new_w, new_h))
         except pygame.error as e:
             print(f"Error al cargar la imagen 'bolsa_basura.png': {e}")
             self.image = pygame.Surface((32, 32))

@@ -280,21 +280,28 @@ settings = {
     "language": None,   # idioma elegido (None al inicio, luego "es" o "en")
 }
 
-# === TEXTOS (I18N) ===
 I18N = {
     "es": {
         "select_lang": "Selecciona tu idioma",
+        "select_language": "Selecciona tu idioma",   # <-- ESTA USA TU MENÚ
         "spanish": "Español",
         "english": "Inglés",
-        "skip": "Pulsa cualquier tecla para saltar",
+        "options_title": "OPCIONES",
+        "volume": "Volumen",
+        "skip": "Pulsa cualquier tecla para saltar"
     },
     "en": {
         "select_lang": "Select your language",
+        "select_language": "Select your language",   # <-- ESTA USA TU MENÚ
         "spanish": "Spanish",
         "english": "English",
-        "skip": "Press any key to skip",
+        "options_title": "OPTIONS",
+        "volume": "Volume",
+        "skip": "Press any key to skip"
     }
 }
+
+
 # === TEXTOS GLOBALES (UI multi-idioma) ===
 TXT = {
     "es": {
@@ -575,7 +582,7 @@ I18N = {
         "spanish": "Español",
         "english": "Inglés",
         "skip": "Pulsa cualquier tecla para saltar",
-        "options_title": "OPCIONES (ESC para volver)",
+        "options_title": "OPCIONES",
         "volume": "Volumen",
         "language": "Idioma",
         "lang_value": {"es": "Español", "en": "Inglés"},
@@ -587,7 +594,7 @@ I18N = {
         "spanish": "Spanish",
         "english": "English",
         "skip": "Press any key to skip",
-        "options_title": "OPTIONS (ESC to go back)",
+        "options_title": "OPTIONS",
         "volume": "Volume",
         "language": "Language",
         "lang_value": {"es": "Spanish", "en": "English"},
@@ -867,6 +874,7 @@ class BotonSimple:
 
 
 # -------------------- TMX Level --------------------
+# -------------------- TMX Level --------------------
 class NivelTiled:
     def __init__(self, ruta_tmx: Path):
         self.tmx = load_pygame(str(ruta_tmx))
@@ -878,6 +886,9 @@ class NivelTiled:
         self.goal_rects = []
         self.enemy_barrier_rects = []
         self.collision_rects = []
+        self.condicion_rects = []  # ←←← AQUI GUARDAMOS LAS PAREDES INVISIBLES DE BASURA
+
+        # ------------------ Barreras de enemigos ------------------
         try:
             barrier_layer = self.tmx.get_layer_by_name("barrera_enemigos")
             import pytmx
@@ -889,6 +900,7 @@ class NivelTiled:
         except ValueError:
             print("ADVERTENCIA: Capa 'barrera_enemigos' no encontrada. Los enemigos podrían caerse.")
 
+        # ------------------ Colisiones normales ------------------
         try:
             collision_layer = self.tmx.get_layer_by_name("collisions")
             import pytmx
@@ -899,10 +911,11 @@ class NivelTiled:
                         self.collision_rects.append(rect)
                 print(f"DEBUG: Se cargaron {len(self.collision_rects)} rectángulos de colisión.")
             else:
-                print("ADVERTENCIA: La capa 'Collisions' existe pero no es una TiledObjectGroup.")
+                print("ADVERTENCIA: La capa 'collisions' existe pero no es un TiledObjectGroup.")
         except ValueError:
-            print("ADVERTENCIA: Capa de colisiones 'Collisions' no encontrada en el archivo TMX.")
+            print("ADVERTENCIA: Capa de colisiones 'collisions' no encontrada en el archivo TMX.")
 
+        # ------------------ Meta ------------------
         try:
             Meta_layer = self.tmx.get_layer_by_name("Meta")
             import pytmx
@@ -914,6 +927,24 @@ class NivelTiled:
         except ValueError:
             pass
 
+        # ------------------ *** CAPA CONDICION (PARED INVISIBLE) *** ------------------
+        try:
+            condicion_layer = self.tmx.get_layer_by_name("Condicion")
+            import pytmx
+            if isinstance(condicion_layer, pytmx.TiledObjectGroup):
+                for obj in condicion_layer:
+                    if obj.width > 0 and obj.height > 0:
+                        rect = pygame.Rect(int(obj.x), int(obj.y), int(obj.width), int(obj.height))
+                        self.condicion_rects.append(rect)
+
+                print(f"DEBUG: Se cargaron {len(self.condicion_rects)} rectángulos de condición.")
+            else:
+                print("ADVERTENCIA: La capa 'condicion' existe pero no es un TiledObjectGroup.")
+
+        except ValueError:
+            print("ADVERTENCIA: Capa 'condicion' no encontrada en el archivo TMX.")
+
+        # ------------------ Spawn del jugador ------------------
         self.spawn = None
         if "Spawns" in self.tmx.objectgroups:
             for obj in self.tmx.objectgroups["Spawns"]:
@@ -930,22 +961,24 @@ class NivelTiled:
                     self.spawn = (spawn_x, spawn_y)
                     break
 
+    # ------------------ Dibujado ------------------
     def draw(self, surface: pygame.Surface, camera_offset):
-        ox, oy = camera_offset;
+        ox, oy = camera_offset
         sw, sh = surface.get_size()
-        x0 = max(0, ox // self.tile_w);
+        x0 = max(0, ox // self.tile_w)
         y0 = max(0, oy // self.tile_h)
         x1 = min(self.tmx.width, (ox + sw) // self.tile_w + 2)
         y1 = min(self.tmx.height, (oy + sh) // self.tile_h + 2)
+
         for layer in self.tmx.visible_layers:
             if hasattr(layer, "tiles"):
                 for x, y, image in layer.tiles():
                     if x0 <= x < x1 and y0 <= y < y1:
-                        surface.blit(image, (x * self.tile_w - ox, y * self.tile_h - oy))
+                        surface.blit(image, (x * self.tile_w - ox,
+                                             y * self.tile_h - oy))
 
     def world_size(self):
         return self.width_px, self.height_px
-
 
 # -------------------- Camera --------------------
 class Camara:
@@ -1039,7 +1072,98 @@ class PauseMenu:
             r = surf.get_rect(center=(self.w // 2, py + 120 + i * 60))
             surface.blit(surf, r)
 
+class TrashMeter:
+    def __init__(self, x, y, total_basura, dificultad="facil"):
+        self.x = x
+        self.y = y
 
+        # Cargar sprite del medidor
+        self.frame_img = pygame.image.load("assets/images/ui/medidor_basura.png").convert_alpha()
+
+        # 🔥 Aumentar tamaño un poquititito (ajusta 1.05 → 1.03 / 1.08 / lo que necesites)
+        scale = 0.08   # 5% más grande
+        new_w = int(self.frame_img.get_width() * scale)
+        new_h = int(self.frame_img.get_height() * scale)
+
+        self.frame_img = pygame.transform.smoothscale(self.frame_img, (new_w, new_h))
+
+        self.w = new_w
+        self.h = new_h
+
+        # Superficie donde dibujaremos el relleno (del mismo tamaño que el sprite)
+        self.fill_surface = pygame.Surface((self.w + 20, self.h + 20), pygame.SRCALPHA)
+
+        # Total de basura en el nivel
+        self.total_basura = total_basura
+
+        # Requisito según dificultad
+        if dificultad == "facil":
+            porcentaje_req = 0.70
+        elif dificultad == "dificil":
+            porcentaje_req = 0.90
+        else:
+            porcentaje_req = 0.80
+
+        requerido = int(round(self.total_basura * porcentaje_req))
+        self.requerida = max(1, min(self.total_basura, requerido))
+
+        self.recogida = 0
+
+        # 🔧 Ajusta esta zona para decir dónde se llena dentro del sprite
+        # (ej. la “ventana” del bote donde se ve el relleno)
+        self.fill_rect_area = pygame.Rect(
+            int(self.w * 0.30),
+            int(self.h * 0.20),
+            int(self.w * 0.40),
+            int(self.h * 0.70)
+        )
+
+        # ↑ margen de 10 px por cada lado (ajústalo a tu sprite real)
+
+        # Color del relleno (puedes cambiar a lo que combine con tu arte)
+        self.fill_color = (0, 255, 255, 200)
+
+    def agregar_basura(self, cantidad=1):
+        self.recogida += cantidad
+        if self.recogida > self.total_basura:
+            self.recogida = self.total_basura
+
+    @property
+    def completado(self):
+        return self.recogida >= self.requerida
+
+    def draw(self, surface):
+        # Limpiamos la superficie de relleno (la dejamos transparente)
+        self.fill_surface.fill((0, 0, 0, 0))
+
+        # porcentaje de relleno en función de la basura requerida
+        porcentaje = self.recogida / self.requerida
+        if porcentaje < 0:
+            porcentaje = 0
+        if porcentaje > 1:
+            porcentaje = 1
+
+        # Vamos a llenar de ABAJO hacia ARRIBA dentro de fill_rect_area
+        area = self.fill_rect_area
+        full_h = area.height
+        filled_h = int(full_h * porcentaje)
+
+        if filled_h > 0:
+            # Rectángulo del relleno, pegado abajo
+            fill_rect = pygame.Rect(
+                area.left,
+                area.bottom - filled_h,  # empieza desde abajo
+                area.width,
+                filled_h
+            )
+
+            pygame.draw.rect(self.fill_surface, self.fill_color, fill_rect)
+
+        # 1) Dibujas primero el relleno
+        surface.blit(self.fill_surface, (self.x -45, self.y ))
+
+        # 2) Luego dibujas encima tu PNG del bote vacío
+        surface.blit(self.frame_img, (self.x -40, self.y))
 
 # -------------------- Game Over Screen --------------------
 class GameOverScreen:
@@ -1851,6 +1975,10 @@ ESTADO_VICTORY_SCREEN = "VICTORY_SCREEN"
 
 
 def main():
+    drag_volume = False
+    slider_exists = False
+    nuevo_slider = None
+
     pygame.mixer.pre_init(
         frequency=44100,  # estándar
         size=-16,  # 16-bits
@@ -1885,10 +2013,17 @@ def main():
 
     # HUD imágenes
     try:
+        cartel_basura_es = pygame.image.load("assets/images/ui/alto_es.png").convert_alpha()
+        cartel_basura_en = pygame.image.load(IMG_DIR / "ui/alto_en.png").convert_alpha()
         vida_lleno_img = pygame.image.load(IMG_DIR / "vidas/vida_llena.png").convert_alpha()
         vida_vacio_img = pygame.image.load(IMG_DIR / "vidas/vida_vacia.png").convert_alpha()
+        cartel_basura_es = pygame.transform.smoothscale(cartel_basura_es, (384, 40))
+        cartel_basura_en = pygame.transform.smoothscale(cartel_basura_en, (384, 40))
         vida_lleno_img = pygame.transform.scale(vida_lleno_img, (32, 32))
         vida_vacio_img = pygame.transform.scale(vida_vacio_img, (32, 32))
+        btn_exit_img = pygame.image.load("assets/images/ui/btn_exit.png").convert_alpha()
+        btn_exit_img = pygame.transform.smoothscale(btn_exit_img, (90, 90))
+
     except pygame.error as e:
         print(f"ERROR AL CARGAR IMÁGENES DEL HUD: {e}")
         vida_lleno_img = vida_vacio_img = None
@@ -1908,6 +2043,11 @@ def main():
         2: (6485, 845),  # NIVEL 2 (ejemplo)
         3: (8673, 871),  # si algún día agregas nivel 3
     }
+    CARTEL_BASURA_POS = {
+        1: (5000, 270),  # EJEMPLO: nivel 1 -> (x, y)
+        2: (5950, 300),  # EJEMPLO: nivel 2 -> (x, y)
+        3: (8170, 310),
+    }
 
     # variable que usaremos al dibujar (se actualiza al cargar cada nivel)
     flag_pos_world = FLAG_POS_BY_LEVEL.get(1, (0, 0))
@@ -1924,6 +2064,16 @@ def main():
     btn_play = None
     btn_opc = None
     btn_salir = None
+    # ------------------ ASSETS UI ------------------
+
+    protagonista_img = pygame.image.load("assets/images/ui/protagonista.png").convert_alpha()
+    protagonista_img = pygame.transform.scale(protagonista_img, (330, 330))
+
+    flag_mx = pygame.image.load("assets/images/ui/flag_mx.png").convert_alpha()
+    flag_us = pygame.image.load("assets/images/ui/flag_us.png").convert_alpha()
+
+    flag_mx = pygame.transform.scale(flag_mx, (48, 32))
+    flag_us = pygame.transform.scale(flag_us, (48, 32))
 
     # -------------- Miniaturas de los niveles --------------
     thumbs = {}
@@ -2006,6 +2156,7 @@ def main():
     tutorial_context = None
     # --- Efectos de texto flotante ---
     floating_texts = []
+    btn_exit = ImageButton(btn_exit_img, center=(constantes.ANCHO_VENTANA - 1050, 40))
 
     # --- Vida extra por basura ---
     trash_collected = 0  # contador actual de basura recogida
@@ -2025,7 +2176,7 @@ def main():
             "img_w": 700,
             "img_y_offset": -50,
             "world_x": 400,  # <-- La clave que faltaba
-            "world_y": 680,
+            "world_y": 800,
             "range_pre": 500,  # <-- La clave que faltaba
             "range_post": 500,  # <-- La clave que faltaba
         },
@@ -2035,7 +2186,7 @@ def main():
             "img_w": 700,
             "img_y_offset": -50,
             "world_x": 1390,  # <-- La clave que faltaba
-            "world_y": 680,
+            "world_y": 800,
             "range_pre": 500,  # <-- La clave que faltaba
             "range_post": 500,  # <-- La clave que faltaba
         },
@@ -2044,8 +2195,8 @@ def main():
             "img_name": "key_clean",
             "img_w": 700,
             "img_y_offset": -50,
-            "world_x": 3400,  # <-- La clave que faltaba
-            "world_y": 680,
+            "world_x": 3430,  # <-- La clave que faltaba
+            "world_y": 800,
             "range_pre": 500,  # <-- La clave que faltaba
             "range_post": 500,  # <-- La clave que faltaba
         },
@@ -2054,7 +2205,7 @@ def main():
             "img_name": "key_collect",
             "img_w": 700,
             "img_y_offset": -50,
-            "world_x": 2200,  # <-- La clave que faltaba
+            "world_x": 2443,  # <-- La clave que faltaba
             "world_y": 680,
             "range_pre": 500,  # <-- La clave que faltaba
             "range_post": 500,  # <-- La clave que faltaba
@@ -2151,12 +2302,55 @@ def main():
         dt = reloj.tick(target_fps) / 1000.0
         mouse_pos = pygame.mouse.get_pos();
         mouse_down = pygame.mouse.get_pressed()[0]
+        click = False
+
 
         # -------------------- EVENTOS --------------------
+        click = False
+        # -------------------- EVENTOS --------------------
         for event in pygame.event.get():
+
             if event.type == pygame.QUIT:
-                musica.stop(300);
                 run = False
+
+            # CLICK NORMAL
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                click = True
+
+            # =====================================================
+            # SLIDER – detectar arrastre SOLO si existe
+            # =====================================================
+            if estado == ESTADO_OPC and nuevo_slider is not None:
+
+                # INICIO DE ARRASTRE
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if nuevo_slider.collidepoint(mouse_pos):
+                        drag_volume = True
+
+                # FIN DE ARRASTRE
+                if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    drag_volume = False
+
+            if btn_exit.clicked(event):
+                print(f"Botón presionado en estado: {estado}")  # <--- DEBUG
+                # Definimos a dónde regresa según dónde estemos
+                if estado == ESTADO_OPC:
+                    estado = ESTADO_MENU
+                    _save_prefs(settings)  # Guardar cambios al salir
+
+                elif estado == ESTADO_SELECT_PERSONAJE:
+                    print("--> Entró a la condición SELECT_PERSONAJE. Cambiando a MENU...")
+                    menu_leaving = False
+                    estado = ESTADO_MENU
+                    menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+
+                elif estado == ESTADO_SELECT_NIVEL:
+                    estado = ESTADO_SELECT_PERSONAJE
+                    select_lock = False  # <--- ¡AGREGA ESTO! IMPORTANTE
+                    # Reset de selección si es necesario
+
+                elif estado == ESTADO_DIFICULTAD:
+                    estado = ESTADO_SELECT_NIVEL
 
             elif estado == ESTADO_LANG_SELECT:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -2298,6 +2492,7 @@ def main():
 
 
             elif estado == ESTADO_OPC:
+                btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
                 if event.type == pygame.KEYDOWN:
                     # Volver al menú
                     if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
@@ -2642,35 +2837,35 @@ def main():
                     Enemigo(x=7552, y=672, velocidad=35, escala=2.5),
                     Enemigo(x=8319, y=448, velocidad=35, escala=2.5),
                     EnemigoPezueso(
-                        x=3350, y=400, jugador=jugador,
+                        x=3350, y=380, jugador=jugador,
                         velocidad_patrulla=100, velocidad_furia=260,
                         radio_det=220, duracion_furia_ms=1800,
                         dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
                         escala_extra=1.0
                     ),
                     EnemigoPezueso(
-                        x=4110, y=390, jugador=jugador,
+                        x=4110, y=340, jugador=jugador,
                         velocidad_patrulla=100, velocidad_furia=260,
                         radio_det=220, duracion_furia_ms=1800,
                         dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
                         escala_extra=1.0
                     ),
                     EnemigoPezueso(
-                        x=5430, y=600, jugador=jugador,
+                        x=5430, y=500, jugador=jugador,
                         velocidad_patrulla=100, velocidad_furia=260,
                         radio_det=220, duracion_furia_ms=1800,
                         dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
                         escala_extra=1.0
                     ),
                     EnemigoPezueso(
-                        x=6610, y=485, jugador=jugador,
+                        x=6610, y=455, jugador=jugador,
                         velocidad_patrulla=100, velocidad_furia=260,
                         radio_det=220, duracion_furia_ms=1800,
                         dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
                         escala_extra=1.0
                     ),
                     EnemigoPezueso(
-                        x=8450, y=330, jugador=jugador,
+                        x=8450, y=310, jugador=jugador,
                         velocidad_patrulla=100, velocidad_furia=260,
                         radio_det=220, duracion_furia_ms=1800,
                         dir_inicial=1, mundo_bounds=(0, 0, nivel.width_px, nivel.height_px),
@@ -2678,7 +2873,6 @@ def main():
                     ),
                 )
 
-            # --- agrega items por nivel (SIN volver a hacer items = Group()) ---
             if nivel_actual == 0:
                 items.add(
                     botella(x=2275, y=590),
@@ -2754,6 +2948,29 @@ def main():
                     bolsa(x=7600, y=630),
                     gustambo(x=8500, y=250)
                 )
+
+            # --- MEDIDOR DE BASURA POR NIVEL ---
+            trash_total = 0
+            for it in items:
+                if isinstance(it, (botella, bolsa, lamina, llanta, gustambo)):
+                    trash_total += 1
+
+            if trash_total <= 0:
+                trash_total = 1  # evitar división entre 0
+
+            # Dificultad para el medidor
+            if selected_difficulty == "DIFICIL":
+                dif = "dificil"
+            else:
+                dif = "facil"
+
+            # Crear el medidor UNA VEZ por carga de nivel
+            medidor = TrashMeter(1000, 20, trash_total, dificultad=dif)
+
+            # Flags para la puerta condicional
+            mostrando_mensaje_gate = False
+            ultimo_gate_rect = None
+
 
             # === Ajustes por dificultad ===
             if selected_difficulty == "DIFICIL":
@@ -2838,6 +3055,27 @@ def main():
             pass  # la interacción se maneja en eventos
 
         elif estado == ESTADO_JUEGO:
+
+
+            # Para puerta/barrera:
+            if medidor.completado:
+                mostrando_mensaje_gate = False
+                # YA NO revisas colisión → la pared desaparece
+            if not medidor.completado:
+                for rect in nivel.condicion_rects:
+                    if jugador.forma.colliderect(rect):
+                        # bloqueas movimiento como una pared normal
+                        if jugador.vel_x > 0:
+                            jugador.rect.right = rect.left
+                        elif jugador.vel_x < 0:
+                            jugador.rect.left = rect.right
+
+                        if jugador.vel_y > 0:
+                            jugador.rect.bottom = rect.top
+                        elif jugador.vel_y < 0:
+                            jugador.rect.top = rect.bottom
+
+                        mostrando_mensaje_gate = True
 
             if fly_mode:
                 vx = (constantes.VELOCIDAD if mover_derecha else 0) - (constantes.VELOCIDAD if mover_izquierda else 0)
@@ -2978,6 +3216,9 @@ def main():
                     # === VIDA EXTRA POR BASURA ===
                     if isinstance(item, (botella, bolsa,lamina,llanta,gustambo)):
                         trash_collected += 1
+
+                        # 🔹 ACTUALIZAR MEDIDOR DE BASURA
+                        medidor.agregar_basura(1)
                         if trash_collected >= trash_threshold:
                             trash_collected -= trash_threshold
                             if jugador.vida_actual < 4:
@@ -3031,7 +3272,16 @@ def main():
             jugador.aplicar_gravedad(dt)
             dy = int(jugador.vel_y * dt)
 
+            # 🔹 Reiniciar flags de puerta cada frame
+            mostrando_mensaje_gate = False
+            ultimo_gate_rect = None
+
+            # ------------------------------
+            #   MOVIMIENTO HORIZONTAL (X)
+            # ------------------------------
             jugador.forma.x += int(dx)
+
+            # Colisión con paredes normales
             for rect in nivel.collision_rects:
                 if jugador.forma.colliderect(rect):
                     if dx > 0:
@@ -3039,7 +3289,24 @@ def main():
                     elif dx < 0:
                         jugador.forma.left = rect.right
 
+            # Colisión con PAREDES CONDICION (solo si NO has llenado el medidor)
+            if not medidor.completado:
+                for rect in nivel.condicion_rects:
+                    if jugador.forma.colliderect(rect):
+                        if dx > 0:
+                            jugador.forma.right = rect.left
+                        elif dx < 0:
+                            jugador.forma.left = rect.right
+
+                        mostrando_mensaje_gate = True
+                        ultimo_gate_rect = rect
+
+            # ------------------------------
+            #   MOVIMIENTO VERTICAL (Y)
+            # ------------------------------
             jugador.forma.y += dy
+
+            # Colisión con paredes normales
             for rect in nivel.collision_rects:
                 if jugador.forma.colliderect(rect):
                     if dy > 0:
@@ -3049,6 +3316,21 @@ def main():
                     elif dy < 0:
                         jugador.forma.top = rect.bottom
                         jugador.vel_y = 0
+
+            # Colisión con PAREDES CONDICION (solo si NO has llenado el medidor)
+            if not medidor.completado:
+                for rect in nivel.condicion_rects:
+                    if jugador.forma.colliderect(rect):
+                        if dy > 0:
+                            jugador.forma.bottom = rect.top
+                            jugador.vel_y = 0
+                            jugador.en_piso = True
+                        elif dy < 0:
+                            jugador.forma.top = rect.bottom
+                            jugador.vel_y = 0
+
+                        mostrando_mensaje_gate = True
+                        ultimo_gate_rect = rect
 
             if not getattr(jugador, "invencible", False):
                 jugador.set_dx(vx)
@@ -3302,56 +3584,166 @@ def main():
             btn_salir.draw(ventana)
             menu_krab.draw(ventana)
 
-        elif estado == ESTADO_OPC:
-            ventana.blit(fondo_menu, (0, 0))
 
+        elif estado == ESTADO_OPC:
+
+            ventana.blit(fondo_menu, (0, 0))
+            # ============================================================
+            # KRABBY DEBAJO Y CENTRADO
+            # ============================================================
+            krab_rect = protagonista_img.get_rect()
+            krab_rect.centerx = constantes.ANCHO_VENTANA // 2 - 10
+            krab_rect.top = 330
+            ventana.blit(protagonista_img, krab_rect)
+
+            # ============================
+            # 1) LENGUAJE ACTUAL
+            # ============================
             lang = settings["language"]
             t = I18N[lang]
 
-            # Título
-            sub = get_font(constantes.FONT_SUBTITLE).render(t["options_title"], True, (255, 255, 255))
-            ventana.blit(sub, (constantes.ANCHO_VENTANA // 2 - sub.get_width() // 2, 60))
+            # ============================
+            # 2) TÍTULO: SOLO “OPCIONES”
+            # ============================
+            titulo_rect = pygame.Rect(0, 0, 320, 60)
+            titulo_rect.center = (constantes.ANCHO_VENTANA // 2, 80)
 
-            # Etiqueta Volumen
-            vol_label = get_font(constantes.FONT_HUD).render(t["volume"], True, (220, 220, 220))
-            ventana.blit(vol_label, (slider_bar_rect.centerx - vol_label.get_width() // 2, slider_bar_rect.top - 40))
+            pygame.draw.rect(ventana, (20, 40, 90), titulo_rect, border_radius=12)
+            pygame.draw.rect(ventana, (255, 255, 255), titulo_rect, width=3, border_radius=12)
 
-            # Slider (bar + progress + handle)
-            pygame.draw.rect(ventana, (80, 80, 90), slider_bar_rect, border_radius=SLIDER_H // 2)
-            progress_rect = slider_bar_rect.copy()
-            progress_rect.width = int(settings["volume"] * slider_bar_rect.width)
-            pygame.draw.rect(ventana, (120, 180, 255), progress_rect, border_radius=SLIDER_H // 2)
+            texto_titulo = get_font(constantes.FONT_SUBTITLE).render(t["options_title"], True, (255, 255, 255))
+            ventana.blit(texto_titulo, (titulo_rect.centerx - texto_titulo.get_width() // 2,
+                                        titulo_rect.centery - texto_titulo.get_height() // 2))
 
-            hx = slider_handle_pos_x()
-            hy = slider_bar_rect.centery
-            pygame.draw.circle(ventana, (240, 240, 255), (hx, hy), HANDLE_R)
+            # ============================
+            # 3) SLIDER DE VOLUMEN
+            # ============================
+            nuevo_slider = slider_bar_rect.copy()
+            nuevo_slider.width = 350
+            nuevo_slider.centerx = constantes.ANCHO_VENTANA // 2
+            nuevo_slider.y = 170
 
-            hint = get_font(constantes.FONT_HUD).render(t["hint"], True, (180, 180, 180))
-            ventana.blit(hint, (slider_bar_rect.centerx - hint.get_width() // 2, slider_bar_rect.bottom + 12))
+            vol_label = get_font(constantes.FONT_HUD).render(t["volume"], True, (255, 255, 255))
+            ventana.blit(vol_label, (nuevo_slider.centerx - vol_label.get_width() // 2, nuevo_slider.y - 40))
 
-            # Botón de idioma
-            pygame.draw.rect(ventana, (40, 40, 50), btn_lang_rect, border_radius=12)
-            pygame.draw.rect(ventana, (120, 120, 140), btn_lang_rect, width=2, border_radius=12)
+            pygame.draw.rect(ventana, (150, 200, 255), nuevo_slider, border_radius=8)
 
-            lang_label = get_font(constantes.FONT_HUD).render(t["language"], True, (230, 230, 230))
-            ventana.blit(lang_label, (btn_lang_rect.centerx - lang_label.get_width() // 2, btn_lang_rect.top + 6))
+            progress_rect = nuevo_slider.copy()
+            progress_rect.width = int(settings["volume"] * nuevo_slider.width)
+            pygame.draw.rect(ventana, (100, 130, 255), progress_rect, border_radius=8)
 
-            lang_value_str = t["lang_value"][settings["language"]]
-            lang_value = get_font(constantes.FONT_HUD).render(lang_value_str, True, (180, 210, 255))
-            ventana.blit(lang_value, (btn_lang_rect.centerx - lang_value.get_width() // 2, btn_lang_rect.top + 28))
+            hx = nuevo_slider.x + int(settings["volume"] * nuevo_slider.width)
+            hy = nuevo_slider.centery
+            pygame.draw.circle(ventana, (255, 255, 255), (hx, hy), 12)
+            # ============================================================
+            # SLIDER (actualización de volumen con arrastre)
+            # ============================================================
+            # ============================================================
+            # SLIDER (arrastre real y suave)
+            # ============================================================
+            if drag_volume:
+                rel_x = mouse_pos[0] - nuevo_slider.x
+                nuevo_volumen = rel_x / nuevo_slider.width
+                nuevo_volumen = max(0, min(1, nuevo_volumen))
+
+                settings["volume"] = nuevo_volumen
+                pygame.mixer.music.set_volume(nuevo_volumen)
+
+            # ============================
+            # 4) PANEL “Selecciona tu idioma”
+            # ============================
+            panel_idioma = pygame.Rect(0, 0, 420, 60)
+            panel_idioma.center = (constantes.ANCHO_VENTANA // 2, 260)
+
+            pygame.draw.rect(ventana, (20, 40, 90), panel_idioma, border_radius=10)
+            pygame.draw.rect(ventana, (255, 255, 255), panel_idioma, width=3, border_radius=10)
+
+            texto_sel = get_font(constantes.FONT_HUD).render(t["select_lang"], True, (255, 255, 255))
+            ventana.blit(texto_sel, (panel_idioma.centerx - texto_sel.get_width() // 2,
+                                     panel_idioma.centery - texto_sel.get_height() // 2))
+
+            # ============================
+            # 5) BOTONES DE IDIOMA
+            # ============================
+            btn_es = pygame.Rect(0, 0, 220, 70)
+            btn_es.center = (constantes.ANCHO_VENTANA // 2 - 150, 350)
+
+            btn_en = pygame.Rect(0, 0, 220, 70)
+            btn_en.center = (constantes.ANCHO_VENTANA // 2 + 150, 350)
+
+            # ============================
+            # 6) AURA (BOTÓN SELECCIONADO)
+            # ============================
+            if settings["language"] == "es":
+                pygame.draw.rect(ventana, (255, 255, 160), btn_es.inflate(18, 18), border_radius=12)
+
+            if settings["language"] == "en":
+                pygame.draw.rect(ventana, (255, 255, 160), btn_en.inflate(18, 18), border_radius=12)
+
+            # ============================
+            # 7) BOTÓN ESPAÑOL
+            # ============================
+            pygame.draw.rect(ventana, (20, 45, 100), btn_es, border_radius=10)
+            pygame.draw.rect(ventana, (255, 255, 255), btn_es, width=3, border_radius=10)
+
+            ventana.blit(flag_mx, (btn_es.x + 6, btn_es.y + 18))  # bandera más abajo
+
+            texto_es = get_font(constantes.FONT_HUD).render(t["spanish"], True, (255, 255, 255))
+            ventana.blit(texto_es, (btn_es.centerx - texto_es.get_width() // 2 + 18,
+                                    btn_es.y + 24))
+
+            # ============================
+            # 8) BOTÓN ENGLISH
+            # ============================
+            pygame.draw.rect(ventana, (20, 45, 100), btn_en, border_radius=10)
+            pygame.draw.rect(ventana, (255, 255, 255), btn_en, width=3, border_radius=10)
+
+            ventana.blit(flag_us, (btn_en.x + 8, btn_en.y + 18))  # bandera más abajo
+
+            texto_en = get_font(constantes.FONT_HUD).render(t["english"], True, (255, 255, 255))
+            ventana.blit(texto_en, (btn_en.centerx - texto_en.get_width() // 2 + 18,
+                                    btn_en.y + 24))
+
+            # ============================
+            # 9) CLIC DE LENGUAJE
+            # ============================
+            if click:
+                if btn_es.collidepoint(mouse_pos):
+                    settings["language"] = "es"
+
+                if btn_en.collidepoint(mouse_pos):
+                    settings["language"] = "en"
+
+            # ============================
+            # 10) ACTUALIZAR INSTANTE
+            # ============================
+            lang = settings["language"]
+            t = I18N[lang]
+
+
+
+            # ============================
+            # 12) BOTÓN SALIR
+            # ============================
+            btn_exit.draw(ventana)
+
 
 
         elif estado == ESTADO_SELECT_PERSONAJE:
             ventana.blit(fondo_menu, (0, 0))
             select_ui.draw(ventana)
+            btn_exit.draw(ventana)
 
         elif estado == ESTADO_SELECT_NIVEL:
             ventana.blit(fondo_menu, (0, 0))
             level_select_ui.draw(ventana)
+            btn_exit.draw(ventana)
 
         elif estado == ESTADO_DIFICULTAD:
             ventana.blit(fondo_menu, (0, 0))
             diff_ui.draw(ventana)
+            btn_exit.draw(ventana)
+
 
         elif estado in ("JUEGO", "PAUSA"):
             # Fondo/parallax y mapa
@@ -3359,11 +3751,11 @@ def main():
                 parallax.draw(ventana)
             nivel.draw(ventana, cam.offset())
 
-            # Offset de cámara (úsalo para TODO lo que dibujas)
+            # Offset de cámara (úsalo para TODO lo que dibujas en mundo)
             ox, oy = cam.offset()
-            if nivel_actual == 0:
-                ox, oy = cam.offset()  # Obtiene el offset de la cámara
 
+            # --- TUTORIALES NIVEL 0 (se mantiene igual) ---
+            if nivel_actual == 0:
                 for prompt_id in g_active_prompt_ids:
                     # 1. Obtener los datos y los assets cacheados
                     try:
@@ -3373,7 +3765,7 @@ def main():
                         continue  # Seguridad por si algo falla
 
                     text_surf = cache["text_surf"]
-                    img_surf = cache["img_surf"]
+                    img_surf  = cache["img_surf"]
 
                     # 2. Calcular Posición en Pantalla
                     screen_x = data["world_x"] - ox
@@ -3381,7 +3773,7 @@ def main():
 
                     # 3. Dibujar Texto (si existe)
                     if text_surf:
-                        t = time.time() * 3
+                        t   = time.time() * 3
                         bob = int(math.sin(t) * 4)  # Animación de flote
                         text_rect = text_surf.get_rect(
                             centerx=screen_x,
@@ -3393,7 +3785,7 @@ def main():
                     if img_surf:
                         img_y_offset = data.get("img_y_offset", -50)
                         t_img = (time.time() * 3) + 0.5  # Flote desfasado
-                        bob = int(math.sin(t_img) * 4)
+                        bob   = int(math.sin(t_img) * 4)
 
                         img_rect = img_surf.get_rect(
                             centerx=screen_x,
@@ -3409,30 +3801,90 @@ def main():
                     fr = flag_img.get_rect(bottomleft=(bx, by))
                 else:
                     # fallback por si no existe la variable (usa la posición fija del mapa)
-                    fr = flag_img.get_rect(bottomleft=(flag_pos_world[0] - ox, flag_pos_world[1] - oy))
+                    fr = flag_img.get_rect(
+                        bottomleft=(flag_pos_world[0] - ox,
+                                    flag_pos_world[1] - oy)
+                    )
                 ventana.blit(flag_img, fr)
 
-            # Enemigos e ítems
-            # --- DIBUJAR ENEMIGOS CON OFFSET VISUAL ---
+            # --- DIBUJAR ENEMIGOS E ITEMS ---
             for e in enemigos:
                 ventana.blit(e.image, (e.rect.x - ox, e.rect.y - oy + e.render_offset_y))
+
             for item in items:
                 ventana.blit(item.image, (item.rect.x - ox, item.rect.y - oy))
 
-            # Jugador
+            # --- JUGADOR ---
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
-            if estado == "PAUSA":
-                pause_menu.draw(ventana)
 
-            # Dibujar textos flotantes (después de dibujar jugador/ítems)
+
+
+            # --- TEXTOS FLOTANTES ---
             for ft in floating_texts:
                 ft.draw(ventana, cam.offset())
 
-            # HUD solo si NO hay cutscene de victoria (para que no parezca congelado)
+            # ==============================
+            # HUD: MEDIDOR DE BASURA + MENSAJE DE PUERTA
+            if not medidor.completado:
+                if nivel_actual in CARTEL_BASURA_POS:
+                    wx, wy = CARTEL_BASURA_POS[nivel_actual]  # coords del mundo
+                    # Distancia entre jugador y cartel
+                    dx = jugador.forma.centerx - wx
+                    dy = jugador.forma.centery - wy
+                    distancia = (dx * dx + dy * dy) ** 0.5  # sqrt rápido
+
+                    # Sólo mostrar si estás cerca
+                    if distancia < 200:  # <-- cambia este valor si quieres más o menos distancia
+                        sx = wx - ox
+                        sy = wy - oy
+
+                        # Imagen según idioma
+                        if settings.get("language") == "en":
+                            ventana.blit(cartel_basura_en, (sx, sy))
+                        else:
+                            ventana.blit(cartel_basura_es, (sx, sy))
+
+            # ==============================
+            # Medidor de basura (es HUD, no depende de la cámara)
+            medidor.draw(ventana)
+
+            # Contador de basura: recogida / total
+            font_basura = get_font(constantes.FONT_UI_ITEM)  # o la fuente que uses para el HUD
+            texto_basura = f"{medidor.recogida} / {medidor.total_basura}"
+
+            # ==== CAMBIO DE COLOR SEGÚN COMPLETADO ====
+            if medidor.completado:  # ya juntó las necesarias
+                color = (0, 255, 150)  # verde aqua bonito
+            else:
+                color = (255, 255, 255)  # blanco normal
+
+            txt_surf = font_basura.render(texto_basura, True, color)
+
+            # Lo colocamos centrado debajo del bote (exacto como tú lo dejaste)
+            x = medidor.x + medidor.w // 5 - txt_surf.get_width() // 2
+            y = medidor.y + medidor.h + 5  # 5 px debajo del bote
+
+            ventana.blit(txt_surf, (x, y))
+
+            if estado == "PAUSA":
+                pause_menu.draw(ventana)
+
+            # Mensaje "ALTO, debes limpiar más..." si chocó con una puerta condicional
+            if (mostrando_mensaje_gate and not medidor.completado and (ultimo_gate_rect is not None)):
+                gate_screen_x = ultimo_gate_rect.centerx - ox
+                gate_screen_y = ultimo_gate_rect.top - oy - 40  # un poco arriba de la puerta
+
+                msg = "ALTO, debes limpiar más para poder pasar"
+                texto_surf = font_hud.render(msg, True, (255, 255, 255))
+                texto_rect = texto_surf.get_rect(center=(gate_screen_x, gate_screen_y))
+                ventana.blit(texto_surf, texto_rect)
+
+            # HUD clásico (timer, vida, puntuación) SOLO si no hay escena de victoria
             if not ("secuencia_victoria" in locals() and secuencia_victoria.activa):
                 draw_timer(ventana, font_hud, timer, pos=(20, 20))
                 draw_hud(ventana, jugador, vida_lleno_img, vida_vacio_img)
                 draw_puntuacion(ventana, font_hud, puntuacion)
+
 
         elif estado == "MUERTE":
             if parallax is not None:
@@ -3469,37 +3921,109 @@ def main():
                 tutorial_overlay.draw(ventana)
 
         elif estado == ESTADO_VICTORIA:
+            # Dibujar fondo/parallax
             if parallax is not None:
                 parallax.draw(ventana)
+
+            # Dibujar nivel
             nivel.draw(ventana, cam.offset())
             ox, oy = cam.offset()
 
-            # Dibuja la bandera en su posición final (usa bandera_rect si existe, si no, fallback)
+            # Bandera en su posición final
             if flag_img:
                 if "secuencia_victoria" in locals():
                     bx = secuencia_victoria.bandera_rect.x - ox
                     by = secuencia_victoria.bandera_rect.bottom - oy
                     fr = flag_img.get_rect(bottomleft=(bx, by))
                 else:
-                    fr = flag_img.get_rect(bottomleft=(flag_pos_world[0] - ox, flag_pos_world[1] - oy))
+                    fr = flag_img.get_rect(bottomleft=(flag_pos_world[0] - ox,
+                                                       flag_pos_world[1] - oy))
                 ventana.blit(flag_img, fr)
 
             # Jugador
             ventana.blit(jugador.image, (jugador.forma.x - ox, jugador.forma.y - oy))
 
-            # Mensaje
-            msg = get_font(constantes.FONT_UI_TITLE).render(tr("victory"), True, (255, 255, 0))
+            # ===== OSCURECER UN POCO EL FONDO =====
+            overlay = pygame.Surface((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), pygame.SRCALPHA)
+            overlay.fill((0, 0, 40, 110))  # azul oscuro, suave
+            ventana.blit(overlay, (0, 0))
+
+            # ===== BURBUJA / PASTILLA DE VICTORIA =====
+            t = pygame.time.get_ticks() / 1000.0
+
+            font_title = get_font(constantes.FONT_UI_TITLE)
+            msg_text = tr("victory")  # "¡VICTORIA!"
+            msg = font_title.render(msg_text, True, (255, 255, 255))
+
+            # La colocamos un poco más arriba para no tapar el texto de "Pulsa ENTER..."
+            center_x = constantes.ANCHO_VENTANA // 2
+            center_y = constantes.ALTO_VENTANA // 2 - 40
+
+            # Tamaño más compacto (antes sumábamos demasiado)
+            bubble_w = msg.get_width() + 80
+            bubble_h = msg.get_height() + 32
+
+            # Pequeño “latido” suave
+            scale = 1.0 + 0.02 * math.sin(t * 3)
+            draw_w = int(bubble_w * scale)
+            draw_h = int(bubble_h * scale)
+
+            bubble_surf = pygame.Surface((draw_w, draw_h), pygame.SRCALPHA)
+
+            # Colores de la burbuja
+            base_color = (120, 210, 255, 180)  # azul agua
+            edge_color = (255, 255, 255, 230)  # borde blanco
+            highlight = (255, 255, 255, 90)  # brillo suave
+
+            rect = pygame.Rect(0, 0, draw_w, draw_h)
+
+            # Elipse principal (tipo pastilla)
+            pygame.draw.ellipse(bubble_surf, base_color, rect)
+            pygame.draw.ellipse(bubble_surf, edge_color, rect, width=3)
+
+            # Brillo en la parte superior izquierda
+            highlight_rect = pygame.Rect(draw_w * 0.1, draw_h * 0.1,
+                                         draw_w * 0.5, draw_h * 0.4)
+            pygame.draw.ellipse(bubble_surf, highlight, highlight_rect)
+
+            # Un par de burbujitas pequeñas cerca (ya no rodeando toda la pantalla)
+            for i in range(3):
+                offset_x = (-40 if i == 0 else (40 if i == 1 else 0))
+                offset_y = (-30 if i < 2 else 30)
+                r = 10 if i < 2 else 6
+
+                bx = draw_w // 2 + offset_x
+                by = draw_h // 2 + offset_y
+
+                pygame.draw.circle(bubble_surf, (180, 230, 255, 160), (bx, by), r)
+                pygame.draw.circle(bubble_surf, (255, 255, 255, 220), (bx, by), r, width=2)
+
+            # Dibujar burbuja en pantalla
+            bubble_rect = bubble_surf.get_rect(center=(center_x, center_y))
+            ventana.blit(bubble_surf, bubble_rect.topleft)
+
+            # Texto con sombra dentro de la burbuja
+            shadow = font_title.render(msg_text, True, (0, 0, 40))
+            ventana.blit(
+                shadow,
+                (center_x - shadow.get_width() // 2 + 2,
+                 center_y - shadow.get_height() // 2 + 3)
+            )
             ventana.blit(
                 msg,
-                (constantes.ANCHO_VENTANA // 2 - msg.get_width() // 2,
-                 constantes.ALTO_VENTANA // 2 - msg.get_height() // 2)
+                (center_x - msg.get_width() // 2,
+                 center_y - msg.get_height() // 2)
             )
-            hint = get_font(constantes.FONT_UI_ITEM).render(tr("victory_hint"), True, (255, 255, 255))
+
+            # ===== HINT DEBAJO =====
+            font_hint = get_font(constantes.FONT_UI_ITEM)
+            hint = font_hint.render(tr("victory_hint"), True, (240, 240, 240))
             ventana.blit(
                 hint,
                 (constantes.ANCHO_VENTANA // 2 - hint.get_width() // 2,
-                 constantes.ALTO_VENTANA // 2 + 60)
+                 center_y + bubble_rect.height // 2 + 25)
             )
+
         pygame.display.flip()
 
     pygame.quit()
