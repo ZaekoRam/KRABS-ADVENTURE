@@ -1975,6 +1975,10 @@ ESTADO_VICTORY_SCREEN = "VICTORY_SCREEN"
 
 
 def main():
+    drag_volume = False
+    slider_exists = False
+    nuevo_slider = None
+
     pygame.mixer.pre_init(
         frequency=44100,  # estándar
         size=-16,  # 16-bits
@@ -2300,14 +2304,32 @@ def main():
         mouse_down = pygame.mouse.get_pressed()[0]
         click = False
 
+
         # -------------------- EVENTOS --------------------
         click = False
+        # -------------------- EVENTOS --------------------
         for event in pygame.event.get():
+
             if event.type == pygame.QUIT:
                 run = False
 
+            # CLICK NORMAL
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 click = True
+
+            # =====================================================
+            # SLIDER – detectar arrastre SOLO si existe
+            # =====================================================
+            if estado == ESTADO_OPC and nuevo_slider is not None:
+
+                # INICIO DE ARRASTRE
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if nuevo_slider.collidepoint(mouse_pos):
+                        drag_volume = True
+
+                # FIN DE ARRASTRE
+                if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    drag_volume = False
 
             if btn_exit.clicked(event):
                 print(f"Botón presionado en estado: {estado}")  # <--- DEBUG
@@ -3613,6 +3635,19 @@ def main():
             hx = nuevo_slider.x + int(settings["volume"] * nuevo_slider.width)
             hy = nuevo_slider.centery
             pygame.draw.circle(ventana, (255, 255, 255), (hx, hy), 12)
+            # ============================================================
+            # SLIDER (actualización de volumen con arrastre)
+            # ============================================================
+            # ============================================================
+            # SLIDER (arrastre real y suave)
+            # ============================================================
+            if drag_volume:
+                rel_x = mouse_pos[0] - nuevo_slider.x
+                nuevo_volumen = rel_x / nuevo_slider.width
+                nuevo_volumen = max(0, min(1, nuevo_volumen))
+
+                settings["volume"] = nuevo_volumen
+                pygame.mixer.music.set_volume(nuevo_volumen)
 
             # ============================
             # 4) PANEL “Selecciona tu idioma”
