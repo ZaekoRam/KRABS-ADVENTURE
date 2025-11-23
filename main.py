@@ -2542,51 +2542,71 @@ def main():
             elif estado == ESTADO_JUEGO:
                 # ---------------- KEYDOWN ----------------
                 if event.type == pygame.KEYDOWN:
-                    # atacar
-                    if event.key == pygame.K_f:
-                        jugador.start_attack()
+                    if event.key == pygame.K_F1:
+                        lang = settings.get("language") or "es"
+                        ui_dir = IMG_DIR / "ui"
+                        path = ui_dir / ("tutorial_en.png" if lang == "en" else "tutorial.png")
+                        if not path.exists():
+                            path = ui_dir / "tutorial.png"
+                        print(f"[INFO] Cargando tutorial desde: {path} (lang={lang})")
+                        tutorial_img = pygame.image.load(path).convert_alpha()
+                        tutorial_overlay = TutorialOverlay(
+                            (constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA),
+                            tutorial_img
+                        )
+                        estado = ESTADO_TUTORIAL
 
-                    # toggle fly con F10 (FUERA de K_f)
-                    if event.key == pygame.K_F10:
-                        fly_mode = not fly_mode
-                        if fly_mode:
-                            jugador.invencible = True
-                            jugador.invencible_timer = 9999
-                            jugador.knockback_activo = False
-                            jugador.knockback_timer = 0.0
-                            jugador.vel_y = 0
-                            jugador.en_piso = False
-                            print("[DEBUG] Fly mode ON")
-                        else:
-                            jugador.invencible = False
-                            jugador.invencible_timer = 0.0
-                            jugador.vel_y = 0
-                            print("[DEBUG] Fly mode OFF")
 
-                    # movimiento horizontal
-                    if event.key in (pygame.K_a, pygame.K_LEFT):
-                        mover_izquierda = True
-                    if event.key in (pygame.K_d, pygame.K_RIGHT):
-                        mover_derecha = True
+                    if secuencia_victoria.activa:
+                        # Opcional: Permitir salir al menú o pausar si quieres,
+                        # pero aquí evitamos que 'mover_izquierda' o 'salto' se activen.
+                        pass
+                    else:
+                        # atacar
+                        if event.key == pygame.K_f:
+                            jugador.start_attack()
 
-                    # salto solo si NO volamos
-                    if not fly_mode and event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
-                        if esta_en_suelo(jugador, nivel.collision_rects):
-                            try:
-                                if getattr(jugador, "en_piso", False):
-                                    musica.sfx("jump", volume=0.9)
-                            except Exception:
-                                pass
-                            jugador.saltar()
+                        # toggle fly con F10 (FUERA de K_f)
+                        if event.key == pygame.K_F10:
+                            fly_mode = not fly_mode
+                            if fly_mode:
+                                jugador.invencible = True
+                                jugador.invencible_timer = 9999
+                                jugador.knockback_activo = False
+                                jugador.knockback_timer = 0.0
+                                jugador.vel_y = 0
+                                jugador.en_piso = False
+                                print("[DEBUG] Fly mode ON")
+                            else:
+                                jugador.invencible = False
+                                jugador.invencible_timer = 0.0
+                                jugador.vel_y = 0
+                                print("[DEBUG] Fly mode OFF")
+
+                        # movimiento horizontal
+                        if event.key in (pygame.K_a, pygame.K_LEFT):
+                            mover_izquierda = True
+                        if event.key in (pygame.K_d, pygame.K_RIGHT):
+                            mover_derecha = True
+
+                        # salto solo si NO volamos
+                        if not fly_mode and event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
+                            if esta_en_suelo(jugador, nivel.collision_rects):
+                                try:
+                                    if getattr(jugador, "en_piso", False):
+                                        musica.sfx("jump", volume=0.9)
+                                except Exception:
+                                    pass
+                                jugador.saltar()
 
                     # control vertical de vuelo
-                    if fly_mode:
-                        if event.key in (pygame.K_w, pygame.K_UP):
-                            fly_up = True
-                        if event.key in (pygame.K_s, pygame.K_DOWN):
-                            fly_down = True
+                        if fly_mode:
+                            if event.key in (pygame.K_w, pygame.K_UP):
+                                fly_up = True
+                            if event.key in (pygame.K_s, pygame.K_DOWN):
+                                fly_down = True
 
-                    # pausa
+                        # pausa
                     if event.key == pygame.K_ESCAPE:
                         estado = ESTADO_PAUSA
                         musica.set_master_volume(settings["volume"] * 0.5)
@@ -2655,8 +2675,8 @@ def main():
                         except Exception:
                             pass
 
-                        tutorial_shown_level1 = True  # ✅ marcar como visto
-                        prefs["tutorial_seen"] = True
+                        tutorial_shown_level1 = False  # ✅ marcar como visto
+                        prefs["tutorial_seen"] = False
                         _save_prefs(prefs)
 
                         # === SPAWN FIX: al cerrar tutorial, dar protección de spawn ===
@@ -2901,51 +2921,53 @@ def main():
                 )
             elif nivel_actual == 2:
                 items.add(
-                    botella(x=644, y=429),
-                    botella(x=923, y=397),
-                    llanta(x=1530, y=600),
-                    lamina(x=1765, y=524),
-                    bolsa(x=2160, y=655),
-                    llanta(x=2558, y=630),
+                    botella(x=680, y=500),
+                    botella(x=900, y=500),
+                    llanta(x=1690, y=650),
+                    lamina(x=1850, y=550),
+                    bolsa(x=2160, y=650),
+                    llanta(x=2558, y=700),
                     botella(x=2890, y=550),
                     botella(x=2890, y=780),
-                    bolsa(x=3258, y=622),
+                    bolsa(x=3210, y=700),
                     gustambo(x=3845, y=760),
                     botella(x=3850, y=516),
-                    botella(x=4760, y=440),
+                    botella(x=4760, y=400),
                     lamina(x=5420, y=780),
                     botella(x=5420, y=520),
                     gustambo(x=6320,y=340)
                 )
             elif nivel_actual == 3:
                 items.add(
-                    lamina(x=1000, y=560),
-                    botella(x=2180, y=650),
-                    botella(x=2030, y=650),
+                    lamina(x=970, y=560),
+                    botella(x=2180, y=590),
+                    botella(x=2030, y=590),
                     botella(x=2180, y=470),
                     botella(x=2030, y=470),
                     bolsa(x=2120, y=800),
                     botella(x=3130, y=630),
-                    lamina(x=3370, y=580),
-                    bolsa(x=3570, y=500),
-                    lamina(x=3710, y=580),
-                    botella(x=3930, y=480),
+                    lamina(x=3270, y=580),
+                    bolsa(x=3430, y=500),
+                    lamina(x=3670, y=580),
+                    botella(x=3890, y=540),
                     llanta(x=4180, y=620),
-                    llanta(x=4400, y=500),
-                    gustambo(x=4600, y=440),
-                    llanta(x=4650, y=810),
-                    llanta(x=4400, y=810),
+                    llanta(x=4350, y=570),
+                    llanta(x=4530, y= 530),
+                    gustambo(x=4700, y=450),
                     llanta(x=4300, y=810),
+                    llanta(x=4400, y=810),
+                    llanta(x=4680, y=810),
                     gustambo(x=5890, y=630),
-                    llanta(x=5890, y=800),
-                    botella(x=6770, y=640),
-                    botella(x=6600, y=530),
+                    llanta(x=5900, y=800),
                     lamina(x=6280, y=630),
-                    bolsa(x=7470, y=630),
-                    bolsa(x=7470, y=830),
-                    bolsa(x=7600, y=830),
+                    botella(x=6480, y= 570),
+                    botella(x=6640, y=600),
+                    botella(x=6830, y=700),
+                    bolsa(x=7470, y=580),
                     gustambo(x=7510, y=430),
-                    bolsa(x=7600, y=630),
+                    bolsa(x=7470, y=780),
+                    bolsa(x=7600, y=780),
+                    bolsa(x=7600, y=580),
                     gustambo(x=8500, y=250)
                 )
 
