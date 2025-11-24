@@ -7,6 +7,9 @@ class Personaje(pygame.sprite.Sprite):
         super().__init__()
         self.hit_sound_played = False  # 🔊 evita repetir sonido de golpe
         self.stun_sound_played = False
+        self.damaged = False
+        self.damage_timer = 0.0
+        self.damage_flash_time = 0.20  # duración del efecto rojo
 
         self.gender = gender
 
@@ -103,18 +106,20 @@ class Personaje(pygame.sprite.Sprite):
         self.invencible_timer = 0
 
     def recibir_dano(self, cantidad):
-        # El jugador solo recibe daño si no es invencible
         if not self.invencible:
             self.vida_actual -= cantidad
-            print(f"Vida restante: {self.vida_actual}")  # Mensaje para depurar
             self.vel_y = self.knockback_speed_y
 
             if self.vida_actual < 0:
                 self.vida_actual = 0
 
-            # Activa la invencibilidad para que no reciba daño múltiple
+            # Activa invencibilidad
             self.invencible = True
             self.invencible_timer = self.INVENCIBLE_DURACION
+
+            # 🔴 Activar flash rojo por daño
+            self.damaged = True
+            self.damage_timer = self.damage_flash_time
 
     def start_attack(self):
         if not self.attacking and self.attack_cooldown_timer <= 0:
@@ -182,6 +187,12 @@ class Personaje(pygame.sprite.Sprite):
         # ... tu gravedad/movimiento ...
         if self.attack_cooldown_timer > 0:
             self.attack_cooldown_timer -= dt
+        # Actualizar flash de daño
+        if self.damaged:
+            self.damage_timer -= dt
+            if self.damage_timer <= 0:
+                self.damaged = False
+
         if self.attacking:
             self.attack_timer -= dt
             if self.attack_timer <= 0:
@@ -216,6 +227,11 @@ class Personaje(pygame.sprite.Sprite):
 
         else:
             frame = self.frames_idle[0]
+
+        # 🔴 aplicar efecto rojizo si está dañado
+        if self.damaged:
+            frame = frame.copy()
+            frame.fill((180, 0, 0), special_flags=pygame.BLEND_RGB_ADD)
 
 
 
