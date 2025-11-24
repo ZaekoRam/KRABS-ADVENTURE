@@ -308,6 +308,7 @@ TXT = {
         # HUD
         "time": "Tiempo",
         "points": "Puntos",
+        "level": "Nivel",
 
         # Menús genéricos
         "menu": "Menú",
@@ -350,6 +351,7 @@ TXT = {
     },
     "en": {
         # HUD
+        "level": "Level",
         "time": "Time",
         "points": "Points",
 
@@ -688,31 +690,124 @@ def escalar_a_ventana(surf: pygame.Surface) -> pygame.Surface:
 
 
 def draw_timer(surface, font, seconds, pos=(20, 20)):
+    # 1. Preparación de datos y colores
     s = max(0, int(seconds))
     color = (255, 80, 80) if s <= 10 else (255, 255, 255)
     sombra = (0, 0, 0)
-    txt = f"{tr('time')}: {s:02d}"
-    surf = font.render(txt, True, color)
-    shad = font.render(txt, True, sombra)
     x, y = pos
-    surface.blit(shad, (x + 2, y + 2))
-    surface.blit(surf, (x, y))
+
+
+    # --- Texto Superior: 'TIME' ---
+    text_time = tr('time')  # Obtiene el texto "TIME" o su traducción
+
+    # Renderizar el texto 'TIME'
+    surf_time = font.render(text_time, True, (255, 255, 255))  # Blanco, ya que no cambia con el tiempo
+    shad_time = font.render(text_time, True, sombra)
+
+    # Dibujar 'TIME' (incluyendo sombra)
+    surface.blit(shad_time, (x + 172, y + 2))
+    surface.blit(surf_time, (x + 170, y))
+
+    # --- Texto Inferior: Segundos ---
+    text_seconds = f"{s:02d}"  # Solo el número de segundos
+
+    # Calcular la posición Y para el texto de los segundos
+    # Se añade la altura del texto 'TIME' (surf_time.get_height()) más un pequeño espaciado (por ejemplo, + 5)
+    y_seconds = y + surf_time.get_height() + 5
+
+    # Renderizar los segundos
+    surf_seconds = font.render(text_seconds, True, color)
+    shad_seconds = font.render(text_seconds, True, sombra)
+
+    # Dibujar los segundos (incluyendo sombra)
+    surface.blit(shad_seconds, (x + 192, y_seconds + 2))
+    surface.blit(surf_seconds, (x + 190, y_seconds))
 
 
 def draw_hud(surface, jugador, img_lleno, img_vacio):
-    if not img_lleno: return
+    if not img_lleno:
+        return
+
+    # ALTURA EXACTA DE "TIME"
+    pos_y = 10   # ← mismo nivel del texto TIME
+
+    img_lleno_big = pygame.transform.scale_by(img_lleno, 2)
+    img_vacio_big = pygame.transform.scale_by(img_vacio, 2)
+
     for i in range(jugador.vida_maxima):
-        pos_x = 20 + i * 40
-        pos_y = 50
+        pos_x = 750 + i * 40   # ← MOVER A LA DERECHA
         if i < jugador.vida_actual:
-            surface.blit(img_lleno, (pos_x, pos_y))
+            surface.blit(img_lleno_big, (pos_x, pos_y))
         else:
-            surface.blit(img_vacio, (pos_x, pos_y))
+            surface.blit(img_vacio_big, (pos_x, pos_y))
 
 
-def draw_puntuacion(surface, font, puntuacion, pos=(20, 80)):
-    texto = font.render(f"{tr('points')}: {puntuacion}", True, (255, 255, 255))
-    surface.blit(texto, pos)
+def draw_nivel(surface, font, nivel, pos=(500, 80)):
+    sombra = (0, 0, 0)
+
+    # ----- TEXTO SUPERIOR: "LEVEL" -----
+    label_text = tr('level')
+    label = font.render(label_text, True, (255, 255, 255))
+    label_shad = font.render(label_text, True, sombra)
+
+    # posición del label
+    lx, ly = pos
+
+    # dibujar sombra y label
+    surface.blit(label_shad, (lx + 2, ly + 2))
+    surface.blit(label, (lx, ly))
+
+    # ----- TEXTO INFERIOR: número del nivel -----
+    if nivel == 0:
+        nivel_str = tr("Tutorial")  # usamos traducción
+    else:
+        nivel_str = str(nivel)
+
+    txt_nivel = font.render(nivel_str, True, (255, 255, 255))
+    shad_nivel = font.render(nivel_str, True, sombra)
+
+    # Y: debajo del label
+    y_nivel = ly + label.get_height() + 5
+
+    # ⭐ X centrado automáticamente ⭐
+    nivel_x = lx + (label.get_width() // 2) - (txt_nivel.get_width() // 2)
+
+    surface.blit(shad_nivel, (nivel_x + 2, y_nivel + 2))
+    surface.blit(txt_nivel, (nivel_x, y_nivel))
+
+
+def draw_puntuacion(surface, font, puntuacion, pos=(400, 20)):
+    sombra = (0, 0, 0)
+
+    # ----- TEXTO SUPERIOR: "POINTS" -----
+    label = font.render(tr("points"), True, (255, 255, 255))
+    label_shad = font.render(tr("points"), True, sombra)
+
+    # posición del label (fija)
+    lx, ly = pos
+
+    # dibujar sombra del label
+    surface.blit(label_shad, (lx + 2, ly + 2))
+    surface.blit(label, (lx, ly))
+
+    # ----- TEXTO INFERIOR: PUNTUACIÓN -----
+    score = str(puntuacion)
+
+    score_text = font.render(score, True, (255, 255, 255))
+    score_shadow = font.render(score, True, sombra)
+
+    # Y: debajo del label
+    y_score = ly + label.get_height() + 5
+
+    # ⭐ X centrado automáticamente debajo del label ⭐
+    score_x = lx + (label.get_width() // 2) - (score_text.get_width() // 2)
+
+    # sombra del número
+    surface.blit(score_shadow, (score_x + 2, y_score + 2))
+    surface.blit(score_text, (score_x, y_score))
+
+
+
 
 
 def reiniciar_nivel(nivel, jugador):
@@ -4081,7 +4176,7 @@ def main():
             hud_x = medidor.x
             hud_y = medidor.y
 
-            btn_pause.rect.midtop = (constantes.ANCHO_VENTANA // 2, 10)
+            btn_pause.rect.midtop = (constantes.ANCHO_VENTANA // 2 - 500, -8)
 
             # --- ACTUALIZAR Y DIBUJAR BOTÓN ---
             mouse_pos = pygame.mouse.get_pos()
@@ -4126,6 +4221,7 @@ def main():
                 draw_timer(ventana, font_hud, timer, pos=(20, 20))
                 draw_hud(ventana, jugador, vida_lleno_img, vida_vacio_img)
                 draw_puntuacion(ventana, font_hud, puntuacion)
+                draw_nivel(ventana, font_hud, nivel_actual, pos=(600, 20))
 
 
         elif estado == "MUERTE":
