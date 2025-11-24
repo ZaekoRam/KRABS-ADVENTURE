@@ -2110,6 +2110,22 @@ def main():
 
     # === BOTONES DE IDIOMA ===
     BTN_W, BTN_H = 260, 60
+    # --- Botones de victoria (usando BotonSimple, sin imágenes) ---
+    btn_v_menu = BotonSimple(
+        texto="",
+        center=(constantes.ANCHO_VENTANA // 2 - 150,
+                constantes.ALTO_VENTANA // 2 + 50),
+        width=280,
+        height=70
+    )
+
+    btn_v_next = BotonSimple(
+        texto="",
+        center=(constantes.ANCHO_VENTANA // 2 + 150,
+                constantes.ALTO_VENTANA // 2 + 50),
+        width=280,
+        height=70
+    )
     btn_es = pygame.Rect(0, 0, BTN_W, BTN_H)
     btn_en = pygame.Rect(0, 0, BTN_W, BTN_H)
     btn_es.center = (constantes.ANCHO_VENTANA // 2, 300)
@@ -2154,6 +2170,9 @@ def main():
         vida_vacio_img = pygame.transform.scale(vida_vacio_img, (32, 32))
         btn_exit_img = pygame.image.load("assets/images/ui/btn_exit.png").convert_alpha()
         btn_exit_img = pygame.transform.smoothscale(btn_exit_img, (90, 90))
+        pause_img = pygame.image.load("assets/images/ui/pause.png").convert_alpha()
+        pause_img = pygame.transform.smoothscale(pause_img, (90, 90))
+
 
     except pygame.error as e:
         print(f"ERROR AL CARGAR IMÁGENES DEL HUD: {e}")
@@ -2288,6 +2307,10 @@ def main():
     # --- Efectos de texto flotante ---
     floating_texts = []
     btn_exit = ImageButton(btn_exit_img, center=(constantes.ANCHO_VENTANA - 1050, 40))
+    btn_pause = ImageButton(
+        surface=pause_img,
+        center=(0, 0)  # luego lo reposicionamos junto al medidor
+    )
 
     # --- Vida extra por basura ---
     trash_collected = 0  # contador actual de basura recogida
@@ -2558,6 +2581,7 @@ def main():
                         run = False
 
             elif estado == ESTADO_SELECT_PERSONAJE:
+                btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
                 now_ms = pygame.time.get_ticks()
                 if now_ms - last_select_time >= SELECT_COOLDOWN_MS and not select_lock:
                     choice = select_ui.handle_event(event)
@@ -2585,6 +2609,7 @@ def main():
                         musica.switch("menu")
 
             elif estado == ESTADO_SELECT_NIVEL:
+                btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
                 level_select_ui.selected = None
                 choice = level_select_ui.handle_event(event)
                 if choice == 0:
@@ -2618,6 +2643,7 @@ def main():
                     last_select_time = pygame.time.get_ticks()
 
             elif estado == ESTADO_DIFICULTAD:
+                btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
                 result = diff_ui.handle_event(event)
                 if result == "BACK":
                     estado = ESTADO_SELECT_NIVEL
@@ -2837,6 +2863,19 @@ def main():
                     estado = ESTADO_MENU
                     menu_leaving = False
                     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if btn_v_menu.rect.collidepoint(event.pos):
+                        # Ir al menú
+                        musica.switch("menu")
+                        estado = ESTADO_MENU
+                        menu_leaving = False
+                        menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+                    elif btn_v_next.rect.collidepoint(event.pos):
+                        # Ir al siguiente nivel
+                        musica.switch("menu")
+                        nivel_actual = nivel_actual + 1
+                        estado = ESTADO_CARGANDO
 
             elif estado == ESTADO_VICTORY_SCREEN:
                 victory_ui.update(mouse_pos)
@@ -4039,6 +4078,17 @@ def main():
             # ==============================
             # Medidor de basura (es HUD, no depende de la cámara)
             medidor.draw(ventana)
+            hud_x = medidor.x
+            hud_y = medidor.y
+
+            btn_pause.rect.midtop = (constantes.ANCHO_VENTANA // 2, 10)
+
+            # --- ACTUALIZAR Y DIBUJAR BOTÓN ---
+            mouse_pos = pygame.mouse.get_pos()
+            mouse_click = pygame.mouse.get_pressed()[0]
+
+            btn_pause.update(mouse_pos, mouse_click)
+            btn_pause.draw(ventana)
 
             # Contador de basura: recogida / total
             font_basura = get_font(constantes.FONT_UI_ITEM)  # o la fuente que uses para el HUD
@@ -4137,64 +4187,56 @@ def main():
 
             # ===== OSCURECER UN POCO EL FONDO =====
             overlay = pygame.Surface((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), pygame.SRCALPHA)
-            overlay.fill((0, 0, 40, 110))  # azul oscuro, suave
+            overlay.fill((0, 0, 40, 110))  # azul oscuro
             ventana.blit(overlay, (0, 0))
 
-            # ===== BURBUJA / PASTILLA DE VICTORIA =====
+            # ===== PASTILLA DE VICTORIA =====
             t = pygame.time.get_ticks() / 1000.0
-
             font_title = get_font(constantes.FONT_UI_TITLE)
-            msg_text = tr("victory")  # "¡VICTORIA!"
+            msg_text = tr("victory")
             msg = font_title.render(msg_text, True, (255, 255, 255))
 
-            # La colocamos un poco más arriba para no tapar el texto de "Pulsa ENTER..."
             center_x = constantes.ANCHO_VENTANA // 2
             center_y = constantes.ALTO_VENTANA // 2 - 40
 
-            # Tamaño más compacto (antes sumábamos demasiado)
             bubble_w = msg.get_width() + 80
             bubble_h = msg.get_height() + 32
 
-            # Pequeño “latido” suave
             scale = 1.0 + 0.02 * math.sin(t * 3)
             draw_w = int(bubble_w * scale)
             draw_h = int(bubble_h * scale)
 
             bubble_surf = pygame.Surface((draw_w, draw_h), pygame.SRCALPHA)
-
-            # Colores de la burbuja
-            base_color = (120, 210, 255, 180)  # azul agua
-            edge_color = (255, 255, 255, 230)  # borde blanco
-            highlight = (255, 255, 255, 90)  # brillo suave
-
             rect = pygame.Rect(0, 0, draw_w, draw_h)
 
-            # Elipse principal (tipo pastilla)
+            # Colores de la burbuja
+            base_color = (120, 210, 255, 180)
+            edge_color = (255, 255, 255, 230)
+            highlight = (255, 255, 255, 90)
+
             pygame.draw.ellipse(bubble_surf, base_color, rect)
             pygame.draw.ellipse(bubble_surf, edge_color, rect, width=3)
 
-            # Brillo en la parte superior izquierda
+            # Brillo2
             highlight_rect = pygame.Rect(draw_w * 0.1, draw_h * 0.1,
                                          draw_w * 0.5, draw_h * 0.4)
             pygame.draw.ellipse(bubble_surf, highlight, highlight_rect)
 
-            # Un par de burbujitas pequeñas cerca (ya no rodeando toda la pantalla)
+            # Burbujitas decorativas
             for i in range(3):
                 offset_x = (-40 if i == 0 else (40 if i == 1 else 0))
                 offset_y = (-30 if i < 2 else 30)
                 r = 10 if i < 2 else 6
-
                 bx = draw_w // 2 + offset_x
                 by = draw_h // 2 + offset_y
-
                 pygame.draw.circle(bubble_surf, (180, 230, 255, 160), (bx, by), r)
                 pygame.draw.circle(bubble_surf, (255, 255, 255, 220), (bx, by), r, width=2)
 
-            # Dibujar burbuja en pantalla
+            # Dibujar burbuja
             bubble_rect = bubble_surf.get_rect(center=(center_x, center_y))
             ventana.blit(bubble_surf, bubble_rect.topleft)
 
-            # Texto con sombra dentro de la burbuja
+            # Texto con sombra
             shadow = font_title.render(msg_text, True, (0, 0, 40))
             ventana.blit(
                 shadow,
@@ -4213,8 +4255,30 @@ def main():
             ventana.blit(
                 hint,
                 (constantes.ANCHO_VENTANA // 2 - hint.get_width() // 2,
-                 center_y + bubble_rect.height // 2 + 25)
+                 center_y + bubble_rect.height // 2 + 140)
             )
+
+            # ===========================================
+            #         🔵 BOTONES DE VICTORIA 🔵
+            # ===========================================
+
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Multi idioma
+            if settings["language"] == "en":
+                btn_v_menu.texto = "Menu"
+                btn_v_next.texto = "Next level"
+            else:
+                btn_v_menu.texto = "Menú"
+                btn_v_next.texto = "Siguiente nivel"
+
+            # Update hover
+            btn_v_menu.update(mouse_pos)
+            btn_v_next.update(mouse_pos)
+
+            # Dibujar botones
+            btn_v_menu.draw(ventana)
+            btn_v_next.draw(ventana)
 
         pygame.display.flip()
 

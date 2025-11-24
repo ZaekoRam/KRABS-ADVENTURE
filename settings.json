@@ -1,4 +1,5 @@
 {
   "volume": 0.8,
-  "language": "es"
+  "language": "es",
+  "tutorial_seen": false
 }
