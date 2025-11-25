@@ -2432,7 +2432,7 @@ def main():
     btn_play = None
     btn_opc = None
     btn_salir = None
-    btn_creditos = BotonSimple(tr('credits_title'), center=(0,0), width=240, height=55)
+    btn_creditos = BotonSimple(tr('credits_title'), center=(1000,100), width=240, height=55)
 
     # ------------------ ASSETS UI ------------------
 
@@ -2815,7 +2815,7 @@ def main():
                         estado = ESTADO_CREDITOS
                         # Música del tutorial
                         try:
-                            musica.switch("tutorial")
+                            musica.switch("nivel0")
                             musica.set_master_volume(settings["volume"])
                         except Exception as e:
                             print("No se pudo reproducir música tutorial:", e)
