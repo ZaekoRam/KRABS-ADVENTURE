@@ -308,6 +308,7 @@ TXT = {
         # HUD
         "time": "Tiempo",
         "points": "Puntos",
+        "level": "Nivel",
 
         # Menús genéricos
         "menu": "Menú",
@@ -325,7 +326,7 @@ TXT = {
 
         # Victoria simple (bandera)
         "victory": "¡VICTORIA!",
-        "victory_hint": "Pulsa ENTER para volver al menú",
+        "victory_hint": "Pulsa ENTER para continuar al siguiente nivel",
 
         # Victory Screen completa (pantalla bonita)
         "v2_title": "¡MISIÓN CUMPLIDA!",
@@ -350,6 +351,7 @@ TXT = {
     },
     "en": {
         # HUD
+        "level": "Level",
         "time": "Time",
         "points": "Points",
 
@@ -369,7 +371,7 @@ TXT = {
 
         # Victoria simple (bandera)
         "victory": "VICTORY!",
-        "victory_hint": "Press ENTER to return to menu",
+        "victory_hint": "Press ENTER to continue to the next level",
 
         # Victory Screen completa (pantalla bonita)
         "v2_title": "MISSION ACCOMPLISHED!",
@@ -688,31 +690,124 @@ def escalar_a_ventana(surf: pygame.Surface) -> pygame.Surface:
 
 
 def draw_timer(surface, font, seconds, pos=(20, 20)):
+    # 1. Preparación de datos y colores
     s = max(0, int(seconds))
     color = (255, 80, 80) if s <= 10 else (255, 255, 255)
     sombra = (0, 0, 0)
-    txt = f"{tr('time')}: {s:02d}"
-    surf = font.render(txt, True, color)
-    shad = font.render(txt, True, sombra)
     x, y = pos
-    surface.blit(shad, (x + 2, y + 2))
-    surface.blit(surf, (x, y))
+
+
+    # --- Texto Superior: 'TIME' ---
+    text_time = tr('time')  # Obtiene el texto "TIME" o su traducción
+
+    # Renderizar el texto 'TIME'
+    surf_time = font.render(text_time, True, (255, 255, 255))  # Blanco, ya que no cambia con el tiempo
+    shad_time = font.render(text_time, True, sombra)
+
+    # Dibujar 'TIME' (incluyendo sombra)
+    surface.blit(shad_time, (x + 172, y + 2))
+    surface.blit(surf_time, (x + 170, y))
+
+    # --- Texto Inferior: Segundos ---
+    text_seconds = f"{s:02d}"  # Solo el número de segundos
+
+    # Calcular la posición Y para el texto de los segundos
+    # Se añade la altura del texto 'TIME' (surf_time.get_height()) más un pequeño espaciado (por ejemplo, + 5)
+    y_seconds = y + surf_time.get_height() + 5
+
+    # Renderizar los segundos
+    surf_seconds = font.render(text_seconds, True, color)
+    shad_seconds = font.render(text_seconds, True, sombra)
+
+    # Dibujar los segundos (incluyendo sombra)
+    surface.blit(shad_seconds, (x + 192, y_seconds + 2))
+    surface.blit(surf_seconds, (x + 190, y_seconds))
 
 
 def draw_hud(surface, jugador, img_lleno, img_vacio):
-    if not img_lleno: return
+    if not img_lleno:
+        return
+
+    # ALTURA EXACTA DE "TIME"
+    pos_y = 10   # ← mismo nivel del texto TIME
+
+    img_lleno_big = pygame.transform.scale_by(img_lleno, 2)
+    img_vacio_big = pygame.transform.scale_by(img_vacio, 2)
+
     for i in range(jugador.vida_maxima):
-        pos_x = 20 + i * 40
-        pos_y = 50
+        pos_x = 750 + i * 40   # ← MOVER A LA DERECHA
         if i < jugador.vida_actual:
-            surface.blit(img_lleno, (pos_x, pos_y))
+            surface.blit(img_lleno_big, (pos_x, pos_y))
         else:
-            surface.blit(img_vacio, (pos_x, pos_y))
+            surface.blit(img_vacio_big, (pos_x, pos_y))
 
 
-def draw_puntuacion(surface, font, puntuacion, pos=(20, 80)):
-    texto = font.render(f"{tr('points')}: {puntuacion}", True, (255, 255, 255))
-    surface.blit(texto, pos)
+def draw_nivel(surface, font, nivel, pos=(500, 80)):
+    sombra = (0, 0, 0)
+
+    # ----- TEXTO SUPERIOR: "LEVEL" -----
+    label_text = tr('level')
+    label = font.render(label_text, True, (255, 255, 255))
+    label_shad = font.render(label_text, True, sombra)
+
+    # posición del label
+    lx, ly = pos
+
+    # dibujar sombra y label
+    surface.blit(label_shad, (lx + 2, ly + 2))
+    surface.blit(label, (lx, ly))
+
+    # ----- TEXTO INFERIOR: número del nivel -----
+    if nivel == 0:
+        nivel_str = tr("Tutorial")  # usamos traducción
+    else:
+        nivel_str = str(nivel)
+
+    txt_nivel = font.render(nivel_str, True, (255, 255, 255))
+    shad_nivel = font.render(nivel_str, True, sombra)
+
+    # Y: debajo del label
+    y_nivel = ly + label.get_height() + 5
+
+    # ⭐ X centrado automáticamente ⭐
+    nivel_x = lx + (label.get_width() // 2) - (txt_nivel.get_width() // 2)
+
+    surface.blit(shad_nivel, (nivel_x + 2, y_nivel + 2))
+    surface.blit(txt_nivel, (nivel_x, y_nivel))
+
+
+def draw_puntuacion(surface, font, puntuacion, pos=(400, 20)):
+    sombra = (0, 0, 0)
+
+    # ----- TEXTO SUPERIOR: "POINTS" -----
+    label = font.render(tr("points"), True, (255, 255, 255))
+    label_shad = font.render(tr("points"), True, sombra)
+
+    # posición del label (fija)
+    lx, ly = pos
+
+    # dibujar sombra del label
+    surface.blit(label_shad, (lx + 2, ly + 2))
+    surface.blit(label, (lx, ly))
+
+    # ----- TEXTO INFERIOR: PUNTUACIÓN -----
+    score = str(puntuacion)
+
+    score_text = font.render(score, True, (255, 255, 255))
+    score_shadow = font.render(score, True, sombra)
+
+    # Y: debajo del label
+    y_score = ly + label.get_height() + 5
+
+    # ⭐ X centrado automáticamente debajo del label ⭐
+    score_x = lx + (label.get_width() // 2) - (score_text.get_width() // 2)
+
+    # sombra del número
+    surface.blit(score_shadow, (score_x + 2, y_score + 2))
+    surface.blit(score_text, (score_x, y_score))
+
+
+
 
 
 def reiniciar_nivel(nivel, jugador):
@@ -1002,6 +1097,30 @@ class Camara:
 
 
 # -------------------- Pause Menu --------------------
+class MensajeTemporal:
+    def __init__(self, texto, duracion=2.0, color=(0,0,0)):
+        self.texto = texto
+        self.duracion = duracion
+        self.color = color
+        self.start = pygame.time.get_ticks()
+        self.alpha = 255
+
+    def draw(self, ventana, fuente):
+        elapsed = (pygame.time.get_ticks() - self.start) / 1000
+
+        if elapsed >= self.duracion:
+            return False  # ya terminó
+
+        # Fade-out
+        self.alpha = max(0, 255 - int((elapsed / self.duracion) * 255))
+
+        surf = fuente.render(self.texto, True, self.color)
+        surf.set_alpha(self.alpha)
+
+        rect = surf.get_rect(center=(constantes.ANCHO_VENTANA//2 +180, 450))
+        ventana.blit(surf, rect)
+        return True
+
 class PauseMenu:
     def __init__(self, size):
         self.w, self.h = size
@@ -1581,16 +1700,48 @@ class CharacterSelectUI:
         return None
 
     def _draw_card(self, surface, rect, portrait, name_surf, enabled=True, hover=False):
-        pygame.draw.rect(surface, (15, 70, 130), rect, border_radius=8, width=6)
-        inner = rect.inflate(-12, -12)
-        pygame.draw.rect(surface, (200, 230, 255) if enabled else (200, 200, 200), inner, border_radius=6)
+
+        # aumentamos ligeramente el tamaño base
+        rect_base = rect.inflate(14, 14)
+        rect_base.center = rect.center
+
+        # rectángulos inflados
+        outer_rect = rect_base
+        inner_rect = rect_base.inflate(-10, -10)
+
+        # efecto de agrandado
         if hover and enabled:
-            pygame.draw.rect(surface, (80, 180, 255), inner, width=4, border_radius=6)
-        pic_rect = portrait.get_rect(center=(inner.centerx, inner.top + 160 // 2 + 26))
+            outer_rect = rect_base.inflate(26, 26)
+            outer_rect.center = rect.center
+
+            inner_rect = rect_base.inflate(16, 16)
+            inner_rect.center = rect.center
+
+        # marco exterior
+        pygame.draw.rect(surface, (15, 70, 130), outer_rect, border_radius=10, width=6)
+
+        # fondo interno (blanco/azul claro)
+        base_color = (200, 230, 255) if enabled else (200, 200, 200)
+        pygame.draw.rect(surface, base_color, inner_rect, border_radius=10)
+
+        # aura fuerte que crece también
+        if hover and enabled:
+            aura = inner_rect.inflate(22, 22)
+            aura.center = inner_rect.center
+            pygame.draw.rect(surface, (40, 140, 255), aura, width=6, border_radius=10)
+
+        pic_offset = 30  # súbele o bájale a tu gusto
+        pic_rect = portrait.get_rect(
+            center=(inner_rect.centerx,
+                    inner_rect.top + inner_rect.height * 0.28 + pic_offset)
+        )
         surface.blit(portrait, pic_rect)
-        name_bar = pygame.Rect(inner.left + 8, inner.bottom - 56, inner.width - 16, 40)
-        pygame.draw.rect(surface, (170, 210, 255) if enabled else (180, 180, 180), name_bar, border_radius=6)
-        nr = name_surf.get_rect(center=name_bar.center);
+
+        # barra del nombre (NO se mueve)
+        name_bar = pygame.Rect(rect.left + 12, rect.bottom - 60, rect.width - 24, 46)
+        pygame.draw.rect(surface, (170, 210, 255), name_bar, border_radius=8)
+
+        nr = name_surf.get_rect(center=name_bar.center)
         surface.blit(name_surf, nr)
 
     def draw(self, surface):
@@ -1678,27 +1829,48 @@ class LevelSelectUI:
 
     # ------------------------------------------------------------------ #
     def _draw_card(self, surface, rect, n_level, label, hover=False, selected=False):
-        pygame.draw.rect(surface, (15, 70, 130), rect, border_radius=8, width=5)
-        inner = rect.inflate(-12, -12)
-        base_color = (180, 220, 255) if selected else (200, 230, 255)
-        pygame.draw.rect(surface, base_color, inner, border_radius=6)
-        if hover:
-            pygame.draw.rect(surface, (80, 180, 255), inner, width=4, border_radius=6)
 
+        rect_base = rect.inflate(14, 14)
+        rect_base.center = rect.center
+
+        outer_rect = rect_base
+        inner_rect = rect_base.inflate(-10, -10)
+
+        if hover or selected:
+            outer_rect = rect_base.inflate(26, 26)
+            outer_rect.center = rect.center
+
+            inner_rect = rect_base.inflate(16, 16)
+            inner_rect.center = rect.center
+
+        # marco azul
+        pygame.draw.rect(surface, (15, 70, 130), outer_rect, border_radius=10, width=6)
+
+        # fondo
+        base_color = (180, 220, 255) if selected else (200, 230, 255)
+        pygame.draw.rect(surface, base_color, inner_rect, border_radius=10)
+
+        # aura fuerte
+        if hover:
+            aura = inner_rect.inflate(22, 22)
+            aura.center = inner_rect.center
+            pygame.draw.rect(surface, (40, 140, 255), aura, width=6, border_radius=10)
+
+        # miniatura, fija
         thumb = self.thumbs.get(n_level)
         if thumb:
-            surface.blit(thumb, thumb.get_rect(center=(inner.centerx, inner.top + 80)))
-        else:
-            ph = pygame.Surface((120, 80)); ph.fill((170, 210, 255))
-            surface.blit(ph, ph.get_rect(center=(inner.centerx, inner.top + 80)))
+            tr = thumb.get_rect(center=(rect.centerx, rect.top + 80))
+            surface.blit(thumb, tr)
 
-        bar = pygame.Rect(inner.left + 8, inner.bottom - 56, inner.width - 16, 40)
-        pygame.draw.rect(surface, (170, 210, 255), bar, border_radius=6)
+        # barra inferior
+        bar = pygame.Rect(rect.left + 12, rect.bottom - 60, rect.width - 24, 46)
+        pygame.draw.rect(surface, (170, 210, 255), bar, border_radius=8)
+
         surface.blit(label, label.get_rect(center=bar.center))
 
         if selected:
             tic = self.font_item.render("✓", True, (15, 40, 80))
-            surface.blit(tic, tic.get_rect(center=(inner.right - 28, inner.top + 26)))
+            surface.blit(tic, tic.get_rect(center=(rect.right - 26, rect.top + 28)))
 
     # ------------------------------------------------------------------ #
     def _draw_tutorial_button(self, surface):
@@ -1812,34 +1984,65 @@ class DifficultySelectUI:
         return None
 
     def _draw_card(self, surface, rect, label_surf, icon=None, selected=False, hover=False):
-        # marco externo
-        pygame.draw.rect(surface, (15, 70, 130), rect, border_radius=8, width=5)
-        inner = rect.inflate(-12, -12)
 
-        # fondo
-        base = (200, 230, 255)
-        pygame.draw.rect(surface, base, inner, border_radius=6)
+        # =====================================================
+        # EFECTO DE CRECIMIENTO DEL BOTÓN COMPLETO
+        # =====================================================
+        outer_rect = rect
+        inner_rect = rect.inflate(-12, -12)
 
-        # borde de selección / hover
-        if selected:
-            pygame.draw.rect(surface, (120, 170, 230), inner.inflate(-6, -6), width=3, border_radius=6)
         if hover:
-            pygame.draw.rect(surface, (80, 180, 255), inner, width=4, border_radius=6)
+            outer_rect = rect.inflate(26, 26)
+            outer_rect.center = rect.center
 
-        # icono
+            inner_rect = inner_rect.inflate(26, 26)  # <-- AHORA EL ÁREA BLANCA TAMBIÉN CRECE
+            inner_rect.center = rect.center
+
+        # =====================================================
+        # MARCO AZUL EXTERNO
+        # =====================================================
+        pygame.draw.rect(surface, (15, 70, 130), outer_rect, border_radius=8, width=5)
+
+        # =====================================================
+        # TARJETA BLANCA (ÁREA INTERNA)
+        # =====================================================
+        pygame.draw.rect(surface, (200, 230, 255), inner_rect, border_radius=6)
+
+        # =====================================================
+        # AURA DE HOVER
+        # =====================================================
+        if hover:
+            # El aura debe crecer MÁS que la tarjeta interna para que se note
+            aura = inner_rect.inflate(40, 40)
+            aura.center = inner_rect.center
+            pygame.draw.rect(surface, (80, 180, 255), aura, width=6, border_radius=10)
+
+        # =====================================================
+        # BORDE DE SELECCIÓN
+        # =====================================================
+        if selected:
+            sel = inner_rect.inflate(-8, -8)
+            pygame.draw.rect(surface, (120, 170, 230), sel, width=3, border_radius=6)
+
+        # =====================================================
+        # ICONO (FIJO EN SU POSICIÓN RELATIVA)
+        # =====================================================
         if icon:
-            ir = icon.get_rect(center=(inner.centerx, inner.top + 75))
+            ir = icon.get_rect(center=(rect.centerx, rect.top + 90))
             surface.blit(icon, ir)
-        else:
-            # placeholder
-            ph = pygame.Surface((100, 70));
-            ph.fill((170, 210, 255))
-            pr = ph.get_rect(center=(inner.centerx, inner.top + 70))
-            surface.blit(ph, pr)
 
-        # barra inferior con texto
-        bar = pygame.Rect(inner.left + 8, inner.bottom - 56, inner.width - 16, 40)
+        # =====================================================
+        # BARRA DEL TEXTO (FIJA, NO SE MUEVE NI CRECE)
+        # =====================================================
+        bar = pygame.Rect(
+            rect.left + 20,
+            rect.bottom - 70,
+            rect.width - 40,
+            48
+        )
+
         pygame.draw.rect(surface, (170, 210, 255), bar, border_radius=6)
+
         lr = label_surf.get_rect(center=bar.center)
         surface.blit(label_surf, lr)
 
@@ -1975,6 +2178,8 @@ ESTADO_VICTORY_SCREEN = "VICTORY_SCREEN"
 
 
 def main():
+    global mensaje_idioma
+    mensaje_idioma = None
     drag_volume = False
     slider_exists = False
     nuevo_slider = None
@@ -2000,10 +2205,47 @@ def main():
 
     # === BOTONES DE IDIOMA ===
     BTN_W, BTN_H = 260, 60
+    # --- Botones de victoria (usando BotonSimple, sin imágenes) ---
+    btn_v_menu = BotonSimple(
+        texto="",
+        center=(constantes.ANCHO_VENTANA // 2 - 150,
+                constantes.ALTO_VENTANA // 2 + 50),
+        width=280,
+        height=70
+    )
+
+    btn_v_next = BotonSimple(
+        texto="",
+        center=(constantes.ANCHO_VENTANA // 2 + 150,
+                constantes.ALTO_VENTANA // 2 + 50),
+        width=280,
+        height=70
+    )
     btn_es = pygame.Rect(0, 0, BTN_W, BTN_H)
     btn_en = pygame.Rect(0, 0, BTN_W, BTN_H)
     btn_es.center = (constantes.ANCHO_VENTANA // 2, 300)
     btn_en.center = (constantes.ANCHO_VENTANA // 2, 380)
+    # ============================
+    #  HOVER DE BOTONES IDIOMA
+    # ============================
+    mouse_pos = pygame.mouse.get_pos();
+    hover_es = btn_es.collidepoint(mouse_pos)
+    hover_en = btn_en.collidepoint(mouse_pos)
+
+    if hover_es:
+        pygame.draw.rect(ventana, (255, 255, 180), btn_es.inflate(10, 10), border_radius=12)
+
+    # Hover EN
+    if hover_en:
+        pygame.draw.rect(ventana, (255, 255, 180), btn_en.inflate(10, 10), border_radius=12)
+
+    # Hover ES
+    if hover_es:
+        pygame.draw.rect(ventana, (255, 255, 180), btn_es.inflate(10, 10), border_radius=12)
+
+    # Hover EN
+    if hover_en:
+        pygame.draw.rect(ventana, (255, 255, 180), btn_en.inflate(10, 10), border_radius=12)
 
     # === VIDEO INTRO (variable temporal) ===
     video_intro = None
@@ -2023,6 +2265,9 @@ def main():
         vida_vacio_img = pygame.transform.scale(vida_vacio_img, (32, 32))
         btn_exit_img = pygame.image.load("assets/images/ui/btn_exit.png").convert_alpha()
         btn_exit_img = pygame.transform.smoothscale(btn_exit_img, (90, 90))
+        pause_img = pygame.image.load("assets/images/ui/pause.png").convert_alpha()
+        pause_img = pygame.transform.smoothscale(pause_img, (90, 90))
+
 
     except pygame.error as e:
         print(f"ERROR AL CARGAR IMÁGENES DEL HUD: {e}")
@@ -2157,6 +2402,10 @@ def main():
     # --- Efectos de texto flotante ---
     floating_texts = []
     btn_exit = ImageButton(btn_exit_img, center=(constantes.ANCHO_VENTANA - 1050, 40))
+    btn_pause = ImageButton(
+        surface=pause_img,
+        center=(constantes.ANCHO_VENTANA - 50, 40)
+    )
 
     # --- Vida extra por basura ---
     trash_collected = 0  # contador actual de basura recogida
@@ -2177,8 +2426,8 @@ def main():
             "img_y_offset": -50,
             "world_x": 400,  # <-- La clave que faltaba
             "world_y": 800,
-            "range_pre": 500,  # <-- La clave que faltaba
-            "range_post": 500,  # <-- La clave que faltaba
+            "range_pre": 800,  # <-- La clave que faltaba
+            "range_post": 800,  # <-- La clave que faltaba
         },
         {
             "id": "jump",
@@ -2187,8 +2436,8 @@ def main():
             "img_y_offset": -50,
             "world_x": 1390,  # <-- La clave que faltaba
             "world_y": 800,
-            "range_pre": 500,  # <-- La clave que faltaba
-            "range_post": 500,  # <-- La clave que faltaba
+            "range_pre": 750,  # <-- La clave que faltaba
+            "range_post": 750,  # <-- La clave que faltaba
         },
         {
             "id": "attack",
@@ -2197,8 +2446,8 @@ def main():
             "img_y_offset": -50,
             "world_x": 3430,  # <-- La clave que faltaba
             "world_y": 800,
-            "range_pre": 500,  # <-- La clave que faltaba
-            "range_post": 500,  # <-- La clave que faltaba
+            "range_pre": 750,  # <-- La clave que faltaba
+            "range_post": 750,  # <-- La clave que faltaba
         },
         {
             "id": "trash",
@@ -2207,8 +2456,8 @@ def main():
             "img_y_offset": -50,
             "world_x": 2443,  # <-- La clave que faltaba
             "world_y": 680,
-            "range_pre": 500,  # <-- La clave que faltaba
-            "range_post": 500,  # <-- La clave que faltaba
+            "range_pre": 750,  # <-- La clave que faltaba
+            "range_post": 750,  # <-- La clave que faltaba
         }
     ]
 
@@ -2291,6 +2540,7 @@ def main():
     current_lang = settings["language"] or "es"
     _rebuild_menu_buttons(current_lang)
     _rebuild_tutorial_cache(current_lang)  # <<< --- AÑADE ESTA LÍNEA (carga inicial)
+    bloquea_click = False
 
     # --------- Game Loop ---------
     while run:
@@ -2321,6 +2571,10 @@ def main():
             # SLIDER – detectar arrastre SOLO si existe
             # =====================================================
             if estado == ESTADO_OPC and nuevo_slider is not None:
+                if btn_exit.clicked(event):
+                    print(f"[DEBUG] Botón 'Atrás' presionado en estado: {estado}")
+                    estado = ESTADO_MENU
+                    _save_prefs(settings)
 
                 # INICIO DE ARRASTRE
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -2331,26 +2585,7 @@ def main():
                 if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                     drag_volume = False
 
-            if btn_exit.clicked(event):
-                print(f"Botón presionado en estado: {estado}")  # <--- DEBUG
-                # Definimos a dónde regresa según dónde estemos
-                if estado == ESTADO_OPC:
-                    estado = ESTADO_MENU
-                    _save_prefs(settings)  # Guardar cambios al salir
 
-                elif estado == ESTADO_SELECT_PERSONAJE:
-                    print("--> Entró a la condición SELECT_PERSONAJE. Cambiando a MENU...")
-                    menu_leaving = False
-                    estado = ESTADO_MENU
-                    menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
-
-                elif estado == ESTADO_SELECT_NIVEL:
-                    estado = ESTADO_SELECT_PERSONAJE
-                    select_lock = False  # <--- ¡AGREGA ESTO! IMPORTANTE
-                    # Reset de selección si es necesario
-
-                elif estado == ESTADO_DIFICULTAD:
-                    estado = ESTADO_SELECT_NIVEL
 
             elif estado == ESTADO_LANG_SELECT:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -2420,11 +2655,18 @@ def main():
                         menu_krab.jump_and_leave()
                     elif btn_opc.clicked(event):
                         estado = ESTADO_OPC
+                        bloquea_click = True
                     elif btn_salir.clicked(event):
                         musica.stop(300)
                         run = False
 
             elif estado == ESTADO_SELECT_PERSONAJE:
+                btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
+                if btn_exit.clicked(event):
+                    print(f"[DEBUG] Botón 'Atrás' presionado en estado: {estado}")
+                    menu_leaving = False
+                    estado = ESTADO_MENU
+                    menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
                 now_ms = pygame.time.get_ticks()
                 if now_ms - last_select_time >= SELECT_COOLDOWN_MS and not select_lock:
                     choice = select_ui.handle_event(event)
@@ -2452,8 +2694,17 @@ def main():
                         musica.switch("menu")
 
             elif estado == ESTADO_SELECT_NIVEL:
+
+                btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
+                if btn_exit.clicked(event):
+                    print(f"[DEBUG] Botón 'Atrás' presionado en estado: {estado}")
+                    estado = ESTADO_SELECT_PERSONAJE
+                    select_lock = False
+                    # Reset de selección si es necesar
+                level_select_ui.selected = None
                 choice = level_select_ui.handle_event(event)
                 if choice == 0:
+                    selected_difficulty = "FACIL"
                     nivel_actual = 0
                     estado = ESTADO_CARGANDO
                 if choice == 1:
@@ -2483,6 +2734,10 @@ def main():
                     last_select_time = pygame.time.get_ticks()
 
             elif estado == ESTADO_DIFICULTAD:
+                if btn_exit.clicked(event):
+                    print(f"[DEBUG] Botón 'Atrás' presionado en estado: {estado}")
+                    estado = ESTADO_SELECT_NIVEL
+                btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
                 result = diff_ui.handle_event(event)
                 if result == "BACK":
                     estado = ESTADO_SELECT_NIVEL
@@ -2532,14 +2787,15 @@ def main():
                 elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                     slider_dragging = False
 
-                elif event.type == pygame.MOUSEMOTION and slider_dragging:
-                    mx, my = event.pos
-                    rel = (mx - slider_bar_rect.left) / slider_bar_rect.width
-                    settings["volume"] = min(1.0, max(0.0, rel))
-                    musica.set_master_volume(settings["volume"])
+
 
 
             elif estado == ESTADO_JUEGO:
+                if btn_pause.clicked(event):
+                    print("PAUSA ACTIVADA")  # Para verificar
+                    estado = ESTADO_PAUSA
+                    musica.set_master_volume(settings["volume"] * 0.5)
+
                 # ---------------- KEYDOWN ----------------
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_F1:
@@ -2607,12 +2863,16 @@ def main():
                                 fly_down = True
 
                         # pausa
-                    if event.key == pygame.K_ESCAPE:
-                        estado = ESTADO_PAUSA
-                        musica.set_master_volume(settings["volume"] * 0.5)
+                        if event.key == pygame.K_ESCAPE:
+                            estado = ESTADO_PAUSA
+                            musica.set_master_volume(settings["volume"] * 0.5)
 
                 # ---------------- KEYUP ----------------
                 elif event.type == pygame.KEYUP:
+                    if btn_pause.clicked(event):
+                        print("PAUSA ACTIVADA")  # Para verificar
+                        estado = ESTADO_PAUSA
+                        musica.set_master_volume(settings["volume"] * 0.5)
                     if event.key in (pygame.K_a, pygame.K_LEFT):
                         mover_izquierda = False
                     if event.key in (pygame.K_d, pygame.K_RIGHT):
@@ -2693,12 +2953,25 @@ def main():
                         musica.set_master_volume(settings["volume"])
 
             elif estado == ESTADO_VICTORIA:
-                if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE,
-                                                                  pygame.K_ESCAPE):
+                if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    nivel_actual = nivel_actual + 1
+                    estado = ESTADO_CARGANDO
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     musica.switch("menu")
                     estado = ESTADO_MENU
                     menu_leaving = False
                     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if btn_v_menu.rect.collidepoint(event.pos):
+                        # Ir al menú
+                        musica.switch("menu")
+                        estado = ESTADO_MENU
+                        menu_leaving = False
+                        menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
+                    elif btn_v_next.rect.collidepoint(event.pos):
+                        nivel_actual = nivel_actual + 1
+                        estado = ESTADO_CARGANDO
 
             elif estado == ESTADO_VICTORY_SCREEN:
                 victory_ui.update(mouse_pos)
@@ -2708,7 +2981,11 @@ def main():
                     estado = ESTADO_MENU
                     menu_leaving = False
                     menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
-
+        if bloquea_click:
+            click = False
+            # Cuando suelte el mouse, ya permitir clicks normales
+            if not mouse_down:
+                bloquea_click = False
         # -------------------- UPDATE --------------------
         if estado == ESTADO_MENU:
             menu_krab.update(dt)
@@ -2940,10 +3217,10 @@ def main():
             elif nivel_actual == 3:
                 items.add(
                     lamina(x=970, y=560),
-                    botella(x=2180, y=590),
-                    botella(x=2030, y=590),
-                    botella(x=2180, y=470),
-                    botella(x=2030, y=470),
+                    botella(x=2180, y=640),
+                    botella(x=2030, y=640),
+                    botella(x=2180, y=500),
+                    botella(x=2030, y=500),
                     bolsa(x=2120, y=800),
                     botella(x=3130, y=630),
                     lamina(x=3270, y=580),
@@ -3077,6 +3354,7 @@ def main():
             pass  # la interacción se maneja en eventos
 
         elif estado == ESTADO_JUEGO:
+            btn_exit = None
 
 
             # Para puerta/barrera:
@@ -3636,17 +3914,30 @@ def main():
             texto_titulo = get_font(constantes.FONT_SUBTITLE).render(t["options_title"], True, (255, 255, 255))
             ventana.blit(texto_titulo, (titulo_rect.centerx - texto_titulo.get_width() // 2,
                                         titulo_rect.centery - texto_titulo.get_height() // 2))
-
             # ============================
             # 3) SLIDER DE VOLUMEN
             # ============================
             nuevo_slider = slider_bar_rect.copy()
             nuevo_slider.width = 350
             nuevo_slider.centerx = constantes.ANCHO_VENTANA // 2
-            nuevo_slider.y = 170
+            nuevo_slider.y = 190
 
             vol_label = get_font(constantes.FONT_HUD).render(t["volume"], True, (255, 255, 255))
-            ventana.blit(vol_label, (nuevo_slider.centerx - vol_label.get_width() // 2, nuevo_slider.y - 40))
+            # ============================
+            # PANEL DE FONDO DEL SLIDER
+            # ============================
+            panel_vol = vol_label.get_rect()
+            panel_vol.inflate_ip(30, 20)  # margen extra horizontal y vertical
+            panel_vol.center = (nuevo_slider.centerx, nuevo_slider.y - 40)
+
+            # Fondo oscuro
+            pygame.draw.rect(ventana, (15, 30, 70), panel_vol, border_radius=12)
+            # Borde blanco
+            pygame.draw.rect(ventana, (255, 255, 255), panel_vol, width=3, border_radius=12)
+
+            # Dibujar el texto centrado
+            ventana.blit(vol_label, (panel_vol.centerx - vol_label.get_width() // 2,
+                                     panel_vol.centery - vol_label.get_height() // 2))
 
             pygame.draw.rect(ventana, (150, 200, 255), nuevo_slider, border_radius=8)
 
@@ -3705,11 +3996,17 @@ def main():
             # ============================
             # 7) BOTÓN ESPAÑOL
             # ============================
+            hover_es = btn_es.collidepoint(mouse_pos)
+
+            # Fondo con hover
+            if hover_es:
+                pygame.draw.rect(ventana, (255, 255, 180), btn_es.inflate(12, 12), border_radius=12)
+
+            # Botón base encima
             pygame.draw.rect(ventana, (20, 45, 100), btn_es, border_radius=10)
             pygame.draw.rect(ventana, (255, 255, 255), btn_es, width=3, border_radius=10)
 
-            ventana.blit(flag_mx, (btn_es.x + 6, btn_es.y + 18))  # bandera más abajo
-
+            ventana.blit(flag_mx, (btn_es.x + 6, btn_es.y + 18))
             texto_es = get_font(constantes.FONT_HUD).render(t["spanish"], True, (255, 255, 255))
             ventana.blit(texto_es, (btn_es.centerx - texto_es.get_width() // 2 + 18,
                                     btn_es.y + 24))
@@ -3717,11 +4014,17 @@ def main():
             # ============================
             # 8) BOTÓN ENGLISH
             # ============================
+            hover_en = btn_en.collidepoint(mouse_pos)
+
+            # Fondo con hover
+            if hover_en:
+                pygame.draw.rect(ventana, (255, 255, 180), btn_en.inflate(12, 12), border_radius=12)
+
+            # Botón base encima
             pygame.draw.rect(ventana, (20, 45, 100), btn_en, border_radius=10)
             pygame.draw.rect(ventana, (255, 255, 255), btn_en, width=3, border_radius=10)
 
-            ventana.blit(flag_us, (btn_en.x + 8, btn_en.y + 18))  # bandera más abajo
-
+            ventana.blit(flag_us, (btn_en.x + 8, btn_en.y + 18))
             texto_en = get_font(constantes.FONT_HUD).render(t["english"], True, (255, 255, 255))
             ventana.blit(texto_en, (btn_en.centerx - texto_en.get_width() // 2 + 18,
                                     btn_en.y + 24))
@@ -3732,9 +4035,11 @@ def main():
             if click:
                 if btn_es.collidepoint(mouse_pos):
                     settings["language"] = "es"
+                    mensaje_idioma = MensajeTemporal("Idioma cambiado")
 
                 if btn_en.collidepoint(mouse_pos):
                     settings["language"] = "en"
+                    mensaje_idioma = MensajeTemporal("Language changed")
 
             # ============================
             # 10) ACTUALIZAR INSTANTE
@@ -3742,8 +4047,9 @@ def main():
             lang = settings["language"]
             t = I18N[lang]
 
-
-
+            if mensaje_idioma:
+                if not mensaje_idioma.draw(ventana, get_font(constantes.FONT_HUD)):
+                    mensaje_idioma = None
             # ============================
             # 12) BOTÓN SALIR
             # ============================
@@ -3767,11 +4073,19 @@ def main():
             btn_exit.draw(ventana)
 
 
-        elif estado in ("JUEGO", "PAUSA"):
+        elif estado == ESTADO_JUEGO or estado == ESTADO_PAUSA:
             # Fondo/parallax y mapa
             if parallax is not None:
                 parallax.draw(ventana)
             nivel.draw(ventana, cam.offset())
+            btn_pause.rect.midtop = (constantes.ANCHO_VENTANA // 2 - 510, -8)
+
+            # --- ACTUALIZAR Y DIBUJAR BOTÓN ---
+            mouse_pos = pygame.mouse.get_pos()
+            mouse_click = pygame.mouse.get_pressed()[0]
+
+            btn_pause.update(mouse_pos, mouse_click)
+            btn_pause.draw(ventana)
 
             # Offset de cámara (úsalo para TODO lo que dibujas en mundo)
             ox, oy = cam.offset()
@@ -3869,6 +4183,10 @@ def main():
             # ==============================
             # Medidor de basura (es HUD, no depende de la cámara)
             medidor.draw(ventana)
+            hud_x = medidor.x
+            hud_y = medidor.y
+
+
 
             # Contador de basura: recogida / total
             font_basura = get_font(constantes.FONT_UI_ITEM)  # o la fuente que uses para el HUD
@@ -3888,7 +4206,7 @@ def main():
 
             ventana.blit(txt_surf, (x, y))
 
-            if estado == "PAUSA":
+            if estado == ESTADO_PAUSA:
                 pause_menu.draw(ventana)
 
             # Mensaje "ALTO, debes limpiar más..." si chocó con una puerta condicional
@@ -3906,6 +4224,7 @@ def main():
                 draw_timer(ventana, font_hud, timer, pos=(20, 20))
                 draw_hud(ventana, jugador, vida_lleno_img, vida_vacio_img)
                 draw_puntuacion(ventana, font_hud, puntuacion)
+                draw_nivel(ventana, font_hud, nivel_actual, pos=(600, 20))
 
 
         elif estado == "MUERTE":
@@ -3967,64 +4286,56 @@ def main():
 
             # ===== OSCURECER UN POCO EL FONDO =====
             overlay = pygame.Surface((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA), pygame.SRCALPHA)
-            overlay.fill((0, 0, 40, 110))  # azul oscuro, suave
+            overlay.fill((0, 0, 40, 110))  # azul oscuro
             ventana.blit(overlay, (0, 0))
 
-            # ===== BURBUJA / PASTILLA DE VICTORIA =====
+            # ===== PASTILLA DE VICTORIA =====
             t = pygame.time.get_ticks() / 1000.0
-
             font_title = get_font(constantes.FONT_UI_TITLE)
-            msg_text = tr("victory")  # "¡VICTORIA!"
+            msg_text = tr("victory")
             msg = font_title.render(msg_text, True, (255, 255, 255))
 
-            # La colocamos un poco más arriba para no tapar el texto de "Pulsa ENTER..."
             center_x = constantes.ANCHO_VENTANA // 2
             center_y = constantes.ALTO_VENTANA // 2 - 40
 
-            # Tamaño más compacto (antes sumábamos demasiado)
             bubble_w = msg.get_width() + 80
             bubble_h = msg.get_height() + 32
 
-            # Pequeño “latido” suave
             scale = 1.0 + 0.02 * math.sin(t * 3)
             draw_w = int(bubble_w * scale)
             draw_h = int(bubble_h * scale)
 
             bubble_surf = pygame.Surface((draw_w, draw_h), pygame.SRCALPHA)
-
-            # Colores de la burbuja
-            base_color = (120, 210, 255, 180)  # azul agua
-            edge_color = (255, 255, 255, 230)  # borde blanco
-            highlight = (255, 255, 255, 90)  # brillo suave
-
             rect = pygame.Rect(0, 0, draw_w, draw_h)
 
-            # Elipse principal (tipo pastilla)
+            # Colores de la burbuja
+            base_color = (120, 210, 255, 180)
+            edge_color = (255, 255, 255, 230)
+            highlight = (255, 255, 255, 90)
+
             pygame.draw.ellipse(bubble_surf, base_color, rect)
             pygame.draw.ellipse(bubble_surf, edge_color, rect, width=3)
 
-            # Brillo en la parte superior izquierda
+            # Brillo2
             highlight_rect = pygame.Rect(draw_w * 0.1, draw_h * 0.1,
                                          draw_w * 0.5, draw_h * 0.4)
             pygame.draw.ellipse(bubble_surf, highlight, highlight_rect)
 
-            # Un par de burbujitas pequeñas cerca (ya no rodeando toda la pantalla)
+            # Burbujitas decorativas
             for i in range(3):
                 offset_x = (-40 if i == 0 else (40 if i == 1 else 0))
                 offset_y = (-30 if i < 2 else 30)
                 r = 10 if i < 2 else 6
-
                 bx = draw_w // 2 + offset_x
                 by = draw_h // 2 + offset_y
-
                 pygame.draw.circle(bubble_surf, (180, 230, 255, 160), (bx, by), r)
                 pygame.draw.circle(bubble_surf, (255, 255, 255, 220), (bx, by), r, width=2)
 
-            # Dibujar burbuja en pantalla
+            # Dibujar burbuja
             bubble_rect = bubble_surf.get_rect(center=(center_x, center_y))
             ventana.blit(bubble_surf, bubble_rect.topleft)
 
-            # Texto con sombra dentro de la burbuja
+            # Texto con sombra
             shadow = font_title.render(msg_text, True, (0, 0, 40))
             ventana.blit(
                 shadow,
@@ -4043,8 +4354,30 @@ def main():
             ventana.blit(
                 hint,
                 (constantes.ANCHO_VENTANA // 2 - hint.get_width() // 2,
-                 center_y + bubble_rect.height // 2 + 25)
+                 center_y + bubble_rect.height // 2 + 140)
             )
+
+            # ===========================================
+            #         🔵 BOTONES DE VICTORIA 🔵
+            # ===========================================
+
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Multi idioma
+            if settings["language"] == "en":
+                btn_v_menu.texto = "Menu"
+                btn_v_next.texto = "Next level"
+            else:
+                btn_v_menu.texto = "Menú"
+                btn_v_next.texto = "Siguiente nivel"
+
+            # Update hover
+            btn_v_menu.update(mouse_pos)
+            btn_v_next.update(mouse_pos)
+
+            # Dibujar botones
+            btn_v_menu.draw(ventana)
+            btn_v_next.draw(ventana)
 
         pygame.display.flip()
 
