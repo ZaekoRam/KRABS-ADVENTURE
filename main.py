@@ -315,6 +315,7 @@ TXT = {
         "continue": "Continuar",
 
         # Pausa
+        "hud_pause": "Pausa",  # <--- AGREGA ESTO
         "pause_title": "PAUSA",
         "pause_resume": "Continuar",
         "pause_to_menu": "Salir al menú",
@@ -360,6 +361,7 @@ TXT = {
         "continue": "Continue",
 
         # Pausa
+        "hud_pause": "Pause",  # <--- AGREGA ESTO
         "pause_title": "PAUSE",
         "pause_resume": "Resume",
         "pause_to_menu": "Exit to Menu",
@@ -2196,6 +2198,14 @@ def main():
 
     ventana = pygame.display.set_mode((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     pygame.display.set_caption("Krab's adventure")
+    try:
+        icono_img = pygame.image.load(IMG_DIR / "ui" / "protagonista.png")  # O la ruta que quieras
+        icono_img = pygame.transform.smoothscale(icono_img, (64, 64))
+        pygame.display.set_icon(icono_img)
+    except Exception:
+        pass
+    ventana = pygame.display.set_mode((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
+    pygame.display.set_caption("Krab's Adventure")
     reloj = pygame.time.Clock()
     prefs = _load_prefs()
     slider_dragging = False
@@ -2404,7 +2414,7 @@ def main():
     btn_exit = ImageButton(btn_exit_img, center=(constantes.ANCHO_VENTANA - 1050, 40))
     btn_pause = ImageButton(
         surface=pause_img,
-        center=(0, 0)  # luego lo reposicionamos junto al medidor
+        center=(constantes.ANCHO_VENTANA - 50, 40)
     )
 
     # --- Vida extra por basura ---
@@ -2571,6 +2581,15 @@ def main():
             # SLIDER – detectar arrastre SOLO si existe
             # =====================================================
             if estado == ESTADO_OPC and nuevo_slider is not None:
+                if btn_exit and btn_exit.clicked(event):
+                    print(f"[DEBUG] Botón 'Atrás' presionado en estado: {estado}")
+                    estado = ESTADO_MENU
+                    _save_prefs(settings)
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        estado = ESTADO_MENU
+                        _save_prefs(settings)
+
 
                 # INICIO DE ARRASTRE
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -2581,26 +2600,7 @@ def main():
                 if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                     drag_volume = False
 
-            if btn_exit.clicked(event):
-                print(f"Botón presionado en estado: {estado}")  # <--- DEBUG
-                # Definimos a dónde regresa según dónde estemos
-                if estado == ESTADO_OPC:
-                    estado = ESTADO_MENU
-                    _save_prefs(settings)  # Guardar cambios al salir
 
-                elif estado == ESTADO_SELECT_PERSONAJE:
-                    print("--> Entró a la condición SELECT_PERSONAJE. Cambiando a MENU...")
-                    menu_leaving = False
-                    estado = ESTADO_MENU
-                    menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
-
-                elif estado == ESTADO_SELECT_NIVEL:
-                    estado = ESTADO_SELECT_PERSONAJE
-                    select_lock = False  # <--- ¡AGREGA ESTO! IMPORTANTE
-                    # Reset de selección si es necesario
-
-                elif estado == ESTADO_DIFICULTAD:
-                    estado = ESTADO_SELECT_NIVEL
 
             elif estado == ESTADO_LANG_SELECT:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -2677,6 +2677,11 @@ def main():
 
             elif estado == ESTADO_SELECT_PERSONAJE:
                 btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
+                if btn_exit.clicked(event):
+                    print(f"[DEBUG] Botón 'Atrás' presionado en estado: {estado}")
+                    menu_leaving = False
+                    estado = ESTADO_MENU
+                    menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
                 now_ms = pygame.time.get_ticks()
                 if now_ms - last_select_time >= SELECT_COOLDOWN_MS and not select_lock:
                     choice = select_ui.handle_event(event)
@@ -2704,7 +2709,13 @@ def main():
                         musica.switch("menu")
 
             elif estado == ESTADO_SELECT_NIVEL:
+
                 btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
+                if btn_exit.clicked(event):
+                    print(f"[DEBUG] Botón 'Atrás' presionado en estado: {estado}")
+                    estado = ESTADO_SELECT_PERSONAJE
+                    select_lock = False
+                    # Reset de selección si es necesar
                 level_select_ui.selected = None
                 choice = level_select_ui.handle_event(event)
                 if choice == 0:
@@ -2738,6 +2749,9 @@ def main():
                     last_select_time = pygame.time.get_ticks()
 
             elif estado == ESTADO_DIFICULTAD:
+                if btn_exit.clicked(event):
+                    print(f"[DEBUG] Botón 'Atrás' presionado en estado: {estado}")
+                    estado = ESTADO_SELECT_NIVEL
                 btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
                 result = diff_ui.handle_event(event)
                 if result == "BACK":
@@ -2788,14 +2802,15 @@ def main():
                 elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                     slider_dragging = False
 
-                elif event.type == pygame.MOUSEMOTION and slider_dragging:
-                    mx, my = event.pos
-                    rel = (mx - slider_bar_rect.left) / slider_bar_rect.width
-                    settings["volume"] = min(1.0, max(0.0, rel))
-                    musica.set_master_volume(settings["volume"])
+
 
 
             elif estado == ESTADO_JUEGO:
+                if btn_pause.clicked(event):
+                    print("PAUSA ACTIVADA")  # Para verificar
+                    estado = ESTADO_PAUSA
+                    musica.set_master_volume(settings["volume"] * 0.5)
+
                 # ---------------- KEYDOWN ----------------
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_F1:
@@ -2863,12 +2878,16 @@ def main():
                                 fly_down = True
 
                         # pausa
-                    if event.key == pygame.K_ESCAPE:
-                        estado = ESTADO_PAUSA
-                        musica.set_master_volume(settings["volume"] * 0.5)
+                        if event.key == pygame.K_ESCAPE:
+                            estado = ESTADO_PAUSA
+                            musica.set_master_volume(settings["volume"] * 0.5)
 
                 # ---------------- KEYUP ----------------
                 elif event.type == pygame.KEYUP:
+                    if btn_pause.clicked(event):
+                        print("PAUSA ACTIVADA")  # Para verificar
+                        estado = ESTADO_PAUSA
+                        musica.set_master_volume(settings["volume"] * 0.5)
                     if event.key in (pygame.K_a, pygame.K_LEFT):
                         mover_izquierda = False
                     if event.key in (pygame.K_d, pygame.K_RIGHT):
@@ -2950,7 +2969,6 @@ def main():
 
             elif estado == ESTADO_VICTORIA:
                 if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                    musica.switch("menu")
                     nivel_actual = nivel_actual + 1
                     estado = ESTADO_CARGANDO
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -2967,8 +2985,6 @@ def main():
                         menu_leaving = False
                         menu_krab = MenuKrab(midbottom=KRAB_MENU_POS, scale=KRAB_MENU_SCALE)
                     elif btn_v_next.rect.collidepoint(event.pos):
-                        # Ir al siguiente nivel
-                        musica.switch("menu")
                         nivel_actual = nivel_actual + 1
                         estado = ESTADO_CARGANDO
 
@@ -2987,6 +3003,7 @@ def main():
                 bloquea_click = False
         # -------------------- UPDATE --------------------
         if estado == ESTADO_MENU:
+            btn_exit = ImageButton(btn_exit_img, center=(constantes.ANCHO_VENTANA - 1050, 40))
             menu_krab.update(dt)
             if menu_leaving and menu_krab.offscreen(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA):
                 musica.set_master_volume(settings["volume"])
@@ -3353,6 +3370,7 @@ def main():
             pass  # la interacción se maneja en eventos
 
         elif estado == ESTADO_JUEGO:
+            btn_exit = None
 
 
             # Para puerta/barrera:
@@ -3884,6 +3902,7 @@ def main():
 
 
         elif estado == ESTADO_OPC:
+            btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
 
             ventana.blit(fondo_menu, (0, 0))
             # ============================================================
@@ -4051,7 +4070,8 @@ def main():
             # ============================
             # 12) BOTÓN SALIR
             # ============================
-            btn_exit.draw(ventana)
+            if btn_exit:
+                btn_exit.draw(ventana)
 
 
 
@@ -4071,11 +4091,35 @@ def main():
             btn_exit.draw(ventana)
 
 
-        elif estado in ("JUEGO", "PAUSA"):
+        elif estado == ESTADO_JUEGO or estado == ESTADO_PAUSA:
             # Fondo/parallax y mapa
             if parallax is not None:
                 parallax.draw(ventana)
             nivel.draw(ventana, cam.offset())
+            btn_pause.rect.midtop = (constantes.ANCHO_VENTANA // 2 - 500, -8)
+
+            # --- ACTUALIZAR Y DIBUJAR BOTÓN ---
+            mouse_pos = pygame.mouse.get_pos()
+            mouse_click = pygame.mouse.get_pressed()[0]
+
+            btn_pause.update(mouse_pos, mouse_click)
+            btn_pause.draw(ventana)
+
+            font_btn = get_font(constantes.FONT_UI_ITEM)
+            txt_pausa = font_btn.render(tr("hud_pause"), True, (255, 255, 255))
+            # 4. Posicionamos: Centro X alineado al botón, Parte superior pegada al fondo del botón
+            # Ajusta el +5 si lo quieres más abajo o más arriba
+            rect_pausa = txt_pausa.get_rect(midtop=(btn_pause.rect.centerx, btn_pause.rect.bottom - 12))
+
+            # 5. Dibujar (con una pequeña sombra negra para que se lea bien en cualquier fondo)
+            sombra_pausa = font_btn.render(tr("hud_pause"), True, (0, 0, 0))
+            # Si escalaste el texto arriba, escala también la sombra
+            ventana.blit(sombra_pausa, (rect_pausa.x + 2, rect_pausa.y + 2))
+
+            ventana.blit(txt_pausa, rect_pausa)
+
+            # 2. Renderizamos el texto usando la función tr() para el idioma
+            txt_pausa = font_btn.render(tr("hud_pause"), True, (255, 255, 255))
 
             # Offset de cámara (úsalo para TODO lo que dibujas en mundo)
             ox, oy = cam.offset()
@@ -4176,14 +4220,7 @@ def main():
             hud_x = medidor.x
             hud_y = medidor.y
 
-            btn_pause.rect.midtop = (constantes.ANCHO_VENTANA // 2 - 500, -8)
 
-            # --- ACTUALIZAR Y DIBUJAR BOTÓN ---
-            mouse_pos = pygame.mouse.get_pos()
-            mouse_click = pygame.mouse.get_pressed()[0]
-
-            btn_pause.update(mouse_pos, mouse_click)
-            btn_pause.draw(ventana)
 
             # Contador de basura: recogida / total
             font_basura = get_font(constantes.FONT_UI_ITEM)  # o la fuente que uses para el HUD
@@ -4203,7 +4240,7 @@ def main():
 
             ventana.blit(txt_surf, (x, y))
 
-            if estado == "PAUSA":
+            if estado == ESTADO_PAUSA:
                 pause_menu.draw(ventana)
 
             # Mensaje "ALTO, debes limpiar más..." si chocó con una puerta condicional
