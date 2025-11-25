@@ -2198,6 +2198,14 @@ def main():
 
     ventana = pygame.display.set_mode((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
     pygame.display.set_caption("Krab's adventure")
+    try:
+        icono_img = pygame.image.load(IMG_DIR / "ui" / "protagonista.png")  # O la ruta que quieras
+        icono_img = pygame.transform.smoothscale(icono_img, (64, 64))
+        pygame.display.set_icon(icono_img)
+    except Exception:
+        pass
+    ventana = pygame.display.set_mode((constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA))
+    pygame.display.set_caption("Krab's Adventure")
     reloj = pygame.time.Clock()
     prefs = _load_prefs()
     slider_dragging = False
