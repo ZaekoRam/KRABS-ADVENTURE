@@ -349,6 +349,9 @@ TXT = {
 
         # Tutorial
         "tutorial_hint": "Enter para continuar • F1 para volver a ver",
+        # Créditos
+        "credits_title": "CRÉDITOS",
+        "credits_hint": "Haz clic en las burbujas • ESC para volver",
     },
     "en": {
         # HUD
@@ -395,6 +398,9 @@ TXT = {
 
         # Tutorial
         "tutorial_hint": "Press Enter to continue • F1 to view again",
+        # Credits
+        "credits_title": "CREDITS",
+        "credits_hint": "Click the bubbles • ESC to go back",
     }
 }
 
@@ -777,6 +783,24 @@ def draw_nivel(surface, font, nivel, pos=(500, 80)):
     surface.blit(shad_nivel, (nivel_x + 2, y_nivel + 2))
     surface.blit(txt_nivel, (nivel_x, y_nivel))
 
+def split_name_for_bubble(name: str, max_chars: int = 16):
+    """
+    Parte un nombre largo en varias líneas para que quepa dentro de la burbuja.
+    """
+    words = name.split()
+    lines = [""]
+    for w in words:
+        cur = lines[-1]
+        if not cur:
+            if len(w) <= max_chars:
+                lines[-1] = w
+            else:
+                lines.append(w)
+        elif len(cur) + 1 + len(w) <= max_chars:
+            lines[-1] = cur + " " + w
+        else:
+            lines.append(w)
+    return lines
 
 def draw_puntuacion(surface, font, puntuacion, pos=(400, 20)):
     sombra = (0, 0, 0)
@@ -968,6 +992,93 @@ class BotonSimple:
         texto_surf = self.font.render(self.texto, True, self.color_texto)
         texto_rect = texto_surf.get_rect(center=self.rect.center)
         surface.blit(texto_surf, texto_rect)
+
+    def clicked(self, event):
+        return (
+                event.type == pygame.MOUSEBUTTONDOWN
+                and event.button == 1
+                and self.rect.collidepoint(event.pos)
+        )
+# ---------------- Burbuja de Créditos ----------------
+class BurbujaCredito:
+    def __init__(self, nombre, font):
+        self.nombre = nombre
+        self.font = font
+
+        # dividir nombre largo para que no se corte
+        self.lineas = split_name_for_bubble(nombre, max_chars=18)
+
+        # calcular dimensiones según texto
+        text_surfs = [font.render(line, True, (255,255,255)) for line in self.lineas]
+        max_w = max(s.get_width() for s in text_surfs)
+        total_h = sum(s.get_height() for s in text_surfs) + (len(text_surfs)-1) * 4
+
+        padding_w = 70  # más ancha
+        padding_h = 100  # más alta
+
+        self.w = max_w + padding_w
+        self.h = total_h + padding_h
+
+        # Spawn horizontal, ajustado por tamaño para que jamás se salga
+        self.x = random.randint(40, constantes.ANCHO_VENTANA - self.w - 40)
+
+        # Spawn vertical: salen de la parte baja sin salirse del borde
+        self.y = random.randint(constantes.ALTO_VENTANA + 20, constantes.ALTO_VENTANA + 200)
+
+        self.speed = random.uniform(80, 100)
+        self.alive = True
+        self.respawn = random.uniform(4.0, 7.0)
+
+
+    def update(self, dt):
+        if not self.alive:
+            if self.respawn > 0:
+                self.respawn -= dt
+            return
+
+        self.y -= self.speed * dt
+        if self.y < -200:
+            self.alive = False
+            self.respawn = random.uniform(1.5, 3.0)
+
+    def hit(self, mx, my):
+        return self.alive and (self.x <= mx <= self.x+self.w and self.y <= my <= self.y+self.h)
+
+    def draw(self, ventana):
+        if not self.alive:
+            return
+
+        # --- DIBUJAR BURBUJA ---
+        surf = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
+
+        base = (130, 200, 255, 200)  # burbuja sólida
+        edge = (255, 255, 255, 255)  # borde fuerte
+        highlight = (255, 255, 255, 110)  # brillo
+
+        rect = pygame.Rect(0, 0, self.w, self.h)
+
+        # base
+        pygame.draw.ellipse(surf, base, rect)
+        # borde
+        pygame.draw.ellipse(surf, edge, rect, width=3)
+        # brillo
+        hl = pygame.Rect(self.w * 0.15, self.h * 0.15, self.w * 0.45, self.h * 0.45)
+        pygame.draw.ellipse(surf, highlight, hl)
+
+        # 1️⃣ PRIMERO dibuja la burbuja
+        ventana.blit(surf, (self.x, self.y))
+
+        # 2️⃣ AHORA SÍ dibuja el texto ENCIMA
+        total_h = len(self.lineas) * self.font.get_height() + (len(self.lineas) - 1) * 4
+        y_text = self.y + (self.h // 2 - total_h // 2)
+
+        for line in self.lineas:
+            txt = self.font.render(line, True, (255, 255, 255))
+            ventana.blit(
+                txt,
+                (self.x + self.w // 2 - txt.get_width() // 2, y_text)
+            )
+            y_text += txt.get_height() + 4
 
 
 # -------------------- TMX Level --------------------
@@ -2176,6 +2287,8 @@ ESTADO_SELECT_NIVEL = "SELECT_NIVEL"
 ESTADO_LANG_SELECT = "LANG_SELECT"
 ESTADO_INTRO_VIDEO = "INTRO_VIDEO"
 ESTADO_VICTORY_SCREEN = "VICTORY_SCREEN"
+ESTADO_CREDITOS = "CREDITOS"
+
 
 
 
@@ -2319,6 +2432,8 @@ def main():
     btn_play = None
     btn_opc = None
     btn_salir = None
+    btn_creditos = BotonSimple(tr('credits_title'), center=(1000,100), width=240, height=55)
+
     # ------------------ ASSETS UI ------------------
 
     protagonista_img = pygame.image.load("assets/images/ui/protagonista.png").convert_alpha()
@@ -2426,6 +2541,25 @@ def main():
     spawn_skip_frames = 0
 
     # Música menú
+    # === CRÉDITOS ===
+    NOMBRES_EQUIPO = [
+        "AMADOR BENITEZ JUAN",
+        "BARBA CASTILLO RICARDO JAFET",
+        "CONTRERAS GONZALEZ DARINKA MONTSERRAT",
+        "RAMIREZ BACELIS JOSE CARLO",
+        "YAÑEZ GONZÁLEZ MARCO ANTONIO",
+    ]
+
+    credit_font = get_font(constantes.FONT_UI_ITEM)
+
+    # Burbujas de fondo (decorativas)
+    credits_bg_bubbles = [Bubble(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA) for _ in range(25)]
+
+    # Burbujas con nombres
+    credits_bubbles = []
+
+    credits_bubbles = [BurbujaCredito(n, credit_font) for n in NOMBRES_EQUIPO]
+
 
     imagenes_tutorial = {}
     NIVEL0_PROMPTS_DATA = [
@@ -2537,7 +2671,7 @@ def main():
                 "img_surf": img_surface,
             }
     def _rebuild_menu_buttons(lang: str):
-        nonlocal btn_play, btn_opc, btn_salir  # ahora existen arriba
+        nonlocal btn_play, btn_opc, btn_salir  # <-- agrega btn_creditos  # ahora existen arriba
 
         img_play = _load_menu_img_variant("botonplay", lang, 360)
         img_opciones = _load_menu_img_variant("botonopciones", lang, 340)
@@ -2558,6 +2692,7 @@ def main():
             current_lang = settings["language"]
             _rebuild_menu_buttons(current_lang)
             _rebuild_tutorial_cache(current_lang)  # <<< --- AÑADE ESTA LÍNEA (recarga)
+            btn_creditos.texto = tr("credits_title")  # ← ESTA LÍNEA ES LA QUE FALTABA
         target_fps = 30 if estado == ESTADO_INTRO_VIDEO else constantes.FPS
         dt = reloj.tick(target_fps) / 1000.0
         mouse_pos = pygame.mouse.get_pos();
@@ -2661,6 +2796,8 @@ def main():
                     _rebuild_menu_buttons(current_lang)
             elif estado == ESTADO_MENU:
                 if not menu_leaving:
+                    btn_creditos.rect.center = (1000, 100)
+                    btn_creditos.update(mouse_pos)
                     btn_play.update(mouse_pos, mouse_down)
                     btn_opc.update(mouse_pos, mouse_down)
                     btn_salir.update(mouse_pos, mouse_down)
@@ -2674,6 +2811,14 @@ def main():
                     elif btn_salir.clicked(event):
                         musica.stop(300)
                         run = False
+                    elif btn_creditos.clicked(event):
+                        estado = ESTADO_CREDITOS
+                        # Música del tutorial
+                        try:
+                            musica.switch("nivel0")
+                            musica.set_master_volume(settings["volume"])
+                        except Exception as e:
+                            print("No se pudo reproducir música tutorial:", e)
 
             elif estado == ESTADO_SELECT_PERSONAJE:
                 btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
@@ -3003,6 +3148,8 @@ def main():
                 bloquea_click = False
         # -------------------- UPDATE --------------------
         if estado == ESTADO_MENU:
+
+
             btn_exit = ImageButton(btn_exit_img, center=(constantes.ANCHO_VENTANA - 1050, 40))
             menu_krab.update(dt)
             if menu_leaving and menu_krab.offscreen(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA):
@@ -3701,11 +3848,37 @@ def main():
 
                     # --- ATAQUE NORMAL: usa el rectángulo de alcance, NO requiere contacto ---
                     if atk.colliderect(e.rect):
+
+                        # --- INICIO BLOQUEO DE PAREDES (RAYCAST) ---
+                        bloqueado = False
+
+                        # Definimos el punto de inicio (Jugador) y fin (Enemigo)
+                        # Nota: Asegúrate de usar .center para que la línea salga del centro del personaje
+                        p_inicio = jugador.forma.center
+                        p_fin = e.rect.center
+
+                        # Revisamos todas las paredes del nivel
+                        for muro in nivel.collision_rects:
+                            # .clipline devuelve datos si la línea cruza el rectángulo (pared)
+                            if muro.clipline(p_inicio, p_fin):
+                                bloqueado = True
+                                break  # Encontramos una pared en medio, no hace falta seguir buscando
+
+                        # Si hay una pared, saltamos al siguiente enemigo sin hacer daño
+                        if bloqueado:
+                            continue
+                        # --- FIN BLOQUEO DE PAREDES ---
+
+                        # --- TU LÓGICA DE DAÑO ORIGINAL ---
                         if hasattr(e, "hurt"):
+                            # Asegúrate de que la variable sea la correcta (attack_damage o ataque_dano)
+                            # según como lo tengas definido en personaje.py
                             e.hurt(jugador.attack_damage)
+
                             if not jugador.hit_sound_played:
                                 musica.sfx("golpe", volume=0.9)
                                 jugador.hit_sound_played = True
+
                         if getattr(e, "vida", 1) <= 0:
                             puntuacion += e.puntos
 
@@ -3864,6 +4037,114 @@ def main():
             txt_en = get_font(constantes.FONT_HUD).render(t["english"], True, (230, 230, 230))
             ventana.blit(txt_en, (btn_en.centerx - txt_en.get_width() // 2, btn_en.centery - txt_en.get_height() // 2))
 
+        # ================================
+        #          ESTADO: CRÉDITOS
+        # ================================
+        elif estado == ESTADO_CREDITOS:
+
+            ventana.fill((5, 20, 50))
+
+            # ------------------------------
+            # Fondo decorativo (tus burbujas decorativas)
+            # ------------------------------
+            for bb in credits_bg_bubbles:
+                bb.update(dt)
+                bb.draw(ventana)
+
+            # ------------------------------
+            # INICIALIZACIÓN DEL SISTEMA
+            # ------------------------------
+            if "credit_index" not in locals():
+                credit_index = 0
+                credits_bubbles = []
+                # primera burbuja
+                credits_bubbles.append(BurbujaCredito(NOMBRES_EQUIPO[0], credit_font))
+                credit_index = 1
+
+            # ------------------------------
+            # MOVIMIENTO DE BURBUJAS
+            # ------------------------------
+            for b in credits_bubbles:
+                # velocidad hacia arriba
+                b.y -= b.speed * dt
+
+                # movimiento escorado (diagonal bonito)
+                b.x += 0.25 * dt  # ajusta si la quieres más diagonales
+
+            # ------------------------------
+            # SPAWN DE LA SIGUIENTE BURBUJA
+            # ------------------------------
+            # si la última burbuja ya llegó al 55% de la pantalla
+            # Si no hay burbujas (porque el usuario las explotó todas), crear la siguiente
+            if len(credits_bubbles) == 0:
+                if credit_index >= len(NOMBRES_EQUIPO):
+                    credit_index = 0  # reinicia si ya terminó
+                credits_bubbles.append(BurbujaCredito(NOMBRES_EQUIPO[credit_index], credit_font))
+                credit_index += 1
+            else:
+                # Ya existe al menos una, podemos tomar la última
+                last = credits_bubbles[-1]
+
+                # spawn más rápido de la siguiente burbuja
+                if last.y < constantes.ALTO_VENTANA * 0.75:
+                    if credit_index < len(NOMBRES_EQUIPO):
+                        credits_bubbles.append(
+                            BurbujaCredito(NOMBRES_EQUIPO[credit_index], credit_font)
+                        )
+                        credit_index += 1
+
+            # ------------------------------
+            # ELIMINAR BURBUJA QUE YA SE FUE
+            # ------------------------------
+            if credits_bubbles[0].y < -300:  # fuera por arriba
+                credits_bubbles.pop(0)
+
+            # ------------------------------
+            # CLICK PARA EXPLOTAR BURBUJA
+            # ------------------------------
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mx, my = event.pos
+                for b in credits_bubbles:
+                    if b.hit(mx, my):
+                        b.alive = False
+                        try:
+                            musica.sfx("bubble", volume=0.8)
+                        except:
+                            pass
+
+            # eliminar explotadas
+            credits_bubbles = [b for b in credits_bubbles if b.alive]
+
+            # ------------------------------
+            # TÍTULO
+            # ------------------------------
+            title_font = get_font(constantes.FONT_UI_TITLE)
+            title_surf = title_font.render(tr("credits_title"), True, (230, 240, 255))
+            title_rect = title_surf.get_rect(center=(constantes.ANCHO_VENTANA // 2, 80))
+            ventana.blit(title_surf, title_rect)
+
+            # ------------------------------
+            # HINT
+            # ------------------------------
+            hint_surf = credit_font.render(tr("credits_hint"), True, (210, 210, 210))
+            hint_rect = hint_surf.get_rect(center=(constantes.ANCHO_VENTANA // 2, constantes.ALTO_VENTANA - 40))
+            ventana.blit(hint_surf, hint_rect)
+
+            # ------------------------------
+            # DIBUJAR BURBUJAS
+            # ------------------------------
+            for b in credits_bubbles:
+                b.draw(ventana)
+
+            # ------------------------------
+            # SALIR
+            # ------------------------------
+            if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                musica.switch("menu")
+                estado = ESTADO_MENU
+
+
+
         elif estado == ESTADO_INTRO_VIDEO:
             ventana.fill((0, 0, 0))
             if video_intro:
@@ -3897,6 +4178,7 @@ def main():
             titulo.draw(ventana);
             btn_play.draw(ventana);
             btn_opc.draw(ventana);
+            btn_creditos.draw(ventana)
             btn_salir.draw(ventana)
             menu_krab.draw(ventana)
 
