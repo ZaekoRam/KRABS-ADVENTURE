@@ -315,6 +315,7 @@ TXT = {
         "continue": "Continuar",
 
         # Pausa
+        "hud_pause": "Pausa",  # <--- AGREGA ESTO
         "pause_title": "PAUSA",
         "pause_resume": "Continuar",
         "pause_to_menu": "Salir al menú",
@@ -360,6 +361,7 @@ TXT = {
         "continue": "Continue",
 
         # Pausa
+        "hud_pause": "Pause",  # <--- AGREGA ESTO
         "pause_title": "PAUSE",
         "pause_resume": "Resume",
         "pause_to_menu": "Exit to Menu",
@@ -2571,10 +2573,15 @@ def main():
             # SLIDER – detectar arrastre SOLO si existe
             # =====================================================
             if estado == ESTADO_OPC and nuevo_slider is not None:
-                if btn_exit.clicked(event):
+                if btn_exit and btn_exit.clicked(event):
                     print(f"[DEBUG] Botón 'Atrás' presionado en estado: {estado}")
                     estado = ESTADO_MENU
                     _save_prefs(settings)
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        estado = ESTADO_MENU
+                        _save_prefs(settings)
+
 
                 # INICIO DE ARRASTRE
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -2988,6 +2995,7 @@ def main():
                 bloquea_click = False
         # -------------------- UPDATE --------------------
         if estado == ESTADO_MENU:
+            btn_exit = ImageButton(btn_exit_img, center=(constantes.ANCHO_VENTANA - 1050, 40))
             menu_krab.update(dt)
             if menu_leaving and menu_krab.offscreen(constantes.ANCHO_VENTANA, constantes.ALTO_VENTANA):
                 musica.set_master_volume(settings["volume"])
@@ -3886,6 +3894,7 @@ def main():
 
 
         elif estado == ESTADO_OPC:
+            btn_exit.update(pygame.mouse.get_pos(), pygame.mouse.get_pressed()[0])
 
             ventana.blit(fondo_menu, (0, 0))
             # ============================================================
@@ -4053,7 +4062,8 @@ def main():
             # ============================
             # 12) BOTÓN SALIR
             # ============================
-            btn_exit.draw(ventana)
+            if btn_exit:
+                btn_exit.draw(ventana)
 
 
 
@@ -4078,7 +4088,7 @@ def main():
             if parallax is not None:
                 parallax.draw(ventana)
             nivel.draw(ventana, cam.offset())
-            btn_pause.rect.midtop = (constantes.ANCHO_VENTANA // 2 - 510, -8)
+            btn_pause.rect.midtop = (constantes.ANCHO_VENTANA // 2 - 500, -8)
 
             # --- ACTUALIZAR Y DIBUJAR BOTÓN ---
             mouse_pos = pygame.mouse.get_pos()
@@ -4086,6 +4096,22 @@ def main():
 
             btn_pause.update(mouse_pos, mouse_click)
             btn_pause.draw(ventana)
+
+            font_btn = get_font(constantes.FONT_UI_ITEM)
+            txt_pausa = font_btn.render(tr("hud_pause"), True, (255, 255, 255))
+            # 4. Posicionamos: Centro X alineado al botón, Parte superior pegada al fondo del botón
+            # Ajusta el +5 si lo quieres más abajo o más arriba
+            rect_pausa = txt_pausa.get_rect(midtop=(btn_pause.rect.centerx, btn_pause.rect.bottom - 12))
+
+            # 5. Dibujar (con una pequeña sombra negra para que se lea bien en cualquier fondo)
+            sombra_pausa = font_btn.render(tr("hud_pause"), True, (0, 0, 0))
+            # Si escalaste el texto arriba, escala también la sombra
+            ventana.blit(sombra_pausa, (rect_pausa.x + 2, rect_pausa.y + 2))
+
+            ventana.blit(txt_pausa, rect_pausa)
+
+            # 2. Renderizamos el texto usando la función tr() para el idioma
+            txt_pausa = font_btn.render(tr("hud_pause"), True, (255, 255, 255))
 
             # Offset de cámara (úsalo para TODO lo que dibujas en mundo)
             ox, oy = cam.offset()
