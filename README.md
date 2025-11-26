@@ -86,8 +86,6 @@ De esta forma, **Krab's Adventure** enseña de manera entretenida la importancia
 |-------|----------------|
 | Mover a la izquierda | ⬅️ / **A** |
 | Mover a la derecha | ➡️ / **D** |
-| Mover hacia arriba | ⬆️ / **W** |
-| Mover hacia abajo | ⬇️ / **S** |
 | Saltar | ⬆️ / **W** / **Espacio** |
 | Limpiar | **F** |
 | Pausa / Retroceder | **Esc** |
