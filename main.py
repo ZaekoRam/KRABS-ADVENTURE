@@ -352,6 +352,10 @@ TXT = {
         # Créditos
         "credits_title": "CRÉDITOS",
         "credits_hint": "Haz clic en las burbujas • ESC para volver",
+        "role_lead": "Líder de Proyecto",
+        "role_prog": "Programador Principal",
+        "role_art":  "Arte y Diseño",
+        "role_docs": "Documentación",     # <--- NUEVO
     },
     "en": {
         # HUD
@@ -401,6 +405,10 @@ TXT = {
         # Credits
         "credits_title": "CREDITS",
         "credits_hint": "Click the bubbles • ESC to go back",
+        "role_lead": "Project Lead",
+        "role_prog": "Lead Programmer",
+        "role_art":  "Art & Design",
+        "role_docs": "Documentation",     # <--- NEW
     }
 }
 
@@ -1001,34 +1009,51 @@ class BotonSimple:
         )
 # ---------------- Burbuja de Créditos ----------------
 class BurbujaCredito:
-    def __init__(self, nombre, font):
-        self.nombre = nombre
+    def __init__(self, datos, font):
+        # 🟢 CAMBIO CLAVE: Desempaquetamos la tupla (Rol, Nombre)
+        # Usamos tr() para traducir el rol automáticamente
+        self.rol = tr(datos[0])
+        self.nombre = datos[1]
+
         self.font = font
+        # Fuente para el rol (usamos una existente o cargamos la pequeña)
+        self.font_rol = get_font(constantes.FONT_UI_ITEM)
 
-        # dividir nombre largo para que no se corte
-        self.lineas = split_name_for_bubble(nombre, max_chars=18)
+        # --- LÓGICA DE TEXTO ---
+        # Dividir nombre largo (usamos solo la parte del nombre)
+        self.lineas = split_name_for_bubble(self.nombre, max_chars=18)
 
-        # calcular dimensiones según texto
-        text_surfs = [font.render(line, True, (255,255,255)) for line in self.lineas]
-        max_w = max(s.get_width() for s in text_surfs)
-        total_h = sum(s.get_height() for s in text_surfs) + (len(text_surfs)-1) * 4
+        # 1. Renderizar Rol (Dorado)
+        self.surf_rol = self.font_rol.render(self.rol, True, (255, 220, 100))
 
-        padding_w = 70  # más ancha
-        padding_h = 100  # más alta
+        # 2. Renderizar Nombres (Blanco)
+        self.text_surfs = [font.render(line, True, (255, 255, 255)) for line in self.lineas]
+
+        # --- CALCULAR DIMENSIONES ---
+        # Ancho máximo: ¿Qué es más ancho, el rol o el nombre?
+        w_nombres = max(s.get_width() for s in self.text_surfs) if self.text_surfs else 0
+        max_w = max(self.surf_rol.get_width(), w_nombres)
+
+        # Alto total: Rol + espacio + Nombres
+        h_nombres = sum(s.get_height() for s in self.text_surfs) + (len(self.text_surfs) - 1) * 4
+        total_h = self.surf_rol.get_height() + 10 + h_nombres
+
+        # Márgenes
+        padding_w = 80
+        padding_h = 110
 
         self.w = max_w + padding_w
         self.h = total_h + padding_h
 
-        # Spawn horizontal, ajustado por tamaño para que jamás se salga
+        # --- SPAWN Y MOVIMIENTO (Igual que antes) ---
+        # Posición X aleatoria dentro de pantalla
         self.x = random.randint(40, constantes.ANCHO_VENTANA - self.w - 40)
-
-        # Spawn vertical: salen de la parte baja sin salirse del borde
+        # Posición Y (Empieza abajo)
         self.y = random.randint(constantes.ALTO_VENTANA + 20, constantes.ALTO_VENTANA + 200)
 
         self.speed = random.uniform(80, 100)
         self.alive = True
         self.respawn = random.uniform(4.0, 7.0)
-
 
     def update(self, dt):
         if not self.alive:
@@ -1037,48 +1062,52 @@ class BurbujaCredito:
             return
 
         self.y -= self.speed * dt
-        if self.y < -200:
+        # Si se sale por arriba, muere
+        if self.y < -300:  # Aumenté un poco el margen de muerte
             self.alive = False
             self.respawn = random.uniform(1.5, 3.0)
 
     def hit(self, mx, my):
-        return self.alive and (self.x <= mx <= self.x+self.w and self.y <= my <= self.y+self.h)
+        # Detectar clic
+        return self.alive and (self.x <= mx <= self.x + self.w and self.y <= my <= self.y + self.h)
 
     def draw(self, ventana):
         if not self.alive:
             return
 
-        # --- DIBUJAR BURBUJA ---
+        # --- 1. DIBUJAR BURBUJA (Fondo) ---
         surf = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
-
-        base = (130, 200, 255, 200)  # burbuja sólida
-        edge = (255, 255, 255, 255)  # borde fuerte
-        highlight = (255, 255, 255, 110)  # brillo
+        base = (130, 200, 255, 200)  # Azul semi-transparente
+        edge = (255, 255, 255, 255)  # Borde blanco
+        highlight = (255, 255, 255, 110)  # Brillo
 
         rect = pygame.Rect(0, 0, self.w, self.h)
 
-        # base
         pygame.draw.ellipse(surf, base, rect)
-        # borde
         pygame.draw.ellipse(surf, edge, rect, width=3)
-        # brillo
         hl = pygame.Rect(self.w * 0.15, self.h * 0.15, self.w * 0.45, self.h * 0.45)
         pygame.draw.ellipse(surf, highlight, hl)
 
-        # 1️⃣ PRIMERO dibuja la burbuja
         ventana.blit(surf, (self.x, self.y))
 
-        # 2️⃣ AHORA SÍ dibuja el texto ENCIMA
-        total_h = len(self.lineas) * self.font.get_height() + (len(self.lineas) - 1) * 4
-        y_text = self.y + (self.h // 2 - total_h // 2)
+        # --- 2. DIBUJAR TEXTO (Contenido) ---
+        # Calculamos dónde empezar a dibujar para que quede centrado verticalmente
+        h_rol = self.surf_rol.get_height()
+        h_nombres = sum(s.get_height() for s in self.text_surfs) + (len(self.text_surfs) - 1) * 4
+        total_content_h = h_rol + 10 + h_nombres
 
-        for line in self.lineas:
-            txt = self.font.render(line, True, (255, 255, 255))
-            ventana.blit(
-                txt,
-                (self.x + self.w // 2 - txt.get_width() // 2, y_text)
-            )
-            y_text += txt.get_height() + 4
+        start_y = self.y + (self.h // 2 - total_content_h // 2)
+
+        # A) Dibujar ROL (Arriba)
+        # Centrado horizontalmente en la burbuja
+        ventana.blit(self.surf_rol, (self.x + self.w // 2 - self.surf_rol.get_width() // 2, start_y))
+
+        current_y = start_y + h_rol + 10
+
+        # B) Dibujar NOMBRE (Abajo del rol)
+        for txt in self.text_surfs:
+            ventana.blit(txt, (self.x + self.w // 2 - txt.get_width() // 2, current_y))
+            current_y += txt.get_height() + 4
 
 
 # -------------------- TMX Level --------------------
@@ -2543,11 +2572,20 @@ def main():
     # Música menú
     # === CRÉDITOS ===
     NOMBRES_EQUIPO = [
-        "AMADOR BENITEZ JUAN",
-        "BARBA CASTILLO RICARDO JAFET",
-        "CONTRERAS GONZALEZ DARINKA MONTSERRAT",
-        "RAMIREZ BACELIS JOSE CARLO",
-        "YAÑEZ GONZÁLEZ MARCO ANTONIO",
+        # Líder de Proyecto -> Carlo
+        ("role_lead", "RAMIREZ BACELIS JOSE CARLO"),
+
+        # Programador Principal -> Marco
+        ("role_prog", "YAÑEZ GONZÁLEZ MARCO ANTONIO"),
+
+        # Arte y Diseño -> Darinka
+        ("role_art", "CONTRERAS GONZALEZ DARINKA MONTSERRAT"),
+
+        # Documentación -> Amador
+        ("role_docs", "AMADOR BENITEZ JUAN"),
+
+        # Documentación -> Ricardo
+        ("role_docs", "BARBA CASTILLO RICARDO JAFET"),
     ]
 
     credit_font = get_font(constantes.FONT_UI_ITEM)
@@ -2685,7 +2723,9 @@ def main():
     _rebuild_menu_buttons(current_lang)
     _rebuild_tutorial_cache(current_lang)  # <<< --- AÑADE ESTA LÍNEA (carga inicial)
     bloquea_click = False
-
+    # === AGREGA ESTO ANTES DEL WHILE RUN ===
+    credits_bubbles = []
+    credit_index = 0
     # --------- Game Loop ---------
     while run:
         if settings["language"] != current_lang:
@@ -2813,6 +2853,15 @@ def main():
                         run = False
                     elif btn_creditos.clicked(event):
                         estado = ESTADO_CREDITOS
+                        credits_bubbles = []  # Borra las burbujas de texto viejas
+                        credit_index = 0  # Reinicia el contador de nombres
+
+                        #(Opcional) Si quieres reiniciar también las de fondo:
+
+                        # Truco: Crear la primera burbuja inmediatamente para que no tarde en salir
+                        if len(NOMBRES_EQUIPO) > 0:
+                            credits_bubbles.append(BurbujaCredito(NOMBRES_EQUIPO[0], credit_font))
+                            credit_index = 1
                         # Música del tutorial
                         try:
                             musica.switch("nivel0")
@@ -4115,13 +4164,15 @@ def main():
             # eliminar explotadas
             credits_bubbles = [b for b in credits_bubbles if b.alive]
 
+
+
+
+
             # ------------------------------
-            # TÍTULO
+            # DIBUJAR BURBUJAS
             # ------------------------------
-            title_font = get_font(constantes.FONT_UI_TITLE)
-            title_surf = title_font.render(tr("credits_title"), True, (230, 240, 255))
-            title_rect = title_surf.get_rect(center=(constantes.ANCHO_VENTANA // 2, 80))
-            ventana.blit(title_surf, title_rect)
+            for b in credits_bubbles:
+                b.draw(ventana)
 
             # ------------------------------
             # HINT
@@ -4129,12 +4180,13 @@ def main():
             hint_surf = credit_font.render(tr("credits_hint"), True, (210, 210, 210))
             hint_rect = hint_surf.get_rect(center=(constantes.ANCHO_VENTANA // 2, constantes.ALTO_VENTANA - 40))
             ventana.blit(hint_surf, hint_rect)
-
             # ------------------------------
-            # DIBUJAR BURBUJAS
+            # TÍTULO
             # ------------------------------
-            for b in credits_bubbles:
-                b.draw(ventana)
+            title_font = get_font(constantes.FONT_UI_TITLE)
+            title_surf = title_font.render(tr("credits_title"), True, (230, 240, 255))
+            title_rect = title_surf.get_rect(center=(constantes.ANCHO_VENTANA // 2, 80))
+            ventana.blit(title_surf, title_rect)
 
             # ------------------------------
             # SALIR
