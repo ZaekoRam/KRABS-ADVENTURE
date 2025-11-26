@@ -2,9 +2,14 @@
 
 ![Image](https://github.com/ZaekoRam/KRABS-ADVENTURE/blob/main/assets/krabsadventuretitulo.gif)
 
-[![ODS 14](https://img.shields.io/badge/ODS-14%20Vida%20Submarina-007FFF?style=for-the-badge&logo=un&logoColor=white)](https://www.un.org/sustainabledevelopment/es/oceans/)
-[![Género](https://img.shields.io/badge/G%C3%A9nero-Plataformas%202D-green?style=for-the-badge)](https://en.wikipedia.org/wiki/Platform_game)
-[![Público](https://img.shields.io/badge/P%C3%BAblico-7%20a%2011%20a%C3%B1os-orange?style=for-the-badge)](https://es.wikipedia.org/wiki/Edutainment)
+[![ODS 14](https://img.shields.io/badge/ODS-14%20Vida%20Submarina-1b6fd1?style=for-the-badge)](https://www.un.org/sustainabledevelopment/es/oceans/)
+![Género](https://img.shields.io/badge/Género-Plataformas%202D-3e8e41?style=for-the-badge)
+![Público](https://img.shields.io/badge/Público-7%20a%2011%20años-d97b32?style=for-the-badge)
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-445f88?style=for-the-badge&logo=python&logoColor=white)
+![Pygame](https://img.shields.io/badge/Hecho%20con-Pygame-445f88?style=for-the-badge)
+![Estado](https://img.shields.io/badge/Estado-Finalizado-4CAF50?style=for-the-badge)
+
 
 <table>
   <thead>
@@ -27,6 +32,35 @@
 </div>
 
 ---
+##  Tráiler Oficial
+
+### Español
+
+<p align="center">
+  Haz clic en la imagen para ver el tráiler oficial en español de <b>Krab's Adventure</b>:
+  <br><br>
+  <a href="https://youtu.be/NWqWHkYKi-w" target="_blank">
+    <img src="https://img.youtube.com/vi/NWqWHkYKi-w/maxresdefault.jpg"
+         alt="Krab's Adventure Trailer Español"
+         width="700">
+  </a>
+</p>
+
+---
+
+### English
+
+<p align="center">
+  Click on the image to watch the official English trailer of <b>Krab's Adventure</b>:
+  <br><br>
+  <a href="https://www.youtube.com/watch?v=z5-huT90EZU" target="_blank">
+    <img src="https://img.youtube.com/vi/z5-huT90EZU/maxresdefault.jpg"
+         alt="Krab's Adventure Trailer English"
+         width="700">
+  </a>
+</p>
+
+---
 
 ## Descripción General del Proyecto
 
@@ -45,6 +79,21 @@ Acompaña a **Krabby**, un simpático cangrejo aventurero, o a su compañera **K
 * **Recoger la basura** para asegurar su correcto reciclaje, ganando 1 vida despues de recolectar tres basuras.
 
 De esta forma, **Krab's Adventure** enseña de manera entretenida la importancia del reciclaje y la conservación, fomentando hábitos de cuidado ecológico desde una edad clave.
+
+##  Controles del Juego
+
+| Acción | Tecla / Botón |
+|-------|----------------|
+| Mover a la izquierda | ⬅️ / **A** |
+| Mover a la derecha | ➡️ / **D** |
+| Mover hacia arriba | ⬆️ / **W** |
+| Mover hacia abajo | ⬇️ / **S** |
+| Saltar | ⬆️ / **W** / **Espacio** |
+| Limpiar | **F** |
+| Pausa / Retroceder | **Esc** |
+
+> Nota: El jugador puede usar tanto las **flechas** como **WASD** para desplazarse libremente.
+
 
 ---
 
@@ -118,12 +167,12 @@ El juego se compone de **3 Mundos principales**, cada uno con desafíos únicos 
     <tr>
       <td><b>Nivel 3</b></td>
       <td>La Bahía Limpia (Final)</td>
-      <td>El gran desafío. El jugador debe usar todo lo aprendido para limpiar completamente la bahía y enfrentarse al 'Monstruo de Basura' final.</td>
+      <td>El gran desafío. El jugador debe usar todo lo aprendido para limpiar completamente la bahía y enfrentarse a los Monstruos de Basura finales.</td>
       <td><img width="100" height="120" alt="Image" src="https://github.com/user-attachments/assets/b5ee2bc4-ba7e-4576-845b-2988a48934c7" /></td>
     </tr>
   </tbody>
 </table>
----
+
 
 ## Objetivos Fundamentales del Proyecto
 
@@ -206,7 +255,7 @@ El jugador podrá visualizar cuántas vidas tiene completas y dañadas:
       <td align="center" style="background-color: white; padding: 10px; border-radius: 5px;"><img width="50" height="50" alt="Image" src="https://github.com/user-attachments/assets/0252224a-9903-4fd2-a623-b3773cafa832" /></td>
       <td align="center" style="background-color: white; padding: 10px; border-radius: 5px;"><img width="50" height="50" alt="Image" src="https://github.com/user-attachments/assets/b5074d1b-9b4c-4327-8d82-410ebe544dc5" />
 </td>
-      <td><b>¡NUEVO!</b> Al recolectar <b>3 unidades de basura</b>, el jugador <b>recupera una vida (Krabbylife)</b>, reforzando el mensaje de que la limpieza trae recompensas.</td>
+      <td><b>¡Ojo!</b> Al recolectar <b>3 unidades de basura</b>, el jugador <b>recupera una vida (Krabbylife)</b>, reforzando el mensaje de que la limpieza trae recompensas.</td>
     </tr>
   </tbody>
 </table>
@@ -253,14 +302,105 @@ El jugador completa la misión al llegar a la bandera de reciclaje.
 
 **¡Observa la acción en este ciclo de juego completo!**
 
-* **Movimiento y Exploración:** ![Image](https://github.com/user-attachments/assets/76a41e22-4995-4949-a446-5eca7500531e)
-* **Impacto y Reacción (Hacer/Recibir Daño):** ![Image](https://github.com/user-attachments/assets/b27a9ef0-5563-4c05-a262-6c4e409ed002)
-* **Recuperación de Vida al Reciclar:** ![Image](https://github.com/user-attachments/assets/4487b322-3a75-470c-bdd9-80abb02d600d)
-* **Hacia la Meta:** ![Image](https://github.com/user-attachments/assets/650cda0e-90f8-46bb-ac3d-91bb3cb963ed)
+* **Movimiento y Exploración:** ![Image](https://github.com/user-attachments/assets/db83cbb1-058a-4e44-8117-6b87369a6255)
+* **Impacto y Reacción (Hacer/Recibir Daño):** ![Image](https://github.com/user-attachments/assets/834ce64a-d245-49e3-ba7a-6fda4584f299)
+* **Recuperación de Vida al Reciclar:** ![Image](https://github.com/user-attachments/assets/f4e46101-3a8a-4697-acd5-e75b2d5255d0)
+* **Hacia la Meta:** ![Image](https://github.com/user-attachments/assets/fe628229-06c3-4517-8f52-131722b7da69)
+---
+```
+## 📁 Estructura del proyecto
+
+KRABS-ADVENTURE/
+│
+├── assets/                                 # Recursos del juego (imágenes, música, efectos, fuentes)
+│   ├── audio/
+│   │   ├── musica/                         # Música de fondo por nivel
+│   │   └── sfx/                            # Efectos de sonido
+│   │       ├── menu.ogg
+│   │       ├── nivel0.ogg
+│   │       ├── nivel1.ogg
+│   │       ├── nivel2.ogg
+│   │       └── nivel3.ogg
+│   │
+│   ├── fonts/
+│   │   └── PressStart2P.ttf                # Fuente retro estilo pixel
+│   │
+│   ├── images/                             # Gráficos del juego
+│   │   ├── characters/                     # Personajes jugables: Krabby y Karol
+│   │   ├── EN/                             # Imágenes del menú en Inglés
+│   │   ├── ES/                             # Imágenes del menú en Español
+│   │   ├── enemigos/                       # Sprites de enemigos/contaminantes
+│   │   ├── items/                          # Basura recolectable / objetos interactivos
+│   │   ├── menu_titulo/
+│   │   ├── menufondo/
+│   │   ├── nivelfondo/
+│   │   ├── parallax/
+│   │   ├── props/
+│   │   ├── tutorial/
+│   │   ├── ui/
+│   │   └── vidas/
+│
+├── maps/                                   # Mapas / niveles del juego
+├── video/                                  # Videos / cinemáticas
+│
+├── camara.py                               # Sistema de cámara
+├── constantes.py                           # Configuraciones globales
+├── enemigos.py                             # Enemigos y peligros
+├── fuentes.py                              # Manejo de tipografías
+├── items.py                                # Lógica de objetos recolectables
+├── main.py                                 # Punto de entrada del juego
+├── musica.py                               # Manejo de música y sonidos
+├── parallax.py                             # Sistema de scroll parallax
+├── personaje.py                            # Clase del jugador
+│
+├── settings.json                           # Configuración persistente (idioma, volumen, etc.)
+├── video_intro.py                          # Reproducción del video de introducción
+│
+└── README.md                               # Documentación del proyecto
+
+```
 
 ---
 
-## 🛠️ Herramientas de Desarrollo
+
+##  **Instalación y ejecución**
+
+1. **Clona este repositorio:**
+```bash
+git clone https://github.com/ZaekoRam/KRABS-ADVENTURE.git
+cd KRABS-ADVENTURE
+```
+
+2. **(Opcional pero recomendado) Crea un entorno virtual para evitar conflictos con otras dependencias:**
+
+- En Windows:
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
+
+- En macOS / Linux:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+3. **Instala las dependencias:**
+```bash
+pip install pygame pytmx ffpyplayer moviepy
+```
+
+4. **Ejecuta el juego:**
+```bash
+python main.py
+```
+
+
+
+---
+
+
+##  Herramientas de Desarrollo
 
 Este proyecto fue desarrollado utilizando las siguientes tecnologías y herramientas para la creación del juego y sus activos:
 
@@ -331,6 +471,64 @@ Un proyecto de esta magnitud es el resultado del esfuerzo colaborativo. Estos so
     </tr>
   </tbody>
 </table>
+
+---
+## Requisitos del sistema
+
+Antes de ejecutar el juego, asegúrate de cumplir con los siguientes requisitos mínimos:
+
+- **Sistema operativo:** Windows 10 / Windows 11 / macOS / Linux  
+- **Versión de Python:** 3.10 o superior  
+- **Bibliotecas necesarias:**  
+  - pygame  
+  - pytmx  
+  - ffpyplayer  
+  - moviepy  
+- **Memoria RAM recomendada:** 4 GB o más  
+- **Espacio en disco:** Al menos 300 MB libres  
+- **Resolución mínima:** 1024×768  
+
+> Nota: Para un mejor rendimiento, se recomienda cerrar otras aplicaciones en segundo plano.
+
+---
+##  Tecnologías utilizadas
+
+El desarrollo de **Krab's Adventure** se basó en herramientas modernas, accesibles y pensadas para crear experiencias 2D fluidas y atractivas. Cada tecnología fue elegida con el objetivo de lograr un rendimiento óptimo y una estética coherente con el estilo pixel-art del proyecto.
+
+###  Lenguaje de programación: Python  
+Utilizado para implementar la lógica del juego, manejo de estados, interacción entre objetos, eventos y comportamiento de los personajes.
+
+###  Motor / Librería principal: Pygame  
+Librería clave para la renderización de sprites, reproducción de sonido, animaciones cuadro por cuadro, gestión de colisiones y creación del entorno visual.
+
+###  Diseño visual y sprites: Aseprite  
+Herramienta empleada para diseñar y animar a Krabby, Karol, enemigos, elementos del océano y objetos recolectables con un estilo retro y colorido.
+
+###  Edición de música y sonidos: Audacity  
+Usada para limpiar, ajustar y mezclar efectos de sonido y pistas musicales utilizadas en menús, niveles y escenas del juego.
+
+###  Control de versiones: GitHub  
+Plataforma utilizada para la gestión del proyecto, control de cambios, trabajo en equipo y documentación del videojuego.
+
+Estas herramientas hicieron posible crear un videojuego educativo que combina entretenimiento, aprendizaje y conciencia ecológica.
+
+---
+
+##  Créditos y agradecimientos
+
+- Proyecto inspirado en el **Objetivo de Desarrollo Sostenible 14 (Vida Submarina)** y en la importancia de proteger los ecosistemas marinos.  
+- La música y varios efectos de sonido fueron trabajados y editados para adaptarse al estilo del juego.  
+- Todas las animaciones, personajes y recursos visuales fueron creados especialmente para este proyecto en **Aseprite**.  
+- Agradecimiento especial a nuestros profesores y compañeros por sus comentarios, ideas y apoyo durante el desarrollo del videojuego.  
+- Gracias a todas las personas que probaron las primeras versiones del juego y ayudaron a mejorar la experiencia final.
+
+---
+
+##  Licencia
+
+Este proyecto está distribuido bajo la licencia **MIT**.
+
+Esto significa que eres libre de utilizar, estudiar, modificar y compartir el código del juego, siempre que se incluya el crédito correspondiente a los autores originales.
 
 ---
 
