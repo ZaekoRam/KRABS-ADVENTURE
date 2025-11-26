@@ -385,7 +385,7 @@ source venv/bin/activate
 
 3. **Instala las dependencias:**
 ```bash
-pip install pygame pytmx ffpyplayer moviepy
+pip install -r requirements.txt
 ```
 
 4. **Ejecuta el juego:**
