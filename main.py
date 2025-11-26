@@ -2608,8 +2608,8 @@ def main():
             "img_y_offset": -50,
             "world_x": 400,  # <-- La clave que faltaba
             "world_y": 800,
-            "range_pre": 800,  # <-- La clave que faltaba
-            "range_post": 800,  # <-- La clave que faltaba
+            "range_pre": 850,  # <-- La clave que faltaba
+            "range_post": 850,  # <-- La clave que faltaba
         },
         {
             "id": "jump",
@@ -2618,8 +2618,8 @@ def main():
             "img_y_offset": -50,
             "world_x": 1390,  # <-- La clave que faltaba
             "world_y": 800,
-            "range_pre": 750,  # <-- La clave que faltaba
-            "range_post": 750,  # <-- La clave que faltaba
+            "range_pre": 850,  # <-- La clave que faltaba
+            "range_post": 850,  # <-- La clave que faltaba
         },
         {
             "id": "attack",
@@ -2628,8 +2628,8 @@ def main():
             "img_y_offset": -50,
             "world_x": 3430,  # <-- La clave que faltaba
             "world_y": 800,
-            "range_pre": 750,  # <-- La clave que faltaba
-            "range_post": 750,  # <-- La clave que faltaba
+            "range_pre": 850,  # <-- La clave que faltaba
+            "range_post": 850,  # <-- La clave que faltaba
         },
         {
             "id": "trash",
@@ -2638,8 +2638,8 @@ def main():
             "img_y_offset": -50,
             "world_x": 2443,  # <-- La clave que faltaba
             "world_y": 680,
-            "range_pre": 750,  # <-- La clave que faltaba
-            "range_post": 750,  # <-- La clave que faltaba
+            "range_pre": 850,  # <-- La clave que faltaba
+            "range_post": 850,  # <-- La clave que faltaba
         }
     ]
 
@@ -2767,8 +2767,10 @@ def main():
 
 
                 # INICIO DE ARRASTRE
+                hitbox_slider = nuevo_slider.inflate(0, 40)  # ← agranda 40px verticalmente
+
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if nuevo_slider.collidepoint(mouse_pos):
+                    if hitbox_slider.collidepoint(mouse_pos):
                         drag_volume = True
 
                 # FIN DE ARRASTRE
@@ -3003,7 +3005,7 @@ def main():
                 if btn_pause.clicked(event):
                     print("PAUSA ACTIVADA")  # Para verificar
                     estado = ESTADO_PAUSA
-                    musica.set_master_volume(settings["volume"] * 0.5)
+                    musica.set_master_volume(settings["volume"] * 0.3)
 
                 # ---------------- KEYDOWN ----------------
                 if event.type == pygame.KEYDOWN:
@@ -3074,14 +3076,14 @@ def main():
                         # pausa
                         if event.key == pygame.K_ESCAPE:
                             estado = ESTADO_PAUSA
-                            musica.set_master_volume(settings["volume"] * 0.5)
+                            musica.set_master_volume(settings["volume"] * 0.3)
 
                 # ---------------- KEYUP ----------------
                 elif event.type == pygame.KEYUP:
                     if btn_pause.clicked(event):
                         print("PAUSA ACTIVADA")  # Para verificar
                         estado = ESTADO_PAUSA
-                        musica.set_master_volume(settings["volume"] * 0.5)
+                        musica.set_master_volume(settings["volume"] * 0.3)
                     if event.key in (pygame.K_a, pygame.K_LEFT):
                         mover_izquierda = False
                     if event.key in (pygame.K_d, pygame.K_RIGHT):
