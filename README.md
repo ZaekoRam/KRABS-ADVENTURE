@@ -460,7 +460,7 @@ Un proyecto de esta magnitud es el resultado del esfuerzo colaborativo. Estos so
       <td><b>Pixel Artist/Artista Visual</b></td>
     </tr>
     <tr>
-      <td><b>AMADOR BENITZ JUAN </b></td>
+      <td><b>AMADOR BENITEZ JUAN </b></td>
       <td><b>Technical Writer/Documentación readme </b></td>
     </tr>
     <tr>
