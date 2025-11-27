@@ -435,40 +435,77 @@ Este proyecto fue desarrollado utilizando las siguientes tecnologías y herramie
 
 ---
 
-## Equipo de Desarrollo (Los Limpiadores Ecológicos)
+## 👥 Equipo de Desarrollo (Los Limpiadores Ecológicos)
 
-Un proyecto de esta magnitud es el resultado del esfuerzo colaborativo. Estos son los roles clave que hicieron posible **Krab's Adventure**:
+Un proyecto de esta magnitud es el resultado del esfuerzo colaborativo.  
+Estos son los roles clave que hicieron posible **Krab's Adventure**:
 
 <table>
   <thead>
     <tr>
-      <th style="background-color: #007FFF; color: white; text-align: center;">Integrante</th>
-      <th style="background-color: #007FFF; color: white; text-align: center;">Rol Principal</th>
+      <th style="background-color: #005FCC; color: white; text-align: center;">Integrante</th>
+      <th style="background-color: #005FCC; color: white; text-align: center;">Rol Principal</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td><b>RAMIREZ BACELIS JOSE CARLO </b></td>
-      <td><b>Lead Programmer/Líder de Programación</b></td>
+      <td><b>RAMIREZ BACELIS JOSE CARLO</b></td>
+      <td><b>Lead Programmer / Líder de Programación</b></td>
     </tr>
     <tr>
       <td><b>YAÑEZ GONZÁLEZ MARCO ANTONIO</b></td>
-      <td><b>Game Designer/Diseñador de Juego y Niveles</b></td>
+      <td><b>Game Designer / Diseñador de Juego y Niveles</b></td>
     </tr>
     <tr>
       <td><b>CONTRERAS GONZALEZ DARINKA MONTSERRAT</b></td>
-      <td><b>Pixel Artist/Artista Visual</b></td>
+      <td><b>Pixel Artist / Artista Visual</b></td>
     </tr>
     <tr>
-      <td><b>AMADOR BENITEZ JUAN </b></td>
-      <td><b>Technical Writer/Documentación readme </b></td>
+      <td><b>AMADOR BENITEZ JUAN</b></td>
+      <td><b>Technical Writer / Documentación</b></td>
     </tr>
     <tr>
-      <td><b>BARBA CASTILLO RICARDO JAFET </b></td>
-      <td><b>Technical Writer/Documentación readme </b></td>
+      <td><b>BARBA CASTILLO RICARDO JAFET</b></td>
+      <td><b>Technical Writer / Documentación</b></td>
     </tr>
   </tbody>
 </table>
+
+<br>
+
+## 🌐 Perfiles Oficiales de GitHub
+
+<table>
+  <thead>
+    <tr>
+      <th style="background-color: #005FCC; color: white; text-align: center;">Integrante</th>
+      <th style="background-color: #005FCC; color: white; text-align: center;">GitHub</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>RAMIREZ BACELIS JOSE CARLO</b></td>
+      <td><a href="https://github.com/ZaekoRam" target="_blank">@ZaekoRam</a></td>
+    </tr>
+    <tr>
+      <td><b>YAÑEZ GONZÁLEZ MARCO ANTONIO</b></td>
+      <td><a href="https://github.com/Cake-marco" target="_blank">@Cake-marco</a></td>
+    </tr>
+    <tr>
+      <td><b>CONTRERAS GONZALEZ DARINKA MONTSERRAT</b></td>
+      <td><a href="https://github.com/darimonc" target="_blank">@darimonc</a></td>
+    </tr>
+    <tr>
+      <td><b>AMADOR BENITEZ JUAN</b></td>
+      <td><a href="https://github.com/Juan-2306" target="_blank">@Juan-2306</a></td>
+    </tr>
+    <tr>
+      <td><b>BARBA CASTILLO RICARDO JAFET</b></td>
+      <td><a href="https://github.com/ricardo1532" target="_blank">@ricardo1532</a></td>
+    </tr>
+  </tbody>
+</table>
+
 
 ---
 ## Requisitos del sistema
