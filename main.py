@@ -4069,7 +4069,13 @@ def main():
 
         # --- DRAW ---
         if estado == ESTADO_LANG_SELECT:
-            ventana.fill((10, 10, 14))
+            bg_idioma = pygame.image.load(IMG_DIR / "menufondo" / "fondomenu.jpeg").convert()
+            FONDO_IDIOMA_SURF = escalar_a_ventana(bg_idioma)
+            # Cargamos Imagen o Fondo, segun sea el caso
+            if FONDO_IDIOMA_SURF:
+                ventana.blit(FONDO_IDIOMA_SURF, (0,0))
+            else:
+                ventana.fill((40, 40, 80))
             # Título (usa un fallback si language aún es None)
             lang_ui = "es"
             t = I18N[lang_ui]
