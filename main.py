@@ -2360,7 +2360,7 @@ def main():
     img_en = pygame.image.load("assets/images/ui/btn_en.png").convert_alpha()
 
     # ESCALAR BOTONES (CAMBIA 4.0 SI LOS QUIERES MÁS GRANDES O MÁS CHICOS)
-    scale_factor = 6.0
+    scale_factor = 2.5
 
     def escalar(img):
         new_w = int(img.get_width() * scale_factor)
@@ -2449,11 +2449,65 @@ def main():
     btn_opc = None
     btn_salir = None
     btn_creditos = BotonSimple(tr('credits_title'), center=(1000,100), width=240, height=55)
+    # --- Botones de la pantalla de victoria ---
+    btn_v_menu = BotonSimple(
+        texto="Menú",
+        center=(constantes.ANCHO_VENTANA // 2 - 150,
+                constantes.ALTO_VENTANA // 2 + 50),
+        width=280,
+        height=70
+    )
+
+    btn_v_next = BotonSimple(
+        texto="Siguiente",
+        center=(constantes.ANCHO_VENTANA // 2 + 150,
+                constantes.ALTO_VENTANA // 2 + 50),
+        width=280,
+        height=70
+    )
 
     # ------------------ ASSETS UI ------------------
 
     protagonista_img = pygame.image.load("assets/images/ui/protagonista.png").convert_alpha()
     protagonista_img = pygame.transform.scale(protagonista_img, (330, 330))
+    # ===============================
+    #   TÍTULOS SEGÚN IDIOMA
+    # ===============================
+    # ===============================
+    #   TÍTULOS SEGÚN IDIOMA (ESCALADOS)
+    # ===============================
+
+    def scale(img, w):
+        h = int(img.get_height() * (w / img.get_width()))
+        return pygame.transform.scale(img, (w, h))
+
+    # Cargar imágenes crudas
+    _raw_title_imgs = {
+        "es": {
+            "opciones": pygame.image.load("assets/images/ui/titles/opciones_es.png").convert_alpha(),
+            "volumen": pygame.image.load("assets/images/ui/titles/volumen_es.png").convert_alpha(),
+            "idioma": pygame.image.load("assets/images/ui/titles/idioma_es.png").convert_alpha(),
+        },
+        "en": {
+            "opciones": pygame.image.load("assets/images/ui/titles/opciones_en.png").convert_alpha(),
+            "volumen": pygame.image.load("assets/images/ui/titles/volumen_en.png").convert_alpha(),
+            "idioma": pygame.image.load("assets/images/ui/titles/idioma_en.png").convert_alpha(),
+        }
+    }
+
+    # Escalar a tamaños uniformes
+    title_imgs = {
+        "es": {
+            "opciones": scale(_raw_title_imgs["es"]["opciones"], 350),
+            "volumen": scale(_raw_title_imgs["es"]["volumen"], 250),
+            "idioma": scale(_raw_title_imgs["es"]["idioma"], 350),
+        },
+        "en": {
+            "opciones": scale(_raw_title_imgs["en"]["opciones"], 350),
+            "volumen": scale(_raw_title_imgs["en"]["volumen"], 250),
+            "idioma": scale(_raw_title_imgs["en"]["idioma"], 350),
+        }
+    }
 
     flag_mx = pygame.image.load("assets/images/ui/flag_mx.png").convert_alpha()
     flag_us = pygame.image.load("assets/images/ui/flag_us.png").convert_alpha()
@@ -4256,118 +4310,75 @@ def main():
 
             t = I18N[lang]
 
+            # (IMPORTANTE) Seleccionar las imágenes del idioma actual
+            title_opc_img = title_imgs[lang]["opciones"]
+            title_vol_img = title_imgs[lang]["volumen"]
+            title_idioma_img = title_imgs[lang]["idioma"]
             # ============================
 
             # 2) TÍTULO: SOLO “OPCIONES”
 
             # ============================
 
-            titulo_rect = pygame.Rect(0, 0, 320, 60)
-
-            titulo_rect.center = (constantes.ANCHO_VENTANA // 2, 80)
-
-            pygame.draw.rect(ventana, (20, 40, 90), titulo_rect, border_radius=12)
-
-            pygame.draw.rect(ventana, (255, 255, 255), titulo_rect, width=3, border_radius=12)
-
-            texto_titulo = get_font(constantes.FONT_SUBTITLE).render(t["options_title"], True, (255, 255, 255))
-
-            ventana.blit(
-
-                texto_titulo,
-
-                (titulo_rect.centerx - texto_titulo.get_width() // 2,
-
-                 titulo_rect.centery - texto_titulo.get_height() // 2)
-
-            )
+            # ============================
+            # 2) TÍTULO OPCIONES (IMAGEN)
+            # ============================
+            opc_rect = title_opc_img.get_rect()
+            opc_rect.center = (constantes.ANCHO_VENTANA // 2, 60)
+            ventana.blit(title_opc_img, opc_rect)
 
             # ============================
-
             # 3) SLIDER DE VOLUMEN
-
             # ============================
 
+            # Crear el rect del slider
             nuevo_slider = slider_bar_rect.copy()
-
             nuevo_slider.width = 350
-
             nuevo_slider.centerx = constantes.ANCHO_VENTANA // 2
-
             nuevo_slider.y = 190
 
-            vol_label = get_font(constantes.FONT_HUD).render(t["volume"], True, (255, 255, 255))
+            # =====================================
+            #   TÍTULO DE VOLUMEN (IMAGEN)
+            # =====================================
+            vol_rect = title_vol_img.get_rect()
+            vol_rect.center = (nuevo_slider.centerx + 15, nuevo_slider.y - 40)
+            ventana.blit(title_vol_img, vol_rect)
 
-            # PANEL DE FONDO DEL SLIDER
-
-            panel_vol = vol_label.get_rect()
-
-            panel_vol.inflate_ip(30, 20)
-
-            panel_vol.center = (nuevo_slider.centerx, nuevo_slider.y - 40)
-
-            pygame.draw.rect(ventana, (15, 30, 70), panel_vol, border_radius=12)
-
-            pygame.draw.rect(ventana, (255, 255, 255), panel_vol, width=3, border_radius=12)
-
-            ventana.blit(
-
-                vol_label,
-
-                (panel_vol.centerx - vol_label.get_width() // 2,
-
-                 panel_vol.centery - vol_label.get_height() // 2)
-
-            )
-
+            # =====================================
+            #   BARRA DE SLIDER (fondo)
+            # =====================================
             pygame.draw.rect(ventana, (150, 200, 255), nuevo_slider, border_radius=8)
 
+            # =====================================
+            #   PROGRESO DEL VOLUMEN
+            # =====================================
             progress_rect = nuevo_slider.copy()
-
             progress_rect.width = int(settings["volume"] * nuevo_slider.width)
-
             pygame.draw.rect(ventana, (100, 130, 255), progress_rect, border_radius=8)
 
+            # =====================================
+            #   MANIJA DEL SLIDER
+            # =====================================
             hx = nuevo_slider.x + int(settings["volume"] * nuevo_slider.width)
-
             hy = nuevo_slider.centery
-
             pygame.draw.circle(ventana, (255, 255, 255), (hx, hy), 12)
 
-            # SLIDER (arrastre real y suave)
-
+            # =====================================
+            #   ARRASTRE DEL SLIDER
+            # =====================================
             if drag_volume:
                 rel_x = mouse_pos[0] - nuevo_slider.x
-
                 nuevo_volumen = rel_x / nuevo_slider.width
-
                 nuevo_volumen = max(0, min(1, nuevo_volumen))
-
                 settings["volume"] = nuevo_volumen
-
                 pygame.mixer.music.set_volume(nuevo_volumen)
 
             # ================================
-
-            # 4) PANEL “Selecciona tu idioma”
-
+            # 4) TÍTULO “Selecciona tu idioma” (IMAGEN)
             # ================================
-
-            panel_idioma = pygame.Rect(0, 0, 420, 60)
-
-            panel_idioma.center = (constantes.ANCHO_VENTANA // 2, 260)
-
-            texto_sel = get_font(constantes.FONT_HUD).render(t["select_lang"], True, (255, 255, 255))
-
-            ventana.blit(
-
-                texto_sel,
-
-                (panel_idioma.centerx - texto_sel.get_width() // 2,
-
-                 panel_idioma.centery - texto_sel.get_height() // 2)
-
-            )
+            id_rect = title_idioma_img.get_rect()
+            id_rect.center = (constantes.ANCHO_VENTANA // 2, 260 - 20)
+            ventana.blit(title_idioma_img, id_rect)
 
             # ============================
 
