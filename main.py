@@ -2360,7 +2360,7 @@ def main():
     img_en = pygame.image.load("assets/images/ui/btn_en.png").convert_alpha()
 
     # ESCALAR BOTONES (CAMBIA 4.0 SI LOS QUIERES MÁS GRANDES O MÁS CHICOS)
-    scale_factor = 6.0
+    scale_factor = 2.5
 
     def escalar(img):
         new_w = int(img.get_width() * scale_factor)
